@@ -15,8 +15,11 @@ export default function MainLayout() {
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
       <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <span className="font-display text-xl font-extrabold tracking-tight text-primary">
-            Daico
+          <span className="flex items-center gap-2">
+            <img src="/mark.png" alt="" className="h-7 w-7" />
+            <span className="font-display text-xl font-extrabold tracking-tight text-primary">
+              Daico
+            </span>
           </span>
           <button
             onClick={signOut}
