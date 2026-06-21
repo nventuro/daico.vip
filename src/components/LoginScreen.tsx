@@ -9,6 +9,11 @@ export default function LoginScreen() {
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
+          <img
+            src="/logo.png"
+            alt="Daico"
+            className="mx-auto mb-4 h-28 w-28"
+          />
           <h1 className="mb-2 font-display text-5xl font-extrabold tracking-tight text-primary">
             Daico
           </h1>
