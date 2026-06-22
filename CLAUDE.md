@@ -23,9 +23,13 @@ All data is sensitive and strictly access-gated.
   (sees nothing, can write nothing) and gets the "Sin acceso" screen. The client
   detects membership by reading `members` (members see rows, non-members see none),
   not via an RPC.
-- **Every new table must enable RLS and add a `private.is_member()` policy in the
-  same migration.** A table without a policy is inaccessible, but never rely on
-  that — be explicit.
+- **Every new table must, in the same migration: (1) enable RLS, (2) add a
+  `private.is_member()` policy, AND (3) `grant` the needed privileges to
+  `authenticated`** (e.g. `grant select, insert, update, delete on public.<table>
+  to authenticated`). RLS is a *filter on top of* SQL privileges, not a
+  replacement: a role with a policy but no GRANT gets "permission denied for
+  table ..." before the policy is ever evaluated. **Never grant to `anon`** —
+  anon must stay fully locked out.
 - SECURITY DEFINER helpers used by RLS live in the **non-exposed `private` schema**
   (e.g. `private.is_member()`), never in `public` — a SECURITY DEFINER function in
   `public` is callable by anyone via the PostgREST `/rpc` API (the security advisor
