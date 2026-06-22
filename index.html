@@ -7,10 +7,6 @@
     <link rel="apple-touch-icon" href="/favicon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d9488" />
-    <meta
-      name="description"
-      content="Daico es una aplicación privada para organizar la vida del hogar: tareas pendientes, turnos y documentos importantes, todo en un solo lugar. El acceso está reservado a los miembros del hogar."
-    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,59 +16,7 @@
     <title>Daico</title>
   </head>
   <body>
-    <!--
-      Static landing content lives inside #root so it is visible WITHOUT
-      JavaScript: crawlers (e.g. Google's OAuth verification) and no-JS visitors
-      see a real homepage explaining the app. React's createRoot().render()
-      replaces this markup on mount, so signed-in users get the live app instead.
-    -->
-    <div id="root">
-      <main
-        style="
-          max-width: 32rem;
-          margin: 0 auto;
-          padding: 3rem 1rem;
-          font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-          color: #1c1917;
-          text-align: center;
-        "
-      >
-        <img src="/logo.png" alt="Daico" width="112" height="112" style="margin: 0 auto" />
-        <h1 style="color: #0d9488; font-size: 2.5rem; margin: 1rem 0 0.5rem">Daico</h1>
-        <p style="font-size: 1.125rem; color: #44403c; margin: 0">
-          Todo en orden, en un solo lugar.
-        </p>
-        <p style="color: #78716c; margin: 1rem auto 0; max-width: 24rem">
-          Daico es una aplicación privada para organizar la vida del hogar: reuní las
-          tareas pendientes, los turnos y los documentos importantes en un solo lugar,
-          simple y seguro. El acceso está reservado a los miembros del hogar e
-          ingresás con tu cuenta de Google.
-        </p>
-        <ul
-          style="
-            list-style: none;
-            padding: 0;
-            margin: 2rem 0 0;
-            text-align: left;
-            display: grid;
-            gap: 0.75rem;
-          "
-        >
-          <li style="border: 1px solid #e7e5e4; border-radius: 0.75rem; padding: 1rem">
-            <strong>Tareas</strong> — Anotá y seguí las cosas que hay que hacer en
-            casa, con fechas.
-          </li>
-          <li style="border: 1px solid #e7e5e4; border-radius: 0.75rem; padding: 1rem">
-            <strong>Turnos</strong> — Organizá turnos médicos y citas importantes en
-            un solo lugar.
-          </li>
-          <li style="border: 1px solid #e7e5e4; border-radius: 0.75rem; padding: 1rem">
-            <strong>Documentos</strong> — Tené a mano los documentos importantes del
-            hogar, de forma segura.
-          </li>
-        </ul>
-      </main>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
