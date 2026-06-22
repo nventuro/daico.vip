@@ -13,18 +13,24 @@ All data is sensitive and strictly access-gated.
 
 ## Security model — read this first
 
-- **Everything is gated behind `is_member()`.** Every table has RLS enabled and a
-  policy of the form `to authenticated using (is_member()) with check (is_member())`.
+- **Everything is gated behind `private.is_member()`.** Every table has RLS enabled
+  and a policy of the form
+  `to authenticated using (private.is_member()) with check (private.is_member())`.
 - **Never add an anon grant or a public view.** There is no public data. The anon
   role must always resolve to zero access.
 - Membership is an allowlist: the `members` table holds the authorized Google
   account emails. A signed-in account that is not a member is fully fail-closed
-  (sees nothing, can write nothing) and gets the "Sin acceso" screen.
-- **Every new table must enable RLS and add an `is_member()` policy in the same
-  migration.** A table without a policy is inaccessible, but never rely on that —
-  be explicit.
-- SECURITY DEFINER functions must always `set search_path = ''` and use fully
-  qualified names (e.g. `public.members`).
+  (sees nothing, can write nothing) and gets the "Sin acceso" screen. The client
+  detects membership by reading `members` (members see rows, non-members see none),
+  not via an RPC.
+- **Every new table must enable RLS and add a `private.is_member()` policy in the
+  same migration.** A table without a policy is inaccessible, but never rely on
+  that — be explicit.
+- SECURITY DEFINER helpers used by RLS live in the **non-exposed `private` schema**
+  (e.g. `private.is_member()`), never in `public` — a SECURITY DEFINER function in
+  `public` is callable by anyone via the PostgREST `/rpc` API (the security advisor
+  flags this). They must always `set search_path = ''` and use fully qualified
+  names (e.g. `public.members`).
 
 ## Privacy — the code is public, the data is private
 

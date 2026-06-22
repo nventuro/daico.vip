@@ -13,15 +13,16 @@ export function AppProvider({
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Resolve membership from the database. `is_member()` checks the signed-in
-  // email against the members allowlist; a non-member signed-in account (or no
-  // session at all) resolves to false, which gates the entire app.
+  // Resolve membership from the database. RLS only lets members read the
+  // `members` table, so a member sees at least one row and a non-member sees
+  // none. A signed-in non-member (or no session at all) resolves to false,
+  // which gates the entire app.
   useEffect(() => {
     async function resolveMembership() {
       setLoading(true);
       if (session) {
-        const { data } = await supabase.rpc('is_member');
-        setIsMember(data === true);
+        const { data, error } = await supabase.from('members').select('email').limit(1);
+        setIsMember(!error && (data?.length ?? 0) > 0);
       } else {
         setIsMember(false);
       }
