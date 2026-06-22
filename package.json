@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "db:link": "set -a && . ./.env && supabase link --project-ref $SUPABASE_PROJECT_REF",
-    "db:push": "set -a && . ./.env && supabase db push",
+    "db:push": "set -a && . ./.env && supabase db push && node scripts/verify-db-security.mjs",
+    "db:verify": "set -a && . ./.env && node scripts/verify-db-security.mjs",
     "db:migration:new": "supabase migration new"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "pg": "^8.22.0",
     "supabase": "^2.76.8",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",

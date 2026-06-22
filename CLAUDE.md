@@ -16,8 +16,20 @@ All data is sensitive and strictly access-gated.
 - **Everything is gated behind `private.is_member()`.** Every table has RLS enabled
   and a policy of the form
   `to authenticated using (private.is_member()) with check (private.is_member())`.
+- **`private.is_member()` binds membership to a verified Google identity**, not to
+  the raw JWT `email` claim: it returns true only when the calling user
+  (`auth.uid()`) has a row in `auth.identities` with `provider = 'google'` whose
+  email is in `members` (case-insensitive). This means a non-Google credential
+  (e.g. an email/password account registered for a member's address) can never
+  pass, regardless of which auth providers happen to be enabled. The Email auth
+  provider is also disabled in the dashboard (Google-only) — keep it that way.
 - **Never add an anon grant or a public view.** There is no public data. The anon
-  role must always resolve to zero access.
+  role must always resolve to zero access. Note: Supabase's project-level default
+  privileges silently grant `anon`/`authenticated` extra privileges (TRUNCATE,
+  REFERENCES, TRIGGER, MAINTAIN) on every new `public` table — migrations don't see
+  this. `20260622020000_harden_security.sql` revokes them and `ALTER`s the
+  `postgres` default privileges so future tables stay clean; the per-table `grant`
+  below must still re-grant the exact set `authenticated` needs.
 - Membership is an allowlist: the `members` table holds the authorized Google
   account emails. A signed-in account that is not a member is fully fail-closed
   (sees nothing, can write nothing) and gets the "Sin acceso" screen. The client
@@ -35,6 +47,11 @@ All data is sensitive and strictly access-gated.
   `public` is callable by anyone via the PostgREST `/rpc` API (the security advisor
   flags this). They must always `set search_path = ''` and use fully qualified
   names (e.g. `public.members`).
+- **`npm run db:verify` asserts these invariants against the live database**
+  (RLS on every public table, an `is_member()` policy on each, zero anon
+  privileges, no SECURITY DEFINER function or view in `public`, etc.) and fails on
+  any drift. It runs automatically after `npm run db:push`. Run it after any schema
+  change; if you add an invariant, add a check in `scripts/verify-db-security.mjs`.
 
 ## Privacy — the code is public, the data is private
 
@@ -85,5 +102,6 @@ All data is sensitive and strictly access-gated.
 Requires `.env` with `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD`.
 
 - `npm run db:link` — link local project to remote Supabase (run once)
-- `npm run db:push` — push pending migrations to remote database
+- `npm run db:push` — push pending migrations to remote database, then verify invariants
+- `npm run db:verify` — check the live DB against the security invariants (read-only)
 - `npm run db:migration:new <name>` — create a new migration file
