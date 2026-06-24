@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { IconLogout, IconListCheck, IconShoppingCart } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
+import { useOnline } from '../hooks/useOnline';
 import LoginScreen from './LoginScreen';
 import NoAccess from './NoAccess';
 import Footer from './Footer';
@@ -15,6 +16,7 @@ function tabClass({ isActive }: { isActive: boolean }): string {
 
 export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
+  const online = useOnline();
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccess />;
@@ -31,9 +33,10 @@ export default function MainLayout() {
           </span>
           <button
             onClick={signOut}
+            disabled={!online}
             aria-label="Cerrar sesión"
-            title="Cerrar sesión"
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong"
+            title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent disabled:hover:text-disabled"
           >
             <IconLogout size={18} stroke={1.5} />
           </button>

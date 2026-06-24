@@ -36,9 +36,16 @@ export function AppProvider({
         return;
       }
       const cacheKey = MEMBER_CACHE_PREFIX + session.user.id;
+      // Offline: don't even attempt the read (it would hang or fail) — go
+      // straight to the last-known-good answer so startup is instant.
+      if (!navigator.onLine) {
+        setIsMember(localStorage.getItem(cacheKey) === '1');
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase.from('members').select('email').limit(1);
       if (error) {
-        // Offline / transient: trust the last-known-good answer for this user.
+        // Online but the read failed (flaky link): trust the cached answer.
         setIsMember(localStorage.getItem(cacheKey) === '1');
       } else {
         const member = (data?.length ?? 0) > 0;
