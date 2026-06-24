@@ -53,6 +53,39 @@ All data is sensitive and strictly access-gated.
   any drift. It runs automatically after `npm run db:push`. Run it after any schema
   change; if you add an invariant, add a check in `scripts/verify-db-security.mjs`.
 
+## Offline-first model — read before touching data tables
+
+- **Chores and the shopping list are offline-first.** A generic engine in
+  `src/lib/offline/` runs SQLite in the browser (SQLocal over OPFS, in a Web
+  Worker) as the source of truth the UI reads/writes, and a sync engine
+  reconciles with Postgres on load / reconnect / app-focus. The README has the
+  architecture overview; this section is the rules.
+- **Every offline-synced table must have a client-supplied `uuid` primary key and
+  an `updated_at timestamptz`.** The UUID gives an offline-created row a stable
+  identity before it reaches the server (never `generated always as identity` for
+  these). `updated_at` is the **last-write-wins key and is client-owned** — set at
+  edit time and sent by the client. **Never add a trigger that bumps `updated_at`
+  on update**: a server-side bump would use sync time and break LWW ordering for
+  edits made offline. The standard table/RLS/grant rules above still apply in the
+  same migration.
+- **To add an offline table:** write the migration (uuid PK + `updated_at` + the
+  usual RLS/policy/grants), add a `TableSpec` to `src/lib/offline/specs.ts` and to
+  `ALL_SPECS`, then add a thin typed hook over `useOfflineTable` (see
+  `useShoppingList` / `useChores`). Do **not** hand-write sync or SQL — the generic
+  `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
+  the LWW reconcile. Conflict policy is last-write-wins with "delete wins".
+- **Do not change the SQLite persistence to the default OPFS VFS or anything
+  needing `SharedArrayBuffer`.** That requires `COOP`/`COEP` response headers,
+  which **GitHub Pages cannot set**. SQLocal's OPFS SAH Pool VFS (the default it
+  uses) needs no special headers — keep it that way. Likewise keep
+  `worker: { format: 'es' }` and `optimizeDeps.exclude: ['sqlocal']` in
+  `vite.config.ts`, or the worker/wasm won't bundle.
+- **The membership check is offline-tolerant** (`AppContext` falls back to a
+  per-user cached verdict when the live read fails). This is only a UI gate — the
+  server's RLS is the real authority, so a stale `true` still reads nothing and has
+  every queued write rejected on sync. Don't "harden" it by removing the cache, or
+  members get locked out at the "Sin acceso" screen with no signal.
+
 ## Privacy — the code is public, the data is private
 
 - This repository is public; the database is private. **Never reference any real

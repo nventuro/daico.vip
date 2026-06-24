@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   IconPlus,
   IconCheck,
   IconTrash,
   IconCalendarEvent,
+  IconWifiOff,
 } from '@tabler/icons-react';
 import type { Chore } from '../types';
-import { supabase } from '../lib/supabase';
+import { useChores } from '../hooks/useChores';
+import { useOnline } from '../hooks/useOnline';
 import { formatDateShort } from '../utils/dateUtils';
 
 /** Today as an ISO date string (yyyy-mm-dd) in local time. */
@@ -17,82 +19,19 @@ function todayIso(): string {
 }
 
 export default function ChoresPage() {
-  const [chores, setChores] = useState<Chore[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const online = useOnline();
+  const { items: chores, loading, error, add, toggleDone, remove } = useChores();
 
   const [newTitle, setNewTitle] = useState('');
   const [newDueOn, setNewDueOn] = useState('');
-  const [saving, setSaving] = useState(false);
 
-  const fetchChores = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('chores')
-      .select('*')
-      .order('done', { ascending: true })
-      .order('due_on', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setChores(data as Chore[]);
-      setError(null);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    async function load() {
-      await fetchChores();
-    }
-    load();
-  }, [fetchChores]);
-
-  async function addChore(e: FormEvent) {
+  function addChore(e: FormEvent) {
     e.preventDefault();
     const title = newTitle.trim();
-    if (!title || saving) return;
-
-    setSaving(true);
-    const { error } = await supabase
-      .from('chores')
-      .insert({ title, due_on: newDueOn || null });
-    setSaving(false);
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
+    if (!title) return;
     setNewTitle('');
     setNewDueOn('');
-    await fetchChores();
-  }
-
-  async function toggleDone(chore: Chore) {
-    // Optimistic update; revert on failure.
-    setChores((prev) =>
-      prev.map((c) => (c.id === chore.id ? { ...c, done: !c.done } : c)),
-    );
-    const { error } = await supabase
-      .from('chores')
-      .update({ done: !chore.done })
-      .eq('id', chore.id);
-    if (error) {
-      setError(error.message);
-      await fetchChores();
-    } else {
-      await fetchChores();
-    }
-  }
-
-  async function deleteChore(chore: Chore) {
-    setChores((prev) => prev.filter((c) => c.id !== chore.id));
-    const { error } = await supabase.from('chores').delete().eq('id', chore.id);
-    if (error) {
-      setError(error.message);
-      await fetchChores();
-    }
+    void add(title, newDueOn || null);
   }
 
   const today = todayIso();
@@ -125,7 +64,7 @@ export default function ChoresPage() {
           </label>
           <button
             type="submit"
-            disabled={!newTitle.trim() || saving}
+            disabled={!newTitle.trim()}
             className="ml-auto flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:bg-disabled"
           >
             <IconPlus size={18} stroke={2} />
@@ -133,6 +72,13 @@ export default function ChoresPage() {
           </button>
         </div>
       </form>
+
+      {!online && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm text-muted-strong">
+          <IconWifiOff size={18} stroke={1.5} className="shrink-0 text-warning" />
+          Sin conexión — se guarda acá y se sincroniza solo cuando vuelva.
+        </div>
+      )}
 
       {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
@@ -144,7 +90,7 @@ export default function ChoresPage() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {chores.map((chore) => {
+          {chores.map((chore: Chore) => {
             const overdue = !chore.done && chore.due_on != null && chore.due_on < today;
             return (
               <li
@@ -152,7 +98,7 @@ export default function ChoresPage() {
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-3 py-3 shadow-sm"
               >
                 <button
-                  onClick={() => toggleDone(chore)}
+                  onClick={() => void toggleDone(chore)}
                   aria-label={chore.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
                   title={chore.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -185,7 +131,7 @@ export default function ChoresPage() {
                 </div>
 
                 <button
-                  onClick={() => deleteChore(chore)}
+                  onClick={() => void remove(chore)}
                   aria-label="Eliminar tarea"
                   title="Eliminar tarea"
                   className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-border-subtle hover:text-error"
