@@ -32,5 +32,9 @@ alter table shopping_items enable row level security;
 create policy "Members have full access to shopping_items" on shopping_items
   for all to authenticated using (private.is_member()) with check (private.is_member());
 
--- Full CRUD for members (RLS still gates every row by is_member()). Never anon.
+-- Strip any surplus Supabase's project-level default privileges may have
+-- auto-granted on table creation (TRUNCATE/REFERENCES/TRIGGER/MAINTAIN), then
+-- grant exactly the set members need. RLS still gates every row by
+-- is_member(). Never anon. (Mirrors the per-table pattern in harden_security.)
+revoke all on public.shopping_items from anon, authenticated;
 grant select, insert, update, delete on public.shopping_items to authenticated;
