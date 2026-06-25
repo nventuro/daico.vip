@@ -52,6 +52,20 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
 3. Add a thin typed hook (see `useShoppingList` / `useChores`) over
    `useOfflineTable`. No new sync code needed.
 
+### Adding a column to an existing offline table
+
+1. Migration: `alter table ... add column`. The column must be **nullable or have
+   a default** — the engine mirrors the change into each client's local SQLite via
+   `ADD COLUMN`, which SQLite only allows under that rule. No new RLS/grant: a
+   column inherits the table's.
+2. Add the column to the table's `TableSpec.columns`. The engine creates it for new
+   clients and `ALTER`s it into existing local databases on next load; sync carries
+   it automatically.
+3. If you **backfill** existing rows, bump their `updated_at` in the same migration
+   so the value reaches already-synced clients (their last-write-wins pull only
+   takes a strictly newer row). Run it once every device has synced, so no unsynced
+   offline edit predates the bump. (See `20260625000000_shopping_position.sql`.)
+
 ### Caveats
 
 - **Last-write-wins** is per-row by client clock. Fine for 1–2 users; clock skew

@@ -32,6 +32,12 @@ export interface ShoppingItem {
   id: string;
   name: string;
   checked: boolean;
+  /**
+   * Client-owned fractional-index sort key (base-62) for manual ordering.
+   * Reordering writes only this column on the moved row. Null sorts last (e.g.
+   * a row inserted manually via SQL); the client sets it on every insert.
+   */
+  position: string | null;
   /** ISO timestamp. */
   created_at: string;
   /** ISO timestamp; the last-write-wins conflict key. */
