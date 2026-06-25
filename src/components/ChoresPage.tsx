@@ -18,18 +18,18 @@ function todayIso(): string {
 export default function ChoresPage() {
   const { items: chores, loading, error, add, toggleDone, remove } = useChores();
 
+  const today = todayIso();
+
   const [newTitle, setNewTitle] = useState('');
-  const [newDueOn, setNewDueOn] = useState('');
+  const [newDueOn, setNewDueOn] = useState(today);
 
   function addChore() {
     const title = newTitle.trim();
     if (!title) return;
     setNewTitle('');
-    setNewDueOn('');
+    setNewDueOn(today);
     void add(title, newDueOn || null);
   }
-
-  const today = todayIso();
 
   const active = chores.filter((c) => !c.done);
   const completed = chores.filter((c) => c.done);
