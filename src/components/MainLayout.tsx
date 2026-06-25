@@ -4,7 +4,6 @@ import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import LoginScreen from './LoginScreen';
 import NoAccess from './NoAccess';
-import Footer from './Footer';
 
 function tabClass({ isActive }: { isActive: boolean }): string {
   return `flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
@@ -56,8 +55,6 @@ export default function MainLayout() {
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6">
         <Outlet />
       </main>
-
-      <Footer className="px-4 pb-8" />
     </div>
   );
 }
