@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { IconCheck, IconTrash } from '@tabler/icons-react';
+import type { CSSProperties, ReactNode } from 'react';
+import { IconCheck, IconX } from '@tabler/icons-react';
 
 interface ChecklistItemProps {
   /** Whether the item is completed (done / bought). */
@@ -14,10 +14,19 @@ interface ChecklistItemProps {
   toggleLabel: string;
   /** Accessible label/title for the remove button. */
   removeLabel: string;
+  /** Optional drag handle (reorderable lists), rendered leftmost on the row. */
+  dragHandle?: ReactNode;
+  /** Ref for the row element, used by drag-and-drop to track it. */
+  containerRef?: (node: HTMLElement | null) => void;
+  /** Inline style for the row (drag transform / transition). */
+  style?: CSSProperties;
+  /** Whether the row is currently being dragged (lifts it visually). */
+  dragging?: boolean;
 }
 
 /** A single checklist row shared by the chores and shopping lists: the whole row
- *  is one tap target that toggles completion, with a separate remove button. */
+ *  is one tap target that toggles completion, with a separate remove button and
+ *  an optional drag handle for manual ordering. */
 export default function ChecklistItem({
   checked,
   label,
@@ -26,14 +35,25 @@ export default function ChecklistItem({
   onRemove,
   toggleLabel,
   removeLabel,
+  dragHandle,
+  containerRef,
+  style,
+  dragging = false,
 }: ChecklistItemProps) {
   return (
-    <li className="flex items-stretch rounded-xl border border-border bg-surface-raised shadow-sm">
+    <li
+      ref={containerRef}
+      style={style}
+      className={`flex items-stretch rounded-xl border border-border bg-surface-raised shadow-sm ${
+        dragging ? 'relative z-10 shadow-lg' : ''
+      }`}
+    >
+      {dragHandle}
       <button
         onClick={onToggle}
         aria-label={toggleLabel}
         title={toggleLabel}
-        className="flex flex-1 items-center gap-3 px-3 py-3 text-left"
+        className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pr-3' : 'px-3'}`}
       >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -59,7 +79,7 @@ export default function ChecklistItem({
         title={removeLabel}
         className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-error"
       >
-        <IconTrash size={18} stroke={1.5} />
+        <IconX size={18} stroke={1.5} />
       </button>
     </li>
   );

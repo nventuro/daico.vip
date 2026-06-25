@@ -26,15 +26,36 @@ type Row = Record<string, unknown>;
 // Lazily created so the worker/OPFS only spin up once an offline table is
 // actually used (never for non-members, who never reach this code).
 let client: SQLocal | null = null;
+let ready: Promise<SQLocal> | null = null;
 
-function db(): SQLocal {
-  if (!client) {
-    client = new SQLocal({
+/**
+ * The local client, guaranteed to have every column its specs declare. `onInit`
+ * creates missing tables; this additionally ALTERs in any column added to a spec
+ * after a client first created the table, so an existing local database picks up
+ * new columns instead of erroring on them. Additive only — a column added this
+ * way must be nullable or carry a DEFAULT (SQLite's rule for ADD COLUMN).
+ */
+function db(): Promise<SQLocal> {
+  if (!ready) {
+    const c = (client ??= new SQLocal({
       databasePath: LOCAL_DB_PATH,
       onInit: (sql) => ALL_SPECS.map((spec) => sql(createTableSql(spec))),
-    });
+    }));
+    ready = migrateColumns(c).then(() => c);
   }
-  return client;
+  return ready;
+}
+
+async function migrateColumns(c: SQLocal): Promise<void> {
+  for (const spec of ALL_SPECS) {
+    const existing = await c.sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
+    const present = new Set(existing.map((col) => col.name));
+    for (const col of spec.columns) {
+      if (!present.has(col.name)) {
+        await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${col.name} ${col.ddl}`);
+      }
+    }
+  }
 }
 
 function createTableSql(spec: TableSpec): string {
@@ -80,7 +101,8 @@ function toObject<T>(spec: TableSpec, row: Row): T {
 
 /** The visible rows (hides items queued for deletion), in the spec's order. */
 export async function listVisible<T>(spec: TableSpec): Promise<T[]> {
-  const rows = await db().sql<Row>(
+  const c = await db();
+  const rows = await c.sql<Row>(
     `SELECT * FROM ${spec.table} WHERE pending_op IS NOT 'delete' ORDER BY ${spec.orderBy}`,
   );
   return rows.map((r) => toObject<T>(spec, r));
@@ -108,7 +130,8 @@ export async function insert(spec: TableSpec, values: Row): Promise<void> {
     0,
   ];
   const placeholders = cols.map(() => '?').join(', ');
-  await db().sql(`INSERT INTO ${spec.table} (${cols.join(', ')}) VALUES (${placeholders})`, ...params);
+  const c = await db();
+  await c.sql(`INSERT INTO ${spec.table} (${cols.join(', ')}) VALUES (${placeholders})`, ...params);
 }
 
 /** Patch app columns of a row and queue the change. */
@@ -119,7 +142,8 @@ export async function update(spec: TableSpec, id: string, patch: Row): Promise<v
   sets.push('updated_at = ?');
   params.push(nowIso());
   sets.push("pending_op = 'upsert'");
-  await db().sql(
+  const c = await db();
+  await c.sql(
     `UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ? AND pending_op IS NOT 'delete'`,
     ...params,
     id,
@@ -133,7 +157,8 @@ export async function update(spec: TableSpec, id: string, patch: Row): Promise<v
  */
 export async function remove(spec: TableSpec, id: string): Promise<void> {
   const ts = nowIso();
-  await db().transaction(async (tx) => {
+  const c = await db();
+  await c.transaction(async (tx) => {
     await tx.sql(`DELETE FROM ${spec.table} WHERE id = ? AND synced = 0`, id);
     await tx.sql(
       `UPDATE ${spec.table} SET pending_op = 'delete', updated_at = ? WHERE id = ? AND synced = 1`,
@@ -143,25 +168,11 @@ export async function remove(spec: TableSpec, id: string): Promise<void> {
   });
 }
 
-/** Delete every visible row matching a (static, spec-derived) WHERE clause. */
-export async function removeWhere(spec: TableSpec, where: string): Promise<void> {
-  const ts = nowIso();
-  await db().transaction(async (tx) => {
-    await tx.sql(
-      `DELETE FROM ${spec.table} WHERE (${where}) AND synced = 0 AND pending_op IS NOT 'delete'`,
-    );
-    await tx.sql(
-      `UPDATE ${spec.table} SET pending_op = 'delete', updated_at = ?
-       WHERE (${where}) AND synced = 1 AND pending_op IS NOT 'delete'`,
-      ts,
-    );
-  });
-}
-
 /** Wipe all local data across every table (sign-out — shared-device hygiene). */
 export async function clearAll(): Promise<void> {
+  const c = await db();
   for (const spec of ALL_SPECS) {
-    await db().sql(`DELETE FROM ${spec.table}`);
+    await c.sql(`DELETE FROM ${spec.table}`);
   }
 }
 
@@ -169,13 +180,15 @@ export async function clearAll(): Promise<void> {
 
 /** Rows with a queued create/update, as full server-shaped objects to push. */
 export async function getPendingUpserts<T>(spec: TableSpec): Promise<T[]> {
-  const rows = await db().sql<Row>(`SELECT * FROM ${spec.table} WHERE pending_op = 'upsert'`);
+  const c = await db();
+  const rows = await c.sql<Row>(`SELECT * FROM ${spec.table} WHERE pending_op = 'upsert'`);
   return rows.map((r) => toObject<T>(spec, r));
 }
 
 /** Ids of rows whose deletion still needs to be pushed. */
 export async function getPendingDeletes(spec: TableSpec): Promise<string[]> {
-  const rows = await db().sql<{ id: string }>(
+  const c = await db();
+  const rows = await c.sql<{ id: string }>(
     `SELECT id FROM ${spec.table} WHERE pending_op = 'delete'`,
   );
   return rows.map((r) => r.id);
@@ -191,7 +204,8 @@ export async function markUpserted(
   id: string,
   pushedUpdatedAt: string,
 ): Promise<void> {
-  await db().sql(
+  const c = await db();
+  await c.sql(
     `UPDATE ${spec.table} SET pending_op = NULL, synced = 1
      WHERE id = ? AND pending_op = 'upsert' AND updated_at = ?`,
     id,
@@ -201,7 +215,8 @@ export async function markUpserted(
 
 /** Drop a local tombstone once its delete has been pushed. */
 export async function markDeleted(spec: TableSpec, id: string): Promise<void> {
-  await db().sql(`DELETE FROM ${spec.table} WHERE id = ? AND pending_op = 'delete'`, id);
+  const c = await db();
+  await c.sql(`DELETE FROM ${spec.table} WHERE id = ? AND pending_op = 'delete'`, id);
 }
 
 /**
@@ -221,7 +236,8 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
     'synced',
   ];
   const insertPlaceholders = insertCols.map(() => '?').join(', ');
-  await db().transaction(async (tx) => {
+  const c = await db();
+  await c.transaction(async (tx) => {
     const remoteIds = new Set<string>();
 
     for (const r of remote) {

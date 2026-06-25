@@ -30,8 +30,10 @@ export const SHOPPING_SPEC: TableSpec = {
   columns: [
     { name: 'name', ddl: 'TEXT NOT NULL' },
     { name: 'checked', ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    // Client-owned fractional-index key for manual drag ordering (see ordering.ts).
+    { name: 'position', ddl: 'TEXT' },
   ],
-  orderBy: 'checked ASC, created_at ASC',
+  orderBy: 'checked ASC, position ASC NULLS LAST, created_at ASC',
 };
 
 export const CHORES_SPEC: TableSpec = {
