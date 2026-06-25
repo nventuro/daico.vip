@@ -29,10 +29,5 @@ export function useShoppingList() {
     [mutate],
   );
 
-  const clearChecked = useCallback(
-    () => mutate(() => engine.removeWhere(SHOPPING_SPEC, 'checked = 1')),
-    [mutate],
-  );
-
-  return { items, loading, error, add, toggle, remove, clearChecked };
+  return { items, loading, error, add, toggle, remove };
 }
