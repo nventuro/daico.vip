@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useRef } from 'react';
 import { IconPlus } from '@tabler/icons-react';
 
 interface AddBarProps {
@@ -24,9 +24,14 @@ export default function AddBar({
   inputLabel,
   children,
 }: AddBarProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     onSubmit();
+    // Keep focus so several items can be added in a row without re-tapping the
+    // input — on mobile this also keeps the keyboard open between adds.
+    inputRef.current?.focus();
   }
 
   return (
@@ -37,6 +42,7 @@ export default function AddBar({
       {children && <div className="mb-2 flex items-center gap-2">{children}</div>}
       <div className="flex items-center gap-2">
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -48,6 +54,11 @@ export default function AddBar({
         />
         <button
           type="submit"
+          // Don't let pressing the button move focus off the input: that blur is
+          // what closes the mobile keyboard and forces a re-tap before the next
+          // item. preventDefault on pointer-down keeps focus; the click (submit)
+          // still fires.
+          onPointerDown={(e) => e.preventDefault()}
           disabled={!value.trim()}
           aria-label="Agregar"
           title="Agregar"
