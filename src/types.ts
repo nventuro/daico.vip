@@ -44,8 +44,49 @@ export interface ShoppingItem {
   updated_at: string;
 }
 
+/**
+ * An imported reference document. Read-only in the app — rows come from an
+ * import script — but offline-synced like every other table, so it carries the
+ * standard client-generated `id` and the `updated_at` last-write-wins key.
+ */
+export interface Guide {
+  id: string;
+  title: string;
+  description: string | null;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
+/**
+ * One readable page of a guide. Chapters are grouped into sections and ordered
+ * by `section_position` then `position`. `body` is markdown (CommonMark plus
+ * the app's directives for images, videos and spoilers); images are referenced
+ * by key and fetched separately.
+ */
+export interface GuideChapter {
+  id: string;
+  guide_id: string;
+  section_title: string;
+  section_position: number;
+  position: number;
+  title: string;
+  body: string;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
 export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 
 /** Max length accepted for a shopping item name (input guard). */
 export const SHOPPING_ITEM_NAME_MAX = 120;
+
+/** Privacy-enhanced YouTube embed base; append the video id. */
+export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
+
+/** YouTube watch page base; append the video id. */
+export const YOUTUBE_WATCH_URL = 'https://www.youtube.com/watch?v=';

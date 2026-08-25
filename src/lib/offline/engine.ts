@@ -39,7 +39,7 @@ function db(): Promise<SQLocal> {
   if (!ready) {
     const c = (client ??= new SQLocal({
       databasePath: LOCAL_DB_PATH,
-      onInit: (sql) => ALL_SPECS.map((spec) => sql(createTableSql(spec))),
+      onInit: (sql) => [...ALL_SPECS.map((spec) => sql(createTableSql(spec))), sql(IMAGE_CACHE_SQL)],
     }));
     ready = migrateColumns(c).then(() => c);
   }
@@ -69,6 +69,17 @@ function createTableSql(spec: TableSpec): string {
     synced INTEGER NOT NULL DEFAULT 0
   )`;
 }
+
+// Guide images are too large to pull wholesale like the spec tables, so they
+// are fetched one at a time on first use and kept here (local-only, never
+// synced) so chapters keep rendering offline. Contents stay base64 text, the
+// form they arrive in, which also avoids binding blobs across the worker.
+const IMAGE_CACHE_TABLE = 'guide_image_cache';
+const IMAGE_CACHE_SQL = `CREATE TABLE IF NOT EXISTS ${IMAGE_CACHE_TABLE} (
+    key TEXT PRIMARY KEY,
+    mime TEXT NOT NULL,
+    data TEXT NOT NULL
+  )`;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -174,6 +185,36 @@ export async function clearAll(): Promise<void> {
   for (const spec of ALL_SPECS) {
     await c.sql(`DELETE FROM ${spec.table}`);
   }
+  await c.sql(`DELETE FROM ${IMAGE_CACHE_TABLE}`);
+}
+
+// ─── Local-only image cache ──────────────────────────────────────────────────
+
+/** An image's MIME type and base64-encoded contents. */
+export interface CachedImage {
+  mime: string;
+  data: string;
+}
+
+/** The locally cached image for a key, or null if it has never been fetched. */
+export async function getCachedImage(key: string): Promise<CachedImage | null> {
+  const c = await db();
+  const rows = await c.sql<CachedImage>(
+    `SELECT mime, data FROM ${IMAGE_CACHE_TABLE} WHERE key = ?`,
+    key,
+  );
+  return rows[0] ?? null;
+}
+
+/** Keep an image locally so later reads need no connection. */
+export async function putCachedImage(key: string, image: CachedImage): Promise<void> {
+  const c = await db();
+  await c.sql(
+    `INSERT OR REPLACE INTO ${IMAGE_CACHE_TABLE} (key, mime, data) VALUES (?, ?, ?)`,
+    key,
+    image.mime,
+    image.data,
+  );
 }
 
 // ─── Sync support (used by sync.ts) ──────────────────────────────────────────
