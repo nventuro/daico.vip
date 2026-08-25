@@ -75,6 +75,54 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
 - **OPFS** needs a modern browser (Chrome/Android, or iOS Safari ≥ 16.4).
 - Local data is wiped on sign-out (shared-device hygiene).
 
+## Guides
+
+Guides are read-only reference documents (a guide → sections → chapters) that
+members can read offline. They are never edited in the app: rows come from an
+import script, and the app only reads them.
+
+- **Tables**: `guides` and `guide_chapters` are ordinary offline-synced tables
+  (see above), so chapters land in the local SQLite and read with no connection.
+  `guide_images` is **not** synced — images are too large to pull wholesale on
+  every sync — so the app fetches each image the first time a chapter needs it
+  and keeps it in a local-only cache table (`guide_image_cache`); previously read
+  chapters render offline. All three are `select`-only for `authenticated`.
+- **Chapter bodies** are markdown: CommonMark + GFM tables, plus three
+  [remark-directive](https://github.com/remarkjs/remark-directive) forms the
+  renderer (`GuideMarkdown`) maps to components:
+  `::image{key="…" width="60" align="center"}` (an image by key, width as a
+  percentage of the column), `::youtube{id="…" start="0"}` (embed; a plain link
+  when offline) and `:spoiler[text]` (tap to reveal). Links to other guides or
+  chapters are ordinary relative links (`/guias/<guide>/<chapter>`).
+
+### Importing guides
+
+```
+npm run guides:import -- --dump <dir> [--dry-run] [--preview <dir>]
+```
+
+The dump directory (kept **outside the repo** — it's private content) has:
+
+```
+guides/<slug>.json   metadata, sections and chapters in the source site's markdown,
+                     plus an image map (token reference → file)
+images/              the referenced image files
+docs/index.json      linked documents (HTML exports) with titles
+decklists/index.json linked decklists (plain text) with titles and source URLs
+```
+
+The importer (`scripts/import-guides.mjs`, helpers in `scripts/import-guides/`)
+converts the source dialect to the markdown above (`normalize.mjs`), turns linked
+documents and decklists into chapters in an "Adjuntos" section and rewrites links
+to them in-app, and recompresses images to WebP (≤ 1600 px). Everything
+source-specific stays in the importer; the app only knows the dialect above.
+
+Ids derive from the source identifiers (UUID v5), so re-running the import
+replaces the guides wholesale while keeping every id — clients update in place via
+the normal sync and links keep working. `--dry-run` skips the database;
+`--preview <dir>` writes each chapter's normalized markdown as a file to inspect.
+Missing attachment files are reported and their links left external.
+
 ## Local development
 
 ```bash

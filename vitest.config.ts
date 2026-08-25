@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config'
 // SQLocal-worker plugins, none of which the (pure, node-only) unit tests need.
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
     environment: 'node',
   },
 })

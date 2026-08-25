@@ -11,32 +11,7 @@
 // linked project (`supabase/.temp/pooler-url`, created by `npm run db:link`).
 // Catalog reads only — no application data is touched.
 // =============================================================================
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(path.join(root, 'node_modules/'));
-const { Client } = require('pg');
-
-function readPassword() {
-  if (process.env.SUPABASE_DB_PASSWORD) return process.env.SUPABASE_DB_PASSWORD.trim();
-  const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
-  const m = env.match(/^SUPABASE_DB_PASSWORD=(.*)$/m);
-  if (!m) throw new Error('SUPABASE_DB_PASSWORD not found in .env');
-  return m[1].trim();
-}
-
-function poolerUrlWithPassword(password) {
-  const file = path.join(root, 'supabase/.temp/pooler-url');
-  if (!fs.existsSync(file)) {
-    throw new Error('supabase/.temp/pooler-url missing — run `npm run db:link` first');
-  }
-  const url = new URL(fs.readFileSync(file, 'utf8').trim());
-  url.password = encodeURIComponent(password);
-  return url.toString();
-}
+import { Client, connectionString } from './lib/db.mjs';
 
 // Each check returns rows describing VIOLATIONS. Zero rows = pass.
 const CHECKS = [
@@ -112,7 +87,7 @@ const CHECKS = [
 ];
 
 const client = new Client({
-  connectionString: poolerUrlWithPassword(readPassword()),
+  connectionString: connectionString(),
   ssl: { rejectUnauthorized: false },
   statement_timeout: 15000,
 });

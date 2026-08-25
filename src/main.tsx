@@ -9,6 +9,9 @@ import App from './App.tsx'
 // bundle small.
 const ChoresPage = lazy(() => import('./components/ChoresPage.tsx'))
 const ShoppingPage = lazy(() => import('./components/ShoppingPage.tsx'))
+const GuidesPage = lazy(() => import('./components/GuidesPage.tsx'))
+const GuidePage = lazy(() => import('./components/GuidePage.tsx'))
+const GuideChapterPage = lazy(() => import('./components/GuideChapterPage.tsx'))
 
 const pageFallback = <p className="text-muted">Cargando...</p>
 
@@ -20,6 +23,9 @@ createRoot(document.getElementById('root')!).render(
           <Route index element={<Navigate to="/tareas" replace />} />
           <Route path="tareas" element={<Suspense fallback={pageFallback}><ChoresPage /></Suspense>} />
           <Route path="compras" element={<Suspense fallback={pageFallback}><ShoppingPage /></Suspense>} />
+          <Route path="guias" element={<Suspense fallback={pageFallback}><GuidesPage /></Suspense>} />
+          <Route path="guias/:guideId" element={<Suspense fallback={pageFallback}><GuidePage /></Suspense>} />
+          <Route path="guias/:guideId/:chapterId" element={<Suspense fallback={pageFallback}><GuideChapterPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { IconLogout, IconListCheck, IconShoppingCart } from '@tabler/icons-react';
+import { IconLogout, IconListCheck, IconShoppingCart, IconBook } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import LoginScreen from './LoginScreen';
@@ -48,6 +48,10 @@ export default function MainLayout() {
           <NavLink to="/compras" className={tabClass}>
             <IconShoppingCart size={18} stroke={1.5} />
             Compras
+          </NavLink>
+          <NavLink to="/guias" className={tabClass}>
+            <IconBook size={18} stroke={1.5} />
+            Guías
           </NavLink>
         </nav>
       </header>

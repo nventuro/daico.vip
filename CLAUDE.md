@@ -74,6 +74,17 @@ All data is sensitive and strictly access-gated.
   `useShoppingList` / `useChores`). Do **not** hand-write sync or SQL — the generic
   `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
   the LWW reconcile. Conflict policy is last-write-wins with "delete wins".
+- **Guides are read-only imported content.** `guides` / `guide_chapters` are
+  normal offline-synced tables that the app never writes (grants are `select`
+  only; rows come from `npm run guides:import`). `guide_images` is deliberately
+  **not** in `ALL_SPECS`: the sync engine pulls whole tables on every sync, and
+  images would make that pull megabytes. They are fetched on demand through
+  `src/lib/guideImages.ts` into a local-only cache table in the engine. Keep any
+  large blob table out of `ALL_SPECS` the same way. Chapter bodies use the
+  markdown + directive dialect described in the README; source-site specifics
+  (token syntax, section names) belong in `scripts/import-guides/`, never in the
+  app. **Never commit a guides dump** — it is private content, keep it outside
+  the repo.
 - **Do not change the SQLite persistence to the default OPFS VFS or anything
   needing `SharedArrayBuffer`.** That requires `COOP`/`COEP` response headers,
   which **GitHub Pages cannot set**. SQLocal's OPFS SAH Pool VFS (the default it
@@ -138,3 +149,10 @@ Requires `.env` with `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD`.
 - `npm run db:push` — push pending migrations to remote database, then verify invariants
 - `npm run db:verify` — check the live DB against the security invariants (read-only)
 - `npm run db:migration:new <name>` — create a new migration file
+
+### Guides
+
+- `npm run guides:import -- --dump <dir> [--dry-run] [--preview <dir>]` — replace
+  the guides in the database with the contents of a dump directory (layout in the
+  README). Re-runs are idempotent (stable ids); `--preview` writes the normalized
+  markdown to inspect before writing.
