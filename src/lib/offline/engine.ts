@@ -108,6 +108,30 @@ function toObject<T>(spec: TableSpec, row: Row): T {
   return obj as T;
 }
 
+// ─── Change events ───────────────────────────────────────────────────────────
+
+// Several hooks may watch one table at the same time, so every local write and
+// every sync merge that changed rows notifies all of them — each instance
+// reloads, not only the one that wrote.
+const listeners = new Map<string, Set<() => void>>();
+
+/** Run `listener` whenever `table`'s local rows change; returns the unsubscribe. */
+export function subscribe(table: string, listener: () => void): () => void {
+  let set = listeners.get(table);
+  if (!set) {
+    set = new Set();
+    listeners.set(table, set);
+  }
+  set.add(listener);
+  return () => {
+    set.delete(listener);
+  };
+}
+
+function emit(table: string): void {
+  listeners.get(table)?.forEach((listener) => listener());
+}
+
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 /** The visible rows (hides items queued for deletion), in the spec's order. */
@@ -121,8 +145,9 @@ export async function listVisible<T>(spec: TableSpec): Promise<T[]> {
 
 // ─── Local mutations (instant, offline-safe) ─────────────────────────────────
 
-/** Insert a new row with a client-generated id, queued for upsert. */
-export async function insert(spec: TableSpec, values: Row): Promise<void> {
+/** Insert a new row with a client-generated id, queued for upsert; returns the id. */
+export async function insert(spec: TableSpec, values: Row): Promise<string> {
+  const id = crypto.randomUUID();
   const ts = nowIso();
   const cols = [
     'id',
@@ -133,7 +158,7 @@ export async function insert(spec: TableSpec, values: Row): Promise<void> {
     'synced',
   ];
   const params = [
-    crypto.randomUUID(),
+    id,
     ...spec.columns.map((c) => toDb(c, values[c.name])),
     ts,
     ts,
@@ -143,6 +168,8 @@ export async function insert(spec: TableSpec, values: Row): Promise<void> {
   const placeholders = cols.map(() => '?').join(', ');
   const c = await db();
   await c.sql(`INSERT INTO ${spec.table} (${cols.join(', ')}) VALUES (${placeholders})`, ...params);
+  emit(spec.table);
+  return id;
 }
 
 /** Patch app columns of a row and queue the change. */
@@ -159,6 +186,7 @@ export async function update(spec: TableSpec, id: string, patch: Row): Promise<v
     ...params,
     id,
   );
+  emit(spec.table);
 }
 
 /**
@@ -177,6 +205,7 @@ export async function remove(spec: TableSpec, id: string): Promise<void> {
       id,
     );
   });
+  emit(spec.table);
 }
 
 /** Wipe all local data across every table (sign-out — shared-device hygiene). */
@@ -186,6 +215,7 @@ export async function clearAll(): Promise<void> {
     await c.sql(`DELETE FROM ${spec.table}`);
   }
   await c.sql(`DELETE FROM ${IMAGE_CACHE_TABLE}`);
+  for (const spec of ALL_SPECS) emit(spec.table);
 }
 
 // ─── Local-only image cache ──────────────────────────────────────────────────
@@ -278,6 +308,7 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
   ];
   const insertPlaceholders = insertCols.map(() => '?').join(', ');
   const c = await db();
+  let changed = false;
   await c.transaction(async (tx) => {
     const remoteIds = new Set<string>();
 
@@ -297,6 +328,7 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
           null,
           1,
         );
+        changed = true;
       } else if (local.pending_op === null) {
         if (Date.parse(r.updated_at as string) > Date.parse(local.updated_at as string)) {
           const setCols = [...spec.columns.map((c) => c.name), 'created_at', 'updated_at'];
@@ -308,6 +340,7 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
             r.updated_at,
             id,
           );
+          changed = true;
         } else if (local.synced === 0) {
           // Server already has it; mark so a later delete pushes a tombstone.
           await tx.sql(`UPDATE ${spec.table} SET synced = 1 WHERE id = ?`, id);
@@ -324,7 +357,9 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
     for (const row of clean) {
       if (!remoteIds.has(row.id)) {
         await tx.sql(`DELETE FROM ${spec.table} WHERE id = ?`, row.id);
+        changed = true;
       }
     }
   });
+  if (changed) emit(spec.table);
 }

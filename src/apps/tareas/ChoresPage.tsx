@@ -2,18 +2,11 @@ import { useState } from 'react';
 import { IconCalendarEvent } from '@tabler/icons-react';
 import type { Chore } from '../../types';
 import { useChores } from './useChores';
-import { formatDateShort } from '../../utils/dateUtils';
+import { formatDateShort, todayIso } from '../../utils/dateUtils';
 import OfflineBanner from '../../components/OfflineBanner';
 import ChecklistItem from '../../components/ChecklistItem';
 import CompletedSection from '../../components/CompletedSection';
 import AddBar from '../../components/AddBar';
-
-/** Today as an ISO date string (yyyy-mm-dd) in local time. */
-function todayIso(): string {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
-}
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, toggleDone, remove } = useChores();

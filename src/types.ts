@@ -85,6 +85,15 @@ export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 /** Max length accepted for a shopping item name (input guard). */
 export const SHOPPING_ITEM_NAME_MAX = 120;
 
+/** Milliseconds in one day, for calendar-day arithmetic. */
+export const MS_PER_DAY = 86_400_000;
+
+/** Months in a year, for calendar-month arithmetic. */
+export const MONTHS_PER_YEAR = 12;
+
+/** Beyond ±this many days a relative date label switches to weekday + dd/mm. */
+export const RELATIVE_DAY_LIMIT = 6;
+
 /** Privacy-enhanced YouTube embed base; append the video id. */
 export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 

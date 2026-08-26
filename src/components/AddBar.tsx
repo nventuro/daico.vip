@@ -39,7 +39,7 @@ export default function AddBar({
       onSubmit={handleSubmit}
       className="sticky bottom-0 -mx-4 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur"
     >
-      {children && <div className="mb-2 flex items-center gap-2">{children}</div>}
+      {children && <div className="mb-2 flex flex-wrap items-center gap-2">{children}</div>}
       <div className="flex items-center gap-2">
         <input
           ref={inputRef}
