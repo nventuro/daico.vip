@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { IconArrowLeft, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useGuides } from './useGuides';
 import GuideMarkdown from './GuideMarkdown';
 
@@ -25,10 +25,7 @@ export default function GuideChapterPage() {
 
   return (
     <article className="flex flex-col gap-4">
-      <Link to={`/guias/${guide.id}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-muted-strong">
-        <IconArrowLeft size={16} stroke={1.5} />
-        {guide.title}
-      </Link>
+      <p className="text-sm text-muted">{guide.title}</p>
       <h1 className="font-display text-3xl font-bold">{chapter.title}</h1>
       <div className="text-on-surface">
         <GuideMarkdown body={chapter.body} />

@@ -125,7 +125,9 @@ Chromium-only APIs are available everywhere.
   `surface`, `surface-raised`, etc.). Add new tokens to the theme if needed.
 - **Mobile-first**: phones are a primary device — design mobile-first; ensure layouts
   and interactions work well on small screens.
-- **Components**: functional components with hooks, one component per file in `src/components/`.
+- **Components**: functional components with hooks, one component per file. Shared
+  components live in `src/components/`, app-specific ones in `src/apps/<id>/`, and
+  the shell (layout, home screen, app frame) in `src/shell/`.
 - **Types**: shared types in `src/types.ts`.
 - **No magic numbers**: domain constants must be named in `src/types.ts`, never hardcoded.
 - **Date format**: always dd/mm order, never mm/dd. Use `formatDate` (long locale) or
@@ -134,6 +136,27 @@ Chromium-only APIs are available everywhere.
 - **No duplicated logic**: extract shared computation; check for existing helpers first.
 - **Zero lint errors**: run `npm run lint` after changes and fix everything before done.
 - **Zero build warnings**: run `npm run build` after changes and fix everything before done.
+
+## App modules
+
+- Each feature is a self-contained module in `src/apps/<id>/`, described by an
+  `AppModule` (contract in `src/apps/types.ts`) and listed in `src/apps/registry.ts`
+  (order = tile order on the home screen). The shell (`src/shell/`) builds the
+  router and the home screen from the registry. The tables a module owns are
+  listed both in its `specs` and in `ALL_SPECS` (test-enforced).
+- The contract, the registry and module files (`src/apps/<id>/index.ts`) are
+  `.ts`, not `.tsx`: routes use `Component:` and pages are `lazy()`-loaded at
+  module scope only — never call `lazy()` inside a component.
+- Module routes are relative to `/<id>`; in-app links are absolute
+  (`/guias/...`). A module never imports `registry.ts`.
+- Per-app colour comes from the `--app` CSS variable the shell sets via
+  `hueStyle`; utilities read it as `bg-(--app)` / `text-(--app)`. Hue tokens live
+  in the `@theme static` block of `src/index.css` (`static` so Tailwind keeps
+  tokens only referenced at runtime). Never build a class name from data
+  (no `bg-${hue}`).
+- Pages don't render the app's title or a back link — the shell's app frame does.
+- `useStatus`, `useUpcoming` and `search` on a module are optional adapters; a
+  module without them simply doesn't contribute to the home screen or search.
 
 ## Git
 

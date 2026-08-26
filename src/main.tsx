@@ -1,33 +1,13 @@
-import { StrictMode, Suspense, lazy } from 'react'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
-
-// Route pages are code-split so each tab's deps (e.g. the shopping list's
-// drag-and-drop engine) load only when that tab is opened, keeping the initial
-// bundle small.
-const ChoresPage = lazy(() => import('./apps/tareas/ChoresPage.tsx'))
-const ShoppingPage = lazy(() => import('./apps/compras/ShoppingPage.tsx'))
-const GuidesPage = lazy(() => import('./apps/guias/GuidesPage.tsx'))
-const GuidePage = lazy(() => import('./apps/guias/GuidePage.tsx'))
-const GuideChapterPage = lazy(() => import('./apps/guias/GuideChapterPage.tsx'))
-
-const pageFallback = <p className="text-muted">Cargando...</p>
+import AppRouter from './shell/AppRouter.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route element={<App />}>
-          <Route index element={<Navigate to="/tareas" replace />} />
-          <Route path="tareas" element={<Suspense fallback={pageFallback}><ChoresPage /></Suspense>} />
-          <Route path="compras" element={<Suspense fallback={pageFallback}><ShoppingPage /></Suspense>} />
-          <Route path="guias" element={<Suspense fallback={pageFallback}><GuidesPage /></Suspense>} />
-          <Route path="guias/:guideId" element={<Suspense fallback={pageFallback}><GuidePage /></Suspense>} />
-          <Route path="guias/:guideId/:chapterId" element={<Suspense fallback={pageFallback}><GuideChapterPage /></Suspense>} />
-        </Route>
-      </Routes>
+      <AppRouter />
     </BrowserRouter>
   </StrictMode>,
 )

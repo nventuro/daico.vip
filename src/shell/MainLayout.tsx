@@ -1,17 +1,9 @@
-import { Outlet, NavLink } from 'react-router-dom';
-import { IconLogout, IconListCheck, IconShoppingCart, IconBook } from '@tabler/icons-react';
+import { Outlet } from 'react-router-dom';
+import { IconLogout } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import LoginScreen from '../components/LoginScreen';
 import NoAccess from '../components/NoAccess';
-
-function tabClass({ isActive }: { isActive: boolean }): string {
-  return `flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-    isActive
-      ? 'bg-primary-subtle text-primary'
-      : 'text-muted hover:bg-border-subtle hover:text-muted-strong'
-  }`;
-}
 
 export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
@@ -40,20 +32,6 @@ export default function MainLayout() {
             <IconLogout size={18} stroke={1.5} />
           </button>
         </div>
-        <nav className="mx-auto flex max-w-2xl gap-2 px-4 pb-2">
-          <NavLink to="/tareas" className={tabClass}>
-            <IconListCheck size={18} stroke={1.5} />
-            Tareas
-          </NavLink>
-          <NavLink to="/compras" className={tabClass}>
-            <IconShoppingCart size={18} stroke={1.5} />
-            Compras
-          </NavLink>
-          <NavLink to="/guias" className={tabClass}>
-            <IconBook size={18} stroke={1.5} />
-            Guías
-          </NavLink>
-        </nav>
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6">

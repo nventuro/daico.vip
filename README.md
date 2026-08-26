@@ -9,6 +9,27 @@ accounts can see or change anything.
 React + TypeScript + Vite · Tailwind CSS v4 · Supabase (Postgres + Google OAuth) ·
 GitHub Pages.
 
+## Apps
+
+Daico is one app made of several small ones. The **shell** (`src/shell/`) owns
+sign-in, membership, the home screen (a grid of app tiles) and the per-app frame
+(a header with the app's name in its colour and a back link one level up). Each
+feature is a **module** in `src/apps/<id>/` — its pages, hooks and the offline
+tables it owns — described by an `AppModule` object (contract in
+`src/apps/types.ts`) and listed in `src/apps/registry.ts`. The router and the
+home screen are built from the registry; its order is the tile order.
+
+### Adding an app
+
+1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`, `hue`,
+   `icon`, the `TableSpec`s it owns and its `routes` (relative to `/<id>`, pages
+   `lazy()`-loaded at module scope).
+2. Add a `--color-app-<id>` token to the `@theme static` block in `src/index.css`
+   and the hue to `AppHue` (and the id to `AppId`) in `src/apps/types.ts`.
+3. Append the module to `apps` in `src/apps/registry.ts`.
+4. Its tables go in `src/lib/offline/specs.ts` / `ALL_SPECS` **and** in the
+   module's `specs` — a test checks the two agree.
+
 ## Offline-first
 
 Chores and the shopping list work with **no connection** — you can open the app,
@@ -48,7 +69,8 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
    `updated_at` timestamp, plus the usual RLS + `private.is_member()` policy +
    `authenticated` grants. **No `updated_at` trigger** — the client owns it for
    last-write-wins.
-2. Add a `TableSpec` to `src/lib/offline/specs.ts` (and to `ALL_SPECS`).
+2. Add a `TableSpec` to `src/lib/offline/specs.ts` (and to `ALL_SPECS`), and list
+   it in the `specs` of the module that owns it (`src/apps/<id>/index.ts`).
 3. Add a thin typed hook (see `useShoppingList` / `useChores`) over
    `useOfflineTable`. No new sync code needed.
 
@@ -89,7 +111,7 @@ import script, and the app only reads them.
   chapters render offline. All three are `select`-only for `authenticated`.
 - **Chapter bodies** are markdown: CommonMark + GFM tables, plus three
   [remark-directive](https://github.com/remarkjs/remark-directive) forms the
-  renderer (`GuideMarkdown`) maps to components:
+  reader (`src/apps/guias/`) maps to components:
   `::image{key="…" width="60" align="center"}` (an image by key, width as a
   percentage of the column), `::youtube{id="…" start="0"}` (embed; a plain link
   when offline) and `:spoiler[text]` (tap to reveal). Links to other guides or

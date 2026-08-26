@@ -64,8 +64,6 @@ export default function ChoresPage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1">
-        <h1 className="mb-4 text-2xl font-bold tracking-tight">Tareas</h1>
-
         <OfflineBanner />
 
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}

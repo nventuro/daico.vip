@@ -1,5 +1,4 @@
 import { Link, useParams } from 'react-router-dom';
-import { IconArrowLeft } from '@tabler/icons-react';
 import type { GuideChapter } from '../../types';
 import { useGuides } from './useGuides';
 
@@ -26,10 +25,6 @@ export default function GuidePage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Link to="/guias" className="inline-flex items-center gap-1 text-sm text-muted hover:text-muted-strong">
-        <IconArrowLeft size={16} stroke={1.5} />
-        Guías
-      </Link>
       <div>
         <h1 className="font-display text-2xl font-bold">{guide.title}</h1>
         {guide.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{guide.description}</p>}
