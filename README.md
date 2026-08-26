@@ -55,10 +55,14 @@ Three pieces make this work:
 
 - **Local SQLite** (`src/lib/offline/`). [SQLocal](https://sqlocal.dev) runs SQLite
   in a Web Worker, persisted to the browser's [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).
-  It uses the **OPFS SAH Pool VFS**, which (unlike the default OPFS VFS) needs no
-  `SharedArrayBuffer` and therefore no `COOP`/`COEP` response headers — important
-  because **GitHub Pages can't set custom headers**. `engine.ts` is the source of
-  truth the UI reads/writes; every change is instant and offline-safe.
+  A custom worker (`sahpoolWorker.ts`) opens the database through the **OPFS
+  SAH-pool VFS**, which — unlike SQLocal's default OPFS VFS — reaches OPFS through
+  worker-only sync access handles, needing no `SharedArrayBuffer` and therefore no
+  `COOP`/`COEP` response headers, which **GitHub Pages can't set**. (SQLocal's
+  default would silently fall back to a throwaway in-memory database.) The trade is
+  one connection per browser: `singleTab.ts` grants it to one tab with a Web Lock,
+  and a second tab shows an "already open in another tab" notice. `engine.ts` is
+  the source of truth the UI reads/writes; every change is instant and offline-safe.
 
 - **Sync engine** (`src/lib/offline/sync.ts`). On load, on reconnect, and on app
   focus it pushes queued local changes and pulls the server state. Conflicts use
@@ -101,7 +105,12 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
   could in theory misorder near-simultaneous edits on different devices. Deletes
   are unconditional ("delete wins"), so deleting an item another device just
   edited removes it.
-- **OPFS** needs a modern browser (Chrome/Android, or iOS Safari ≥ 16.4).
+- **One tab at a time.** The SAH-pool VFS allows a single connection per browser,
+  so only one tab uses the local database; a second tab shows an "already open in
+  another tab" notice (close it and reload to take over). No data is lost — every
+  tab still reconciles through the server.
+- **OPFS sync access handles** (what the SAH-pool VFS uses) need Chrome/Android or
+  desktop Firefox ≥ 111 — both target browsers qualify.
 - Local data is wiped on sign-out (shared-device hygiene).
 
 ## Fechas

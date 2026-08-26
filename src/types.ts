@@ -131,6 +131,21 @@ export interface Recipe {
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
 export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 
+/**
+ * Name of the OPFS SAH-pool VFS the local database is opened through. This VFS
+ * persists to OPFS without needing `SharedArrayBuffer` (and therefore no
+ * COOP/COEP headers, which the static host can't set), at the cost of a single
+ * connection per origin — hence the single-tab lock below.
+ */
+export const LOCAL_DB_VFS_NAME = 'daico-opfs-sahpool';
+
+/**
+ * Web Locks name held for a tab's lifetime by whichever tab owns the local
+ * database. The SAH-pool VFS allows only one connection per origin, so a second
+ * tab must not open it; it shows the "already open elsewhere" notice instead.
+ */
+export const DB_OWNER_LOCK = 'daico-db-owner';
+
 /** Max length accepted for a shopping item name (input guard). */
 export const SHOPPING_ITEM_NAME_MAX = 120;
 
@@ -148,6 +163,9 @@ export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 
 /** YouTube watch page base; append the video id. */
 export const YOUTUBE_WATCH_URL = 'https://www.youtube.com/watch?v=';
+
+/** How many days ahead a pending chore shows on the home screen's upcoming list. */
+export const CHORE_NOTICE_DAYS = 3;
 
 /** Notice window (days ahead) a new date gets unless the user picks another. */
 export const DATE_NOTICE_DAYS_DEFAULT = 7;

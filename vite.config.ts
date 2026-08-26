@@ -54,9 +54,10 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
-  // SQLocal ships a worker + wasm that must not be pre-bundled by Vite's dep
-  // optimizer, or the worker fails to resolve its assets.
-  optimizeDeps: { exclude: ['sqlocal'] },
+  // SQLocal and the SQLite wasm ship a worker + wasm that must not be pre-bundled
+  // by Vite's dep optimizer, or the custom SAH-pool worker fails to resolve its
+  // assets. The worker imports `@sqlite.org/sqlite-wasm` directly, so exclude it too.
+  optimizeDeps: { exclude: ['sqlocal', '@sqlite.org/sqlite-wasm'] },
   // SQLocal's worker code-splits, which Vite's default IIFE worker format can't
   // bundle — emit ES module workers instead (supported on all modern browsers).
   worker: { format: 'es' },

@@ -20,12 +20,12 @@
 import { SQLocal } from 'sqlocal';
 import { LOCAL_DB_PATH } from '../../types';
 import { ALL_SPECS, type ColumnSpec, type TableSpec } from './specs';
+import { checkDbOwnership, MultiTabError } from './singleTab';
 
 type Row = Record<string, unknown>;
 
 // Lazily created so the worker/OPFS only spin up once an offline table is
 // actually used (never for non-members, who never reach this code).
-let client: SQLocal | null = null;
 let ready: Promise<SQLocal> | null = null;
 
 /**
@@ -34,14 +34,22 @@ let ready: Promise<SQLocal> | null = null;
  * after a client first created the table, so an existing local database picks up
  * new columns instead of erroring on them. Additive only — a column added this
  * way must be nullable or carry a DEFAULT (SQLite's rule for ADD COLUMN).
+ *
+ * The database is opened through a custom worker that uses the OPFS SAH-pool VFS
+ * (sahpoolWorker.ts) so it persists without COOP/COEP headers. Opening is gated
+ * on this tab owning the single-connection lock; a non-owner throws MultiTabError.
  */
 function db(): Promise<SQLocal> {
   if (!ready) {
-    const c = (client ??= new SQLocal({
-      databasePath: LOCAL_DB_PATH,
-      onInit: (sql) => [...ALL_SPECS.map((spec) => sql(createTableSql(spec))), sql(IMAGE_CACHE_SQL)],
-    }));
-    ready = migrateColumns(c).then(() => c);
+    ready = checkDbOwnership().then((owner) => {
+      if (!owner) throw new MultiTabError();
+      const c = new SQLocal({
+        databasePath: LOCAL_DB_PATH,
+        processor: new Worker(new URL('./sahpoolWorker.ts', import.meta.url), { type: 'module' }),
+        onInit: (sql) => [...ALL_SPECS.map((spec) => sql(createTableSql(spec))), sql(IMAGE_CACHE_SQL)],
+      });
+      return migrateColumns(c).then(() => c);
+    });
   }
   return ready;
 }

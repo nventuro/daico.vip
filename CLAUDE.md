@@ -93,11 +93,21 @@ Chromium-only APIs are available everywhere.
   (token syntax, section names) belong in `scripts/import-guides/`, never in the
   app. **Never commit a guides dump** — it is private content, keep it outside
   the repo.
-- **Do not change the SQLite persistence to the default OPFS VFS or anything
-  needing `SharedArrayBuffer`.** That requires `COOP`/`COEP` response headers,
-  which **GitHub Pages cannot set**. SQLocal's OPFS SAH Pool VFS (the default it
-  uses) needs no special headers — keep it that way. Likewise keep
-  `worker: { format: 'es' }` and `optimizeDeps.exclude: ['sqlocal']` in
+- **The local database persists through the OPFS SAH-pool VFS, opened by a custom
+  SQLocal worker (`src/lib/offline/sahpoolWorker.ts`), not SQLocal's default.**
+  SQLocal's default worker uses the classic OPFS VFS, which reaches the file system
+  through a `SharedArrayBuffer`/Atomics proxy and therefore needs `COOP`/`COEP`
+  response headers — and **GitHub Pages can't set those**, so the default silently
+  falls back to an in-memory database that never persists (only a `console.warn`).
+  The SAH-pool VFS uses worker-only sync access handles instead: no
+  `SharedArrayBuffer`, no headers, same OPFS storage. Keep opening the database
+  through that worker (passed as SQLocal's `processor` in `engine.ts`); **don't
+  revert to SQLocal's default and don't add anything needing `SharedArrayBuffer`
+  or cross-origin isolation.** The SAH-pool VFS allows one connection per origin,
+  so `src/lib/offline/singleTab.ts` elects one owning tab with a Web Lock and a
+  second tab gets the "already open in another tab" notice. Likewise keep
+  `worker: { format: 'es' }` and
+  `optimizeDeps.exclude: ['sqlocal', '@sqlite.org/sqlite-wasm']` in
   `vite.config.ts`, or the worker/wasm won't bundle.
 - **The membership check is offline-tolerant** (`AppContext` falls back to a
   per-user cached verdict when the live read fails). This is only a UI gate — the

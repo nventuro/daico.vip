@@ -1,16 +1,29 @@
+import { lazy, Suspense } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { IconLogout, IconSearch } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
+import { useDbOwnership } from '../hooks/useDbOwnership';
 import LoginScreen from '../components/LoginScreen';
 import NoAccess from '../components/NoAccess';
+
+// Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
+const TabConflict = lazy(() => import('../components/TabConflict'));
 
 export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
   const online = useOnline();
+  const dbOwnership = useDbOwnership();
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccess />;
+  // The local store allows one connection per browser; a second tab is diverted.
+  if (dbOwnership === 'blocked')
+    return (
+      <Suspense fallback={null}>
+        <TabConflict />
+      </Suspense>
+    );
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
