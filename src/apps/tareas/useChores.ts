@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import type { Chore } from '../types';
-import { CHORES_SPEC } from '../lib/offline/specs';
-import * as engine from '../lib/offline/engine';
-import { useOfflineTable } from './useOfflineTable';
+import type { Chore } from '../../types';
+import { CHORES_SPEC } from '../../lib/offline/specs';
+import * as engine from '../../lib/offline/engine';
+import { useOfflineTable } from '../../hooks/useOfflineTable';
 
 /** Local-first chores: add / toggle / delete, syncing in the background. Every
  *  action is instant and works offline. */

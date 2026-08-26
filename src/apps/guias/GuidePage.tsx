@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { IconArrowLeft } from '@tabler/icons-react';
-import type { GuideChapter } from '../types';
-import { useGuides } from '../hooks/useGuides';
+import type { GuideChapter } from '../../types';
+import { useGuides } from './useGuides';
 
 /** Chapters grouped by section, preserving the store's reading order. */
 function groupBySection(chapters: GuideChapter[]): { title: string; chapters: GuideChapter[] }[] {

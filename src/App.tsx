@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { AppProvider } from './context/AppContext';
-import MainLayout from './components/MainLayout';
+import MainLayout from './shell/MainLayout';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);

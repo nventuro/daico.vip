@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { guideImageUrl } from '../lib/guideImages';
+import { guideImageUrl } from '../../lib/guideImages';
 
 interface Props {
   imageKey: string;

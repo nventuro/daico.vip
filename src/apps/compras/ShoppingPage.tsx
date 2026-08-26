@@ -14,14 +14,14 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { ShoppingItem } from '../types';
-import { useShoppingList } from '../hooks/useShoppingList';
-import { keyForMove } from '../lib/ordering';
-import OfflineBanner from './OfflineBanner';
-import ChecklistItem from './ChecklistItem';
+import type { ShoppingItem } from '../../types';
+import { useShoppingList } from './useShoppingList';
+import { keyForMove } from '../../lib/ordering';
+import OfflineBanner from '../../components/OfflineBanner';
+import ChecklistItem from '../../components/ChecklistItem';
 import SortableShoppingItem from './SortableShoppingItem';
-import CompletedSection from './CompletedSection';
-import AddBar from './AddBar';
+import CompletedSection from '../../components/CompletedSection';
+import AddBar from '../../components/AddBar';
 
 export default function ShoppingPage() {
   const { items, loading, error, add, toggle, remove, move } = useShoppingList();

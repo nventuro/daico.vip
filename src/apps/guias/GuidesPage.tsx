@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
-import { useGuides } from '../hooks/useGuides';
+import { useGuides } from './useGuides';
 
 export default function GuidesPage() {
   const { guides, loading, error } = useGuides();

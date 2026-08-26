@@ -3,10 +3,10 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import { Link } from 'react-router-dom';
-import { directivesToElements } from '../lib/markdownDirectives';
+import { directivesToElements } from '../../lib/markdownDirectives';
 import GuideImage from './GuideImage';
-import GuideVideo from './GuideVideo';
-import Spoiler from './Spoiler';
+import GuideVideo from '../../components/GuideVideo';
+import Spoiler from '../../components/Spoiler';
 
 const remarkPlugins = [remarkGfm, remarkDirective, directivesToElements];
 

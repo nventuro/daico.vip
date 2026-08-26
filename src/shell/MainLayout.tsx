@@ -2,8 +2,8 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { IconLogout, IconListCheck, IconShoppingCart, IconBook } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
-import LoginScreen from './LoginScreen';
-import NoAccess from './NoAccess';
+import LoginScreen from '../components/LoginScreen';
+import NoAccess from '../components/NoAccess';
 
 function tabClass({ isActive }: { isActive: boolean }): string {
   return `flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${

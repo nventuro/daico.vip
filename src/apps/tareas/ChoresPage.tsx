@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { IconCalendarEvent } from '@tabler/icons-react';
-import type { Chore } from '../types';
-import { useChores } from '../hooks/useChores';
-import { formatDateShort } from '../utils/dateUtils';
-import OfflineBanner from './OfflineBanner';
-import ChecklistItem from './ChecklistItem';
-import CompletedSection from './CompletedSection';
-import AddBar from './AddBar';
+import type { Chore } from '../../types';
+import { useChores } from './useChores';
+import { formatDateShort } from '../../utils/dateUtils';
+import OfflineBanner from '../../components/OfflineBanner';
+import ChecklistItem from '../../components/ChecklistItem';
+import CompletedSection from '../../components/CompletedSection';
+import AddBar from '../../components/AddBar';
 
 /** Today as an ISO date string (yyyy-mm-dd) in local time. */
 function todayIso(): string {

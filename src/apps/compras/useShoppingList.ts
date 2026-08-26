@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
-import { SHOPPING_ITEM_NAME_MAX, type ShoppingItem } from '../types';
-import { SHOPPING_SPEC } from '../lib/offline/specs';
-import * as engine from '../lib/offline/engine';
-import { keyForAppend } from '../lib/ordering';
-import { useOfflineTable } from './useOfflineTable';
+import { SHOPPING_ITEM_NAME_MAX, type ShoppingItem } from '../../types';
+import { SHOPPING_SPEC } from '../../lib/offline/specs';
+import * as engine from '../../lib/offline/engine';
+import { keyForAppend } from '../../lib/ordering';
+import { useOfflineTable } from '../../hooks/useOfflineTable';
 
 /** Local-first shopping list: add / toggle / delete / reorder items, syncing in
  *  the background. Every action is instant and works offline. */

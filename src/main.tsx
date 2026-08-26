@@ -7,11 +7,11 @@ import App from './App.tsx'
 // Route pages are code-split so each tab's deps (e.g. the shopping list's
 // drag-and-drop engine) load only when that tab is opened, keeping the initial
 // bundle small.
-const ChoresPage = lazy(() => import('./components/ChoresPage.tsx'))
-const ShoppingPage = lazy(() => import('./components/ShoppingPage.tsx'))
-const GuidesPage = lazy(() => import('./components/GuidesPage.tsx'))
-const GuidePage = lazy(() => import('./components/GuidePage.tsx'))
-const GuideChapterPage = lazy(() => import('./components/GuideChapterPage.tsx'))
+const ChoresPage = lazy(() => import('./apps/tareas/ChoresPage.tsx'))
+const ShoppingPage = lazy(() => import('./apps/compras/ShoppingPage.tsx'))
+const GuidesPage = lazy(() => import('./apps/guias/GuidesPage.tsx'))
+const GuidePage = lazy(() => import('./apps/guias/GuidePage.tsx'))
+const GuideChapterPage = lazy(() => import('./apps/guias/GuideChapterPage.tsx'))
 
 const pageFallback = <p className="text-muted">Cargando...</p>
 

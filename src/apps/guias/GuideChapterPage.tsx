@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { IconArrowLeft, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { useGuides } from '../hooks/useGuides';
+import { useGuides } from './useGuides';
 import GuideMarkdown from './GuideMarkdown';
 
 export default function GuideChapterPage() {

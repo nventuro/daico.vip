@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { Guide, GuideChapter } from '../types';
-import { GUIDES_SPEC, GUIDE_CHAPTERS_SPEC } from '../lib/offline/specs';
-import * as engine from '../lib/offline/engine';
-import { useOfflineTable } from './useOfflineTable';
+import type { Guide, GuideChapter } from '../../types';
+import { GUIDES_SPEC, GUIDE_CHAPTERS_SPEC } from '../../lib/offline/specs';
+import * as engine from '../../lib/offline/engine';
+import { useOfflineTable } from '../../hooks/useOfflineTable';
 
 /**
  * The library of imported guides and their chapters, read from the local store
