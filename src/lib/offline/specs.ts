@@ -85,6 +85,18 @@ export const DATES_SPEC: TableSpec = {
   orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
 };
 
+export const RECIPES_SPEC: TableSpec = {
+  table: 'recipes',
+  columns: [
+    { name: 'title', ddl: 'TEXT NOT NULL' },
+    // Markdown in the app's dialect; empty until the recipe is written.
+    { name: 'body', ddl: "TEXT NOT NULL DEFAULT ''" },
+    { name: 'minutes', ddl: 'INTEGER' },
+    { name: 'servings', ddl: 'INTEGER' },
+  ],
+  orderBy: 'title COLLATE NOCASE ASC',
+};
+
 /** Every offline-synced table, in sync order. */
 export const ALL_SPECS: TableSpec[] = [
   CHORES_SPEC,
@@ -92,4 +104,5 @@ export const ALL_SPECS: TableSpec[] = [
   GUIDES_SPEC,
   GUIDE_CHAPTERS_SPEC,
   DATES_SPEC,
+  RECIPES_SPEC,
 ];

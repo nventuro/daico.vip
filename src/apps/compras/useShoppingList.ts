@@ -14,11 +14,17 @@ export function useShoppingList() {
     (name: string) => {
       const value = name.trim().slice(0, SHOPPING_ITEM_NAME_MAX);
       if (!value) return Promise.resolve();
-      // Append after the last active item (items are kept in position order).
-      const position = keyForAppend(items.filter((i) => !i.checked));
-      return mutate(() => engine.insert(SHOPPING_SPEC, { name: value, checked: false, position }));
+      return mutate(async () => {
+        // Append after the last active item (items are kept in position order).
+        // Read the list at write time rather than closing over `items`, so
+        // several adds in a row from one handler each land after the previous
+        // one instead of all minting the same key.
+        const current = await engine.listVisible<ShoppingItem>(SHOPPING_SPEC);
+        const position = keyForAppend(current.filter((i) => !i.checked));
+        return engine.insert(SHOPPING_SPEC, { name: value, checked: false, position });
+      });
     },
-    [items, mutate],
+    [mutate],
   );
 
   const toggle = useCallback(

@@ -107,6 +107,27 @@ export interface DateEntry {
   updated_at: string;
 }
 
+/**
+ * A recipe: a title and a markdown body in the app's dialect (an
+ * `:::ingredients` block renders as a tickable list). Created with only a title
+ * and written afterwards, so an empty body is normal. Like every offline-synced
+ * row, `id` is a client-generated UUID and `updated_at` is the last-write-wins
+ * key.
+ */
+export interface Recipe {
+  id: string;
+  title: string;
+  body: string;
+  /** Total time in minutes, when known. */
+  minutes: number | null;
+  /** How many portions it yields, when known. */
+  servings: number | null;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
 export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 
@@ -140,3 +161,6 @@ export const DATE_REPEAT_MONTHS_DEFAULT = 3;
 /** Bounds for a date's every-N-months interval (input guard). */
 export const DATE_REPEAT_MONTHS_MIN = 1;
 export const DATE_REPEAT_MONTHS_MAX = 24;
+
+/** Smallest value accepted for a recipe's minutes or servings (input guard). */
+export const RECIPE_QUANTITY_MIN = 1;

@@ -32,7 +32,7 @@ home screen are built from the registry; its order is the tile order.
 
 ## Offline-first
 
-Chores, the shopping list and dates work with **no connection** — you can open
+Chores, the shopping list, dates and recipes work with **no connection** — you can open
 the app, add, check off, and delete items offline (e.g. at a shop with no
 signal), and it all syncs automatically once you're back online. There's no spinner on any
 action: the UI reads and writes a local database and the network happens in the
@@ -108,6 +108,36 @@ itself with zero writes. A one-off whose day has passed sits under "Pasadas"
 until it is deleted. Each entry has a notice window (`notice_days`) that decides
 how far ahead it appears in the home screen's "Próximo" list.
 
+## Recetas
+
+Recipes are markdown documents in the `recipes` table (offline-synced like the
+others): a title, an optional time and number of servings, and a body in the
+dialect below. A recipe is created with only its title and written afterwards in
+a plain textarea. An `:::ingredients` block in the body renders as a tickable
+list on the recipe page; each row can be sent to the shopping list, and one
+button sends everything not ticked. Ticks are a reading aid for the current
+session and are never saved.
+
+## Markdown dialect
+
+Guide chapters and recipe bodies share one reader (`src/components/Markdown.tsx`):
+CommonMark + GFM tables, plus these
+[remark-directive](https://github.com/remarkjs/remark-directive) forms mapped to
+components:
+
+- `::image{key="…" width="60" align="center"}` — an image by key, width as a
+  percentage of the column. Only guides can resolve one (they own an image
+  cache); anywhere else it renders nothing.
+- `::youtube{id="…" start="0"}` — an embed; a plain link when offline.
+- `:spoiler[text]` — tap to reveal.
+- `:::ingredients` … `:::` — a markdown list (`-`, `*` or `1.`) inside; each
+  item becomes a tickable row with an "add to Compras" button. Inline markup in
+  an item is flattened to plain text; anything that isn't a list item is
+  ignored.
+
+Links to other guides or chapters are ordinary relative links
+(`/guias/<guide>/<chapter>`).
+
 ## Guides
 
 Guides are read-only reference documents (a guide → sections → chapters) that
@@ -120,13 +150,7 @@ import script, and the app only reads them.
   every sync — so the app fetches each image the first time a chapter needs it
   and keeps it in a local-only cache table (`guide_image_cache`); previously read
   chapters render offline. All three are `select`-only for `authenticated`.
-- **Chapter bodies** are markdown: CommonMark + GFM tables, plus three
-  [remark-directive](https://github.com/remarkjs/remark-directive) forms the
-  reader (`src/apps/guias/`) maps to components:
-  `::image{key="…" width="60" align="center"}` (an image by key, width as a
-  percentage of the column), `::youtube{id="…" start="0"}` (embed; a plain link
-  when offline) and `:spoiler[text]` (tap to reveal). Links to other guides or
-  chapters are ordinary relative links (`/guias/<guide>/<chapter>`).
+- **Chapter bodies** are written in the markdown dialect above.
 
 ### Importing guides
 
