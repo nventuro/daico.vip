@@ -4,6 +4,13 @@ Private household app for tracking chores, appointments, and personal documents,
 backed by Supabase. Access is restricted to a fixed allowlist of authorized users.
 All data is sensitive and strictly access-gated.
 
+## Target platform
+
+Supported browsers are **Android mobile (Chromium-based)** and **desktop Firefox
+(Gecko)**. iOS and Safari are out of scope — a feature unsupported only on
+Safari/iOS is not a blocker. The two supported engines differ, so don't assume
+Chromium-only APIs are available everywhere.
+
 ## Tech Stack
 
 - React + TypeScript + Vite
