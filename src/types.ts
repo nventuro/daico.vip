@@ -79,6 +79,34 @@ export interface GuideChapter {
   updated_at: string;
 }
 
+/** How a date repeats: never, every year, or every `repeat_months` months. */
+export const REPEAT_KINDS = ['none', 'yearly', 'months'] as const;
+export type RepeatKind = (typeof REPEAT_KINDS)[number];
+
+/**
+ * A calendar entry — a birthday, an appointment, a renewal. Not a task: nothing
+ * is ever done, and the app never rewrites a row on its own. `occurs_on` is the
+ * anchor the user entered; a recurring entry's next occurrence is computed from
+ * it on read, so it rolls over by itself. Like every offline-synced row, `id` is
+ * a client-generated UUID and `updated_at` is the last-write-wins key.
+ */
+export interface DateEntry {
+  id: string;
+  title: string;
+  /** The anchor: the ISO date (yyyy-mm-dd) entered by the user, never moved by the app. */
+  occurs_on: string;
+  repeat: RepeatKind;
+  /** Interval in months when `repeat` is 'months'; null otherwise. */
+  repeat_months: number | null;
+  /** How many days ahead the entry shows on the home screen (0 = only on the day). */
+  notice_days: number;
+  notes: string | null;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
 export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 
@@ -99,3 +127,16 @@ export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 
 /** YouTube watch page base; append the video id. */
 export const YOUTUBE_WATCH_URL = 'https://www.youtube.com/watch?v=';
+
+/** Notice window (days ahead) a new date gets unless the user picks another. */
+export const DATE_NOTICE_DAYS_DEFAULT = 7;
+
+/** Notice windows (days ahead) offered when adding or editing a date. */
+export const DATE_NOTICE_DAYS_OPTIONS = [0, 1, 3, 7, 14, 30] as const;
+
+/** Interval a date gets when switched to repeating every N months. */
+export const DATE_REPEAT_MONTHS_DEFAULT = 3;
+
+/** Bounds for a date's every-N-months interval (input guard). */
+export const DATE_REPEAT_MONTHS_MIN = 1;
+export const DATE_REPEAT_MONTHS_MAX = 24;

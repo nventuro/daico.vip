@@ -32,9 +32,9 @@ home screen are built from the registry; its order is the tile order.
 
 ## Offline-first
 
-Chores and the shopping list work with **no connection** — you can open the app,
-add, check off, and delete items offline (e.g. at a shop with no signal), and it
-all syncs automatically once you're back online. There's no spinner on any
+Chores, the shopping list and dates work with **no connection** — you can open
+the app, add, check off, and delete items offline (e.g. at a shop with no
+signal), and it all syncs automatically once you're back online. There's no spinner on any
 action: the UI reads and writes a local database and the network happens in the
 background.
 
@@ -96,6 +96,17 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
   edited removes it.
 - **OPFS** needs a modern browser (Chrome/Android, or iOS Safari ≥ 16.4).
 - Local data is wiped on sign-out (shared-device hygiene).
+
+## Fechas
+
+Dates are calendar entries — birthdays, appointments, renewals — kept in the
+`dates` table (offline-synced like the others). A date is not a task: nothing is
+ever "done". `occurs_on` is the **anchor** the user entered and the app never
+rewrites it; for a repeating entry (yearly, or every N months) the next
+occurrence is computed on read from the anchor, so a birthday rolls over by
+itself with zero writes. A one-off whose day has passed sits under "Pasadas"
+until it is deleted. Each entry has a notice window (`notice_days`) that decides
+how far ahead it appears in the home screen's "Próximo" list.
 
 ## Guides
 

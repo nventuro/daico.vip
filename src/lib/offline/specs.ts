@@ -7,6 +7,7 @@
 // itself: `id` (a client-generated UUID text), `created_at`, and `updated_at`
 // (the last-write-wins key). `columns` below lists only the app-specific ones.
 // =============================================================================
+import { DATE_NOTICE_DAYS_DEFAULT } from '../../types';
 
 export interface ColumnSpec {
   name: string;
@@ -70,5 +71,25 @@ export const GUIDE_CHAPTERS_SPEC: TableSpec = {
   orderBy: 'guide_id ASC, section_position ASC, position ASC',
 };
 
+export const DATES_SPEC: TableSpec = {
+  table: 'dates',
+  columns: [
+    { name: 'title', ddl: 'TEXT NOT NULL' },
+    // yyyy-mm-dd, like chores.due_on.
+    { name: 'occurs_on', ddl: 'TEXT NOT NULL' },
+    { name: 'repeat', ddl: "TEXT NOT NULL DEFAULT 'none'" },
+    { name: 'repeat_months', ddl: 'INTEGER' },
+    { name: 'notice_days', ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
+    { name: 'notes', ddl: 'TEXT' },
+  ],
+  orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
+};
+
 /** Every offline-synced table, in sync order. */
-export const ALL_SPECS: TableSpec[] = [CHORES_SPEC, SHOPPING_SPEC, GUIDES_SPEC, GUIDE_CHAPTERS_SPEC];
+export const ALL_SPECS: TableSpec[] = [
+  CHORES_SPEC,
+  SHOPPING_SPEC,
+  GUIDES_SPEC,
+  GUIDE_CHAPTERS_SPEC,
+  DATES_SPEC,
+];

@@ -2,7 +2,7 @@ import type { RouteObject } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 import type { TableSpec } from '../lib/offline/specs';
 
-export type AppId = 'tareas' | 'compras' | 'guias';
+export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas';
 
 /** Colour token name (`--color-<hue>` in the theme) an app is painted with. */
 export type AppHue =

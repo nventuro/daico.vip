@@ -2,6 +2,7 @@ import type { AppModule } from './types';
 import tareas from './tareas';
 import compras from './compras';
 import guias from './guias';
+import fechas from './fechas';
 
 /** Every app, in the order they appear on the home screen. */
-export const apps: readonly AppModule[] = [tareas, compras, guias];
+export const apps: readonly AppModule[] = [tareas, compras, guias, fechas];

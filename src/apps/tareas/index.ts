@@ -2,6 +2,8 @@ import { lazy } from 'react';
 import { IconListCheck } from '@tabler/icons-react';
 import { CHORES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
+import { useChoresStatus } from './useChoresStatus';
+import { useChoresUpcoming } from './useChoresUpcoming';
 
 const ChoresPage = lazy(() => import('./ChoresPage'));
 
@@ -12,6 +14,8 @@ const tareas: AppModule = {
   icon: IconListCheck,
   specs: [CHORES_SPEC],
   routes: [{ index: true, Component: ChoresPage }],
+  useStatus: useChoresStatus,
+  useUpcoming: useChoresUpcoming,
 };
 
 export default tareas;

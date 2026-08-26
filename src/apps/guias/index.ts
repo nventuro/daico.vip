@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { IconBook } from '@tabler/icons-react';
 import { GUIDES_SPEC, GUIDE_CHAPTERS_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
+import { useGuidesStatus } from './useGuidesStatus';
 
 const GuidesPage = lazy(() => import('./GuidesPage'));
 const GuidePage = lazy(() => import('./GuidePage'));
@@ -18,6 +19,7 @@ const guias: AppModule = {
     { path: ':guideId', Component: GuidePage },
     { path: ':guideId/:chapterId', Component: GuideChapterPage },
   ],
+  useStatus: useGuidesStatus,
 };
 
 export default guias;
