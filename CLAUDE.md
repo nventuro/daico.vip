@@ -62,7 +62,7 @@ Chromium-only APIs are available everywhere.
 
 ## Offline-first model — read before touching data tables
 
-- **Chores and the shopping list are offline-first.** A generic engine in
+- **Every data table is offline-first.** A generic engine in
   `src/lib/offline/` runs SQLite in the browser (SQLocal over OPFS, in a Web
   Worker) as the source of truth the UI reads/writes, and a sync engine
   reconciles with Postgres on load / reconnect / app-focus. The README has the
@@ -77,8 +77,9 @@ Chromium-only APIs are available everywhere.
   same migration.
 - **To add an offline table:** write the migration (uuid PK + `updated_at` + the
   usual RLS/policy/grants), add a `TableSpec` to `src/lib/offline/specs.ts` and to
-  `ALL_SPECS`, then add a thin typed hook over `useOfflineTable` (see
-  `useShoppingList` / `useChores`). Do **not** hand-write sync or SQL — the generic
+  `ALL_SPECS`, list it in the owning module's `specs` (`src/apps/<id>/index.ts`),
+  then add a thin typed hook over `useOfflineTable` (see `useShoppingList` /
+  `useChores`). Do **not** hand-write sync or SQL — the generic
   `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
   the LWW reconcile. Conflict policy is last-write-wins with "delete wins".
 - **Guides are read-only imported content.** `guides` / `guide_chapters` are
