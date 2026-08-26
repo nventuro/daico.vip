@@ -4,6 +4,7 @@ import { CHORES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
 import { useChoresStatus } from './useChoresStatus';
 import { useChoresUpcoming } from './useChoresUpcoming';
+import { searchChores } from './search';
 
 const ChoresPage = lazy(() => import('./ChoresPage'));
 
@@ -16,6 +17,7 @@ const tareas: AppModule = {
   routes: [{ index: true, Component: ChoresPage }],
   useStatus: useChoresStatus,
   useUpcoming: useChoresUpcoming,
+  search: searchChores,
 };
 
 export default tareas;

@@ -4,6 +4,7 @@ import { DATES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
 import { useDatesStatus } from './useDatesStatus';
 import { useDatesUpcoming } from './useDatesUpcoming';
+import { searchDates } from './search';
 
 const DatesPage = lazy(() => import('./DatesPage'));
 const DateEditPage = lazy(() => import('./DateEditPage'));
@@ -20,6 +21,7 @@ const fechas: AppModule = {
   ],
   useStatus: useDatesStatus,
   useUpcoming: useDatesUpcoming,
+  search: searchDates,
 };
 
 export default fechas;

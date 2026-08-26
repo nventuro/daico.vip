@@ -3,6 +3,7 @@ import { IconChefHat } from '@tabler/icons-react';
 import { RECIPES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
 import { useRecipesStatus } from './useRecipesStatus';
+import { searchRecipes } from './search';
 
 const RecipesPage = lazy(() => import('./RecipesPage'));
 const RecipePage = lazy(() => import('./RecipePage'));
@@ -20,6 +21,7 @@ const recetas: AppModule = {
     { path: ':id/editar', Component: RecipeEditPage },
   ],
   useStatus: useRecipesStatus,
+  search: searchRecipes,
 };
 
 export default recetas;

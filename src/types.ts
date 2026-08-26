@@ -164,3 +164,12 @@ export const DATE_REPEAT_MONTHS_MAX = 24;
 
 /** Smallest value accepted for a recipe's minutes or servings (input guard). */
 export const RECIPE_QUANTITY_MIN = 1;
+
+/** Pause in typing (ms) before the search box runs a search. */
+export const SEARCH_DEBOUNCE_MS = 200;
+
+/** Characters shown either side of a match in a search result excerpt. */
+export const SEARCH_EXCERPT_RADIUS = 40;
+
+/** Most results a single app contributes to a search. */
+export const SEARCH_MAX_HITS_PER_APP = 20;

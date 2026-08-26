@@ -1,5 +1,5 @@
-import { Outlet } from 'react-router-dom';
-import { IconLogout } from '@tabler/icons-react';
+import { Link, Outlet } from 'react-router-dom';
+import { IconLogout, IconSearch } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import LoginScreen from '../components/LoginScreen';
@@ -22,15 +22,25 @@ export default function MainLayout() {
               Daico
             </span>
           </span>
-          <button
-            onClick={signOut}
-            disabled={!online}
-            aria-label="Cerrar sesión"
-            title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent disabled:hover:text-disabled"
-          >
-            <IconLogout size={18} stroke={1.5} />
-          </button>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/buscar"
+              aria-label="Buscar"
+              title="Buscar"
+              className="flex items-center rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong"
+            >
+              <IconSearch size={18} stroke={1.5} />
+            </Link>
+            <button
+              onClick={signOut}
+              disabled={!online}
+              aria-label="Cerrar sesión"
+              title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent disabled:hover:text-disabled"
+            >
+              <IconLogout size={18} stroke={1.5} />
+            </button>
+          </div>
         </div>
       </header>
 

@@ -19,6 +19,13 @@ tables it owns — described by an `AppModule` object (contract in
 `src/apps/types.ts`) and listed in `src/apps/registry.ts`. The router and the
 home screen are built from the registry; its order is the tile order.
 
+**Buscar** (`/buscar`, the magnifier in the header) searches every app at once.
+A module takes part by exporting an optional `search(query)` adapter that
+returns its hits (title, optional subtitle, link); the page runs every adapter
+and shows the results grouped by app, in registry order. Matching is case- and
+accent-insensitive (`noquis` finds "Ñoquis"), and since each adapter reads the
+app's local store it works with no connection.
+
 ### Adding an app
 
 1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`, `hue`,
