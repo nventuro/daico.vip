@@ -14,8 +14,9 @@ import {
   CONTROL_CLASS,
   FIELD_CLASS,
 } from '../../components/controlClasses';
+import { noticeLabel } from '../../utils/dateUtils';
 import type { DateInput } from './useDates';
-import { noticeLabel, repeatLabel } from './labels';
+import { repeatLabel } from './labels';
 
 /** The scheduling half of a date: when, how it repeats, and the notice window. */
 export type DateFieldsValue = Pick<

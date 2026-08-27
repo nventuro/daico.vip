@@ -1,25 +1,24 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { IconFileText } from '@tabler/icons-react';
-import { formatBytes } from '../../utils/textUtils';
-import { useObjectUrl } from '../../hooks/useObjectUrl';
-import FormField from '../../components/FormField';
-import TextInput from '../../components/TextInput';
-import Button from '../../components/Button';
-import { useChores } from './useChores';
-import { useAttachments } from './useAttachments';
-import { useAttachmentFile } from './useAttachmentFile';
+import { formatBytes } from '../utils/textUtils';
+import { useObjectUrl } from '../hooks/useObjectUrl';
+import { useAttachments } from '../hooks/useAttachments';
+import { useAttachmentFile } from '../hooks/useAttachmentFile';
+import FormField from './FormField';
+import TextInput from './TextInput';
+import Button from './Button';
+import type { AttachmentOwnerProps } from './AttachmentPage';
 
 /**
- * Names the attachment just added to a chore (the file is already stored, so a
- * reload here loses nothing — it only leaves the attachment unnamed). Cancelar
- * undoes the add; Guardar keeps it, named or not.
+ * Names the attachment just added to an entry (the file is already stored, so
+ * a reload here loses nothing — it only leaves the attachment unnamed).
+ * Cancelar undoes the add; Guardar keeps it, named or not.
  */
-export default function NewAttachmentPage() {
-  const { id, attachmentId } = useParams();
+export default function NewAttachmentPage({ owner, ownerTitle, ownerPath }: AttachmentOwnerProps) {
+  const { attachmentId } = useParams();
   const navigate = useNavigate();
-  const { items: chores } = useChores();
-  const { items, loading, rename, remove } = useAttachments(id);
+  const { items, loading, rename, remove } = useAttachments(owner);
   const attachment = items.find((a) => a.id === attachmentId);
   const isImage = attachment?.mime.startsWith('image/') ?? false;
   const view = useAttachmentFile(isImage ? attachment : undefined, false);
@@ -27,31 +26,29 @@ export default function NewAttachmentPage() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const chorePath = `/tareas/${id}`;
   // Loaded and not there: it was undone, or the link is stale.
-  if (!loading && !attachment) return <Navigate to={chorePath} replace />;
+  if (!loading && !attachment) return <Navigate to={ownerPath} replace />;
   if (!attachment) return <p className="text-muted">Cargando...</p>;
-  const chore = chores.find((c) => c.id === id);
 
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!attachment || busy) return;
     setBusy(true);
     await rename(attachment.id, name);
-    navigate(chorePath);
+    navigate(ownerPath);
   }
 
   async function cancel() {
     if (!attachment || busy) return;
     setBusy(true);
     await remove(attachment);
-    navigate(chorePath);
+    navigate(ownerPath);
   }
 
   return (
     <form onSubmit={save} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-sm text-muted">
-        <span>{chore ? `${chore.title} · nuevo adjunto` : 'Nuevo adjunto'}</span>
+        <span>{ownerTitle ? `${ownerTitle} · nuevo adjunto` : 'Nuevo adjunto'}</span>
         <div className="flex h-60 items-center justify-center overflow-hidden border border-border bg-surface-raised">
           {preview ? (
             <img src={preview} alt="" className="h-full w-full object-contain" />

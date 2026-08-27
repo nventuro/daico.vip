@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { CHORE_NOTICE_DAYS } from '../../types';
 import type { Upcoming } from '../types';
 import { daysUntil, todayIso } from '../../utils/dateUtils';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
-import { useAttachments } from './useAttachments';
 import { choreMarks } from './marks';
 
 /** Pending chores that are overdue or due within the next few days, for the
@@ -24,7 +24,7 @@ export function useChoresUpcoming(): Upcoming[] {
                 appId: 'tareas',
                 marks: choreMarks(
                   chore,
-                  attachments.some((a) => a.owner_id === chore.id),
+                  attachments.some((a) => a.owner_kind === 'chore' && a.owner_id === chore.id),
                 ),
               },
             ]

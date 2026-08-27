@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ATTACHMENT_FILE_TYPES, type Attachment } from '../../types';
-import { decryptFile } from '../../lib/householdKey';
-import { fetchAttachmentFile } from '../../lib/attachmentFiles';
-import * as engine from '../../lib/offline/engine';
-import { useMasterKey } from '../../hooks/useMasterKey';
+import { ATTACHMENT_FILE_TYPES, type Attachment } from '../types';
+import { decryptFile } from '../lib/householdKey';
+import { fetchAttachmentFile } from '../lib/attachmentFiles';
+import * as engine from '../lib/offline/engine';
+import { useMasterKey } from './useMasterKey';
 
 /** An attachment's file as the page can use it, once it can. */
 export type AttachmentFileView =

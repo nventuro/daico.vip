@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { UNDO_MS, type Chore } from '../../types';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
-import { useAttachments } from './useAttachments';
 import { relativeDay, todayIso } from '../../utils/dateUtils';
 import { useUndo } from '../../hooks/useUndo';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -16,7 +16,10 @@ import { choreMarks } from './marks';
 export default function ChoresPage() {
   const { items: chores, loading, error, add, setDone } = useChores();
   const { items: attachments } = useAttachments();
-  const attached = useMemo(() => new Set(attachments.map((a) => a.owner_id)), [attachments]);
+  const attached = useMemo(
+    () => new Set(attachments.filter((a) => a.owner_kind === 'chore').map((a) => a.owner_id)),
+    [attachments],
+  );
   const undo = useUndo<Chore>(UNDO_MS);
 
   const today = todayIso();

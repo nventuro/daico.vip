@@ -312,6 +312,15 @@ export async function getAttachmentUploadState(id: string): Promise<AttachmentUp
   return rows[0] ? uploadState(rows[0]) : null;
 }
 
+/** The ids of every attachment whose file this device holds. */
+export async function listAttachmentFileIds(): Promise<string[]> {
+  const c = await db();
+  const rows = await c.sql<Pick<AttachmentFileRow, 'id'>>(
+    `SELECT id FROM ${ATTACHMENT_FILES_TABLE}`,
+  );
+  return rows.map((row) => row.id);
+}
+
 /** Keep an attachment's file locally: one just added here (`uploaded` false,
  *  queued for upload) or one fetched from the bucket (`uploaded` true). */
 export async function putAttachmentFile(

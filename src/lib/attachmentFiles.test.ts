@@ -23,6 +23,7 @@ const row = {
   size: 3,
   wrapped_file_key: 'k',
 };
+const documentRow = { ...row, owner_kind: 'document', owner_id: 'd1' };
 
 /** An attachment as the app adds one: the file first, then its row. */
 async function added(id: string, content = 'abc'): Promise<void> {
@@ -167,6 +168,46 @@ describe('syncAttachmentFiles', () => {
       'young-orphan',
       'old-kept',
     ]);
+  });
+
+  it("keeps every document's file on this device, and no other", async () => {
+    server.seedObjects(ATTACHMENTS_BUCKET, [
+      { name: 'doc', data: bytes('doc'), created_at: T0 },
+      { name: 'chore', data: bytes('chore'), created_at: T0 },
+    ]);
+    await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
+    await engine.insert(ATTACHMENTS_SPEC, row, 'chore');
+    await syncAttachmentFiles();
+    expect(await engine.getAttachmentFile('doc')).toEqual(bytes('doc'));
+    expect(await engine.getAttachmentUploadState('doc')).toBe('uploaded');
+    expect(await engine.getAttachmentFile('chore')).toBeNull();
+    await syncAttachmentFiles();
+    expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
+  });
+
+  it("leaves a document's file the bucket does not have yet for a later run", async () => {
+    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'now', data: bytes('now'), created_at: T0 }]);
+    await engine.insert(ATTACHMENTS_SPEC, documentRow, 'later');
+    await engine.insert(ATTACHMENTS_SPEC, documentRow, 'now');
+    await syncAttachmentFiles();
+    expect(await engine.getAttachmentFile('now')).toEqual(bytes('now'));
+    expect(await engine.getAttachmentFile('later')).toBeNull();
+    server.seedObjects(ATTACHMENTS_BUCKET, [
+      { name: 'later', data: bytes('later'), created_at: T0 },
+    ]);
+    await syncAttachmentFiles();
+    expect(await engine.getAttachmentFile('later')).toEqual(bytes('later'));
+  });
+
+  it('leaves the fetch of document files for the next run when the bucket is unreachable', async () => {
+    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'doc', data: bytes('doc'), created_at: T0 }]);
+    await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
+    server.fail('download', ATTACHMENTS_BUCKET, 'network down');
+    await expect(syncAttachmentFiles()).rejects.toThrow('network down');
+    expect(await engine.getAttachmentFile('doc')).toBeNull();
+    server.restore();
+    await syncAttachmentFiles();
+    expect(await engine.getAttachmentFile('doc')).toEqual(bytes('doc'));
   });
 
   it('runs at the end of a sync when registered, so a new attachment reaches both places', async () => {

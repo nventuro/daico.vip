@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import * as engine from '../../lib/offline/engine';
+import * as engine from '../lib/offline/engine';
 
 /** Where this device's copy of an attachment's file stands with the bucket,
  *  kept current; null when the device holds no copy. */

@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import { afterSync } from './lib/offline/sync';
+import { syncAttachmentFiles } from './lib/attachmentFiles';
 import { AppProvider } from './context/AppContext';
 import MainLayout from './shell/MainLayout';
+
+// Attachment files travel outside the tables; they follow every sync so a file
+// added offline goes up as soon as the rows do, whichever screen is open.
+afterSync(syncAttachmentFiles);
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);

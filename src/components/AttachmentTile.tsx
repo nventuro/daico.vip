@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { IconCloudOff, IconCloudUpload, IconFileText, IconPhoto } from '@tabler/icons-react';
-import type { Attachment } from '../../types';
-import { useObjectUrl } from '../../hooks/useObjectUrl';
-import { useAttachmentFile } from './useAttachmentFile';
-import { useAttachmentUploadState } from './useAttachmentUploadState';
+import type { Attachment } from '../types';
+import { useObjectUrl } from '../hooks/useObjectUrl';
+import { useAttachmentFile } from '../hooks/useAttachmentFile';
+import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
 
 interface AttachmentTileProps {
   attachment: Attachment;
@@ -12,7 +12,7 @@ interface AttachmentTileProps {
 }
 
 /**
- * One square of a chore's attachment grid: the picture itself once it is on
+ * One square of an entry's attachment grid: the picture itself once it is on
  * this device (an image is fetched for it, since the picture is the tile), a
  * file icon for a PDF, the name under it, and a cloud when the file has not
  * reached the server yet.
@@ -57,7 +57,7 @@ export default function AttachmentTile({ attachment, to }: AttachmentTileProps) 
           </span>
         )}
       </span>
-      <span className="truncate text-xs text-muted">{attachment.name || ' '}</span>
+      <span className="truncate text-xs text-muted">{attachment.name || ' '}</span>
     </Link>
   );
 }

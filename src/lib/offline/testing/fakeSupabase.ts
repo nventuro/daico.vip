@@ -166,8 +166,11 @@ export class FakeServer {
       download: async (path: string) => {
         const error = await this.run({ op: 'download', table: bucket, id: path });
         const object = objects.get(path);
-        if (error || !object) {
-          return { data: null, error: storageError(error ?? new Error('Object not found')) };
+        if (error) return { data: null, error: storageError(error) };
+        if (!object) {
+          const missing: StorageFailure = new Error('Object not found');
+          missing.status = 404;
+          return { data: null, error: storageError(missing) };
         }
         return { data: new Blob([object.data]), error: null };
       },

@@ -1,20 +1,26 @@
 import { useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconPlus } from '@tabler/icons-react';
-import { ATTACHMENT_FILE_TYPES } from '../../types';
-import { useMasterKey } from '../../hooks/useMasterKey';
+import { ATTACHMENT_FILE_TYPES, type AttachmentOwner } from '../types';
+import { useMasterKey } from '../hooks/useMasterKey';
+import { attachmentProblem, useAttachments } from '../hooks/useAttachments';
 import AttachmentTile from './AttachmentTile';
-import { attachmentProblem, useAttachments } from './useAttachments';
 
 const ACCEPT = Object.keys(ATTACHMENT_FILE_TYPES).join(',');
 
+interface AttachmentGridProps {
+  owner: AttachmentOwner;
+  /** The entry's own page, which its attachments' screens hang under. */
+  ownerPath: string;
+}
+
 /**
- * A chore's attachments as a grid of tiles, ending in Agregar, which opens the
- * device's own picker (camera, files, cloud drives alike) and then the screen
- * that names the picked file.
+ * An entry's attachments as a grid of tiles, ending in Agregar, which opens
+ * the device's own picker (camera, files, cloud drives alike) and then the
+ * screen that names the picked file.
  */
-export default function AttachmentGrid({ choreId }: { choreId: string }) {
-  const { items, add } = useAttachments(choreId);
+export default function AttachmentGrid({ owner, ownerPath }: AttachmentGridProps) {
+  const { items, add } = useAttachments(owner);
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
@@ -30,9 +36,9 @@ export default function AttachmentGrid({ choreId }: { choreId: string }) {
     if (refused || masterKey.status !== 'unlocked') return;
     // Store it now; the next screen only gives it a name.
     setBusy(true);
-    const id = await add(choreId, file, masterKey.key);
+    const id = await add(file, masterKey.key);
     setBusy(false);
-    if (id) navigate(`/tareas/${choreId}/nuevo/${id}`);
+    if (id) navigate(`${ownerPath}/nuevo/${id}`);
   }
 
   return (
@@ -42,7 +48,7 @@ export default function AttachmentGrid({ choreId }: { choreId: string }) {
           <AttachmentTile
             key={attachment.id}
             attachment={attachment}
-            to={`/tareas/${choreId}/${attachment.id}`}
+            to={`${ownerPath}/${attachment.id}`}
           />
         ))}
         <label className="flex min-w-0 cursor-pointer flex-col gap-1">

@@ -1,11 +1,16 @@
 import { useCallback, useMemo } from 'react';
-import { ATTACHMENT_FILE_TYPES, ATTACHMENT_MAX_BYTES, type Attachment } from '../../types';
-import { ATTACHMENTS_SPEC } from '../../lib/offline/specs';
-import * as engine from '../../lib/offline/engine';
-import { encryptFile } from '../../lib/householdKey';
-import { removeAttachmentObject } from '../../lib/attachmentFiles';
-import { useOfflineTable } from '../../hooks/useOfflineTable';
-import { formatBytes, lowercaseTrimmed } from '../../utils/textUtils';
+import {
+  ATTACHMENT_FILE_TYPES,
+  ATTACHMENT_MAX_BYTES,
+  type Attachment,
+  type AttachmentOwner,
+} from '../types';
+import { ATTACHMENTS_SPEC } from '../lib/offline/specs';
+import * as engine from '../lib/offline/engine';
+import { encryptFile } from '../lib/householdKey';
+import { removeAttachmentObject } from '../lib/attachmentFiles';
+import { useOfflineTable } from './useOfflineTable';
+import { formatBytes, lowercaseTrimmed } from '../utils/textUtils';
 
 /**
  * The attachment MIME type for `file`, or null when it is not one we take.
@@ -32,20 +37,20 @@ export function attachmentProblem(file: File): string | null {
 }
 
 /**
- * Local-first attachments of chores: every chore's when `choreId` is not given,
- * one chore's otherwise. Adding encrypts the file under `masterKey` and keeps
- * it here until the next sync uploads it; removing takes the row, the local
- * file and (best effort) the bucket's object.
+ * Local-first attachments: every entry's when `owner` is not given, one
+ * entry's otherwise. Adding (to `owner`) encrypts the file under `masterKey`
+ * and keeps it here until the next sync uploads it; removing takes the row,
+ * the local file and (best effort) the bucket's object.
  */
-export function useAttachments(choreId?: string) {
+export function useAttachments(owner?: AttachmentOwner) {
   const { items: all, loading, error, mutate } = useOfflineTable<Attachment>(ATTACHMENTS_SPEC);
+  const kind = owner?.kind;
+  const ownerId = owner?.id;
 
   const items = useMemo(
     () =>
-      choreId === undefined
-        ? all
-        : all.filter((a) => a.owner_kind === 'chore' && a.owner_id === choreId),
-    [all, choreId],
+      kind === undefined ? all : all.filter((a) => a.owner_kind === kind && a.owner_id === ownerId),
+    [all, kind, ownerId],
   );
 
   // Adds the attachment the moment the file is picked (before it is named), so
@@ -53,8 +58,11 @@ export function useAttachments(choreId?: string) {
   // surviving the trip through the device's file picker, which on some phones
   // reloads the app. The name is set afterwards, on its own screen.
   const add = useCallback(
-    (ownerId: string, file: File, masterKey: CryptoKey) =>
+    (file: File, masterKey: CryptoKey) =>
       mutate(async () => {
+        if (kind === undefined || ownerId === undefined) {
+          throw new Error('An attachment needs an entry to belong to');
+        }
         const mime = attachmentType(file);
         if (!mime) throw new Error(`Unsupported attachment type ${file.type}`);
         const { data, wrappedFileKey } = await encryptFile(
@@ -68,7 +76,7 @@ export function useAttachments(choreId?: string) {
         return engine.insert(
           ATTACHMENTS_SPEC,
           {
-            owner_kind: 'chore',
+            owner_kind: kind,
             owner_id: ownerId,
             name: '',
             mime,
@@ -78,7 +86,7 @@ export function useAttachments(choreId?: string) {
           id,
         );
       }),
-    [mutate],
+    [mutate, kind, ownerId],
   );
 
   const rename = useCallback(

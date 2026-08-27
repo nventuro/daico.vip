@@ -88,8 +88,14 @@ export interface GuideChapter {
 export type EntryMark = 'notes' | 'repeat';
 
 /** The kinds of entry an attachment can belong to. */
-export const ATTACHMENT_OWNER_KINDS = ['chore'] as const;
+export const ATTACHMENT_OWNER_KINDS = ['chore', 'document'] as const;
 export type AttachmentOwnerKind = (typeof ATTACHMENT_OWNER_KINDS)[number];
+
+/** The entry an attachment belongs to. */
+export interface AttachmentOwner {
+  kind: AttachmentOwnerKind;
+  id: string;
+}
 
 /**
  * A file — a picture, a PDF — attached to an entry. Only this metadata is a
@@ -183,6 +189,26 @@ export interface Recipe {
   updated_at: string;
 }
 
+/**
+ * A document — a passport, an ID, a policy — whose content is its attachments:
+ * the pictures or PDFs of it. The row holds only what lists it and announces
+ * its expiry; anything sensitive (a number, a date of birth) stays inside the
+ * encrypted files. Like every offline-synced row, `id` is a client-generated
+ * UUID and `updated_at` is the last-write-wins key.
+ */
+export interface DocumentEntry {
+  id: string;
+  title: string;
+  /** When it stops being valid (yyyy-mm-dd), if it ever does. */
+  expires_on: string | null;
+  /** How many days ahead of its expiry the document shows on the home screen. */
+  notice_days: number;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
 export const LOCAL_DB_PATH = 'daico-local.sqlite3';
 
@@ -244,6 +270,13 @@ export const DATE_REPEAT_MONTHS_DEFAULT = 3;
 /** Bounds for a date's every-N-months interval (input guard). */
 export const DATE_REPEAT_MONTHS_MIN = 1;
 export const DATE_REPEAT_MONTHS_MAX = 24;
+
+/** Notice window (days ahead of its expiry) a new document gets. */
+export const DOCUMENT_NOTICE_DAYS_DEFAULT = 30;
+
+/** Notice windows offered for a document's expiry — up to six months, the
+ *  margin a passport is often required to have left. */
+export const DOCUMENT_NOTICE_DAYS_OPTIONS = [7, 30, 90, 180] as const;
 
 /** Smallest value accepted for a recipe's minutes or servings (input guard). */
 export const RECIPE_QUANTITY_MIN = 1;

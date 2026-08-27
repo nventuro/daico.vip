@@ -1,13 +1,13 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import type { ChoreInput } from './useChores';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
-import { useAttachments } from './useAttachments';
 import ChoreForm from './ChoreForm';
 
 export default function ChoreEditPage() {
   const { id } = useParams();
   const { items, loading, error, save, remove } = useChores();
-  const attachments = useAttachments(id);
+  const attachments = useAttachments({ kind: 'chore', id: id ?? '' });
   const navigate = useNavigate();
 
   const chore = items.find((c) => c.id === id);

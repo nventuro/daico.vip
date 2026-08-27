@@ -7,7 +7,7 @@
 // itself: `id` (a client-generated UUID text), `created_at`, and `updated_at`
 // (the last-write-wins key). `columns` below lists only the app-specific ones.
 // =============================================================================
-import { DATE_NOTICE_DAYS_DEFAULT } from '../../types';
+import { DATE_NOTICE_DAYS_DEFAULT, DOCUMENT_NOTICE_DAYS_DEFAULT } from '../../types';
 
 export interface ColumnSpec {
   name: string;
@@ -98,6 +98,17 @@ export const RECIPES_SPEC: TableSpec = {
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
+export const DOCUMENTS_SPEC: TableSpec = {
+  table: 'documents',
+  columns: [
+    { name: 'title', ddl: 'TEXT NOT NULL' },
+    // yyyy-mm-dd, like dates.occurs_on; null for a document that never expires.
+    { name: 'expires_on', ddl: 'TEXT' },
+    { name: 'notice_days', ddl: `INTEGER NOT NULL DEFAULT ${DOCUMENT_NOTICE_DAYS_DEFAULT}` },
+  ],
+  orderBy: 'title COLLATE NOCASE ASC',
+};
+
 export const HOUSEHOLD_KEY_SPEC: TableSpec = {
   table: 'household_key',
   columns: [
@@ -122,17 +133,18 @@ export const ATTACHMENTS_SPEC: TableSpec = {
   orderBy: 'created_at ASC',
 };
 
-/** Tables the shell itself owns, synced before any app's. */
-export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC];
+/** Tables no single app owns — the shell's own, and the ones several apps
+ *  share — synced before any app's. */
+export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC, ATTACHMENTS_SPEC];
 
 /** Every offline-synced table, in sync order. */
 export const ALL_SPECS: TableSpec[] = [
   ...SHELL_SPECS,
   CHORES_SPEC,
-  ATTACHMENTS_SPEC,
   SHOPPING_SPEC,
   GUIDES_SPEC,
   GUIDE_CHAPTERS_SPEC,
   DATES_SPEC,
   RECIPES_SPEC,
+  DOCUMENTS_SPEC,
 ];

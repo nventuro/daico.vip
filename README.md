@@ -156,6 +156,21 @@ list on the recipe page; each row can be sent to the shopping list, and one
 button sends everything not ticked. Ticks are a reading aid for the current
 session and are never saved.
 
+## Documentos
+
+Documents — a passport, an ID, an insurance policy — live in the `documents`
+table (offline-synced like the others): a title, an optional expiry
+(`expires_on`) and its notice window (`notice_days`). The content is the
+document's attachments (see Adjuntos): the pictures or PDFs of it, encrypted on
+the device. Deliberately nothing else is typed in, so a number or a date of
+birth never reaches the server in the clear. A document is created with only
+its title and opened at once to attach its files. The list is alphabetical with
+the expiry under the title ("vence 14/02/2027", "venció" once past). A document
+with an expiry shows in Próximo from `notice_days` ahead (up to six months, the
+margin a passport often needs) and stays there once expired, until the expiry is
+updated or cleared. Every document's files are kept on every device, so a
+document can be seen with no connection wherever it was added.
+
 ## Markdown dialect
 
 Guide chapters and recipe bodies share one reader (`src/components/Markdown.tsx`):
@@ -178,9 +193,9 @@ Links to other guides or chapters are ordinary relative links
 
 ## Adjuntos
 
-A chore can carry attachments — pictures and PDFs, up to `ATTACHMENT_MAX_BYTES`
-each — that are encrypted on the device before they leave it, so the server
-only ever stores ciphertext.
+A chore or a document can carry attachments — pictures and PDFs, up to
+`ATTACHMENT_MAX_BYTES` each — that are encrypted on the device before they
+leave it, so the server only ever stores ciphertext.
 
 - **Tables and bucket**: `attachments` (owner, optional name, mime, size, the
   wrapped file key) is an ordinary offline-synced table; the file bytes live in
@@ -199,15 +214,19 @@ only ever stores ciphertext.
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
-- **In the app**: a chore's edit form shows its attachments as a grid; Agregar
-  opens the device's own picker, then a screen that names the file. A row with
-  attachments carries the same mark as one with notes. Opening an attachment
+- **In the app**: an entry's edit form shows its attachments as a grid; Agregar
+  opens the device's own picker, then a screen that names the file. The grid,
+  the viewer and the naming screen are shared (`src/components/Attachment*`);
+  each app's attachment routes are thin wrappers naming the entry in the URL
+  as the owner. A chore with attachments carries the same mark as one with
+  notes. Opening an attachment
   shows it (an image inline, a PDF as an icon) with Compartir / Descargar / Abrir
   to get it out through the device's share sheet or, on desktop, a download or a
   new tab. A file added offline shows a cloud until it reaches the server.
-- **Sync**: files follow every table sync (`afterSync`): uploads go out, files
-  of deleted rows are dropped, and bucket objects that no row refers to and are
-  older than an hour are removed. A file the bucket refuses for good (too large,
+- **Sync**: files follow every table sync (`afterSync`, registered in
+  `src/App.tsx`): uploads go out, files of deleted rows are dropped, every
+  document's files this device lacks are fetched and kept, and bucket objects
+  that no row refers to and are older than an hour are removed. A file the bucket refuses for good (too large,
   wrong type) is marked failed and not retried.
 
 ## Guides

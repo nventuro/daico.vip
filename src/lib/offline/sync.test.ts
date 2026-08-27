@@ -112,10 +112,10 @@ describe('syncAll', () => {
 
     expect(callLog()).toEqual([
       'select:household_key',
+      'select:attachments',
       'upsert:chores',
       'upsert:chores',
       'select:chores',
-      'select:attachments',
       'delete:shopping_items',
       'select:shopping_items',
       ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),
@@ -188,8 +188,8 @@ describe('syncAll', () => {
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);
     expect(callLog()).toEqual([
       'select:household_key',
-      'select:chores',
       'select:attachments',
+      'select:chores',
       'upsert:shopping_items',
       'select:shopping_items',
       ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),

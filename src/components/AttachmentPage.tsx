@@ -3,26 +3,35 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   IconCloudOff,
   IconCloudUpload,
+  IconDeviceMobileCheck,
   IconExternalLink,
   IconFileText,
   IconShare,
 } from '@tabler/icons-react';
-import { useOnline } from '../../hooks/useOnline';
-import { useObjectUrl } from '../../hooks/useObjectUrl';
-import Button from '../../components/Button';
-import FormFooter from '../../components/FormFooter';
-import { useChores } from './useChores';
-import { useAttachments } from './useAttachments';
-import { useAttachmentFile } from './useAttachmentFile';
-import { useAttachmentUploadState } from './useAttachmentUploadState';
+import type { AttachmentOwner } from '../types';
+import { useOnline } from '../hooks/useOnline';
+import { useObjectUrl } from '../hooks/useObjectUrl';
+import { useAttachments } from '../hooks/useAttachments';
+import { useAttachmentFile } from '../hooks/useAttachmentFile';
+import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
+import Button from './Button';
+import FormFooter from './FormFooter';
+
+/** What an attachment's screens need to know about the entry it belongs to. */
+export interface AttachmentOwnerProps {
+  owner: AttachmentOwner;
+  /** The entry's title, once it is loaded. */
+  ownerTitle: string | undefined;
+  /** The entry's own page, which its attachments' screens hang under. */
+  ownerPath: string;
+}
 
 /** One attachment: the picture or the PDF's face, its name, a way to get it
  *  out of the app, and its deletion behind the usual confirm. */
-export default function AttachmentPage() {
-  const { id, attachmentId } = useParams();
+export default function AttachmentPage({ owner, ownerTitle, ownerPath }: AttachmentOwnerProps) {
+  const { attachmentId } = useParams();
   const navigate = useNavigate();
-  const { items: chores } = useChores();
-  const { items, loading, remove } = useAttachments(id);
+  const { items, loading, remove } = useAttachments(owner);
   const attachment = items.find((a) => a.id === attachmentId);
   const view = useAttachmentFile(attachment, true);
   const url = useObjectUrl(view.status === 'ready' ? view.file : null);
@@ -32,7 +41,6 @@ export default function AttachmentPage() {
   if (loading) return <p className="text-muted">Cargando...</p>;
   if (!attachment) return <p className="text-muted">Adjunto no encontrado.</p>;
 
-  const chore = chores.find((c) => c.id === id);
   const isImage = attachment.mime.startsWith('image/');
   const file = view.status === 'ready' ? view.file : null;
   // The device's share sheet takes files on Android; desktop Firefox has none,
@@ -56,7 +64,7 @@ export default function AttachmentPage() {
   async function handleRemove() {
     if (!attachment) return;
     await remove(attachment);
-    navigate(`/tareas/${id}`);
+    navigate(ownerPath);
   }
 
   let hint: ReactNode = null;
@@ -78,6 +86,15 @@ export default function AttachmentPage() {
     hint = online
       ? 'Todavía no se subió desde el dispositivo donde se agregó.'
       : 'Sin conexión, y este adjunto no está guardado en este dispositivo.';
+  } else if (owner.kind === 'document' && uploadState === 'uploaded') {
+    // Said only of a document: being readable with no connection is what it
+    // is kept here for, not a side effect of having been opened once.
+    hint = (
+      <span className="inline-flex items-center gap-1.5">
+        <IconDeviceMobileCheck size={16} stroke={1.5} className="shrink-0" />
+        Guardado en este dispositivo: se ve sin conexión.
+      </span>
+    );
   } else if (!isImage && file) {
     hint = canShare ? 'Se abre con el visor del teléfono.' : 'Se abre en otra pestaña.';
   }
@@ -103,7 +120,7 @@ export default function AttachmentPage() {
         <span className={attachment.name ? 'font-medium' : 'text-muted'}>
           {attachment.name || 'sin nombre'}
         </span>
-        {chore && <span className="text-sm text-muted">{chore.title}</span>}
+        {ownerTitle && <span className="text-sm text-muted">{ownerTitle}</span>}
         {hint && <span className="mt-2 text-sm text-muted">{hint}</span>}
       </div>
 

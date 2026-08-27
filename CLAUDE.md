@@ -88,7 +88,8 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 - **To add an offline table:** write the migration (uuid PK + `updated_at` + the
   usual RLS/policy/grants + the `last_write_wins` trigger), add a `TableSpec` to
   `src/lib/offline/specs.ts` and to `ALL_SPECS`, list it in the owning module's
-  `specs` (`src/apps/<id>/index.ts`),
+  `specs` (`src/apps/<id>/index.ts`) — or in `SHELL_SPECS` when no single app
+  owns it, as with `attachments` —
   then add a thin typed hook over `useOfflineTable` (see `useShoppingList` /
   `useChores`). Do **not** hand-write sync or SQL — the generic
   `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
@@ -135,9 +136,14 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 ## Attachments and the household key — read before touching files or keys
 
 - **Attachment files never reach the server in the clear.** The row
-  (`attachments`: owner, name, mime, size) is an ordinary offline-synced table;
-  the bytes go to the private `attachments` storage bucket, under the row's id,
-  encrypted on the device. Key hierarchy, all in `src/lib/householdKey.ts` (the
+  (`attachments`: owner, name, mime, size) is an ordinary offline-synced table
+  shared by every app whose entries take files (`owner_kind`: a chore, a
+  document), so it lives in `SHELL_SPECS`. The grid, tile, viewer and naming
+  screen are the shared `src/components/Attachment*` (hooks in `src/hooks/`),
+  parametrized by the owner; an app's attachment routes are thin wrappers
+  (`ChoreAttachmentPage`, `DocumentAttachmentPage`) that say which entry in
+  the URL owns them. The bytes go to the private `attachments` storage bucket,
+  under the row's id, encrypted on the device. Key hierarchy, all in `src/lib/householdKey.ts` (the
   only crypto code — never add another): the phrase (six words from
   `src/lib/phraseWords.ts`, held on paper) → PBKDF2 → wraps the **master key**
   (AES-KW) → wraps a **file key** per attachment (AES-KW) → encrypts the file
@@ -159,11 +165,15 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   only: a local-only `attachment_files` table (engine) holds a file added here
   until its upload goes through (`pending` / `uploaded` / `failed` — a 4xx other
   than auth/throttling is final and never retried) and keeps a file opened here
-  for offline reading; `afterSync` (registered in `src/apps/tareas/index.ts`)
-  runs uploads, prunes files whose rows are gone, and sweeps bucket objects with
-  no row that are older than `ATTACHMENT_ORPHAN_MIN_AGE_MS`. Never pull files
-  wholesale and never put them in `ALL_SPECS`. Blobs are immutable: replacing a
-  file is a new attachment; only `name` ever changes.
+  for offline reading; `afterSync` (registered in `src/App.tsx`) runs uploads,
+  prunes files whose rows are gone, fetches every **document's** files this
+  device lacks (`fetchDocumentFiles`: a document — a passport, an ID — must be
+  readable with no connection, and a household's documents are few and each
+  capped), and sweeps bucket objects with no row that are older than
+  `ATTACHMENT_ORPHAN_MIN_AGE_MS`. That fetch is the one exception to files
+  being fetched on demand: never extend it to another owner kind, never pull
+  files wholesale, and never put them in `ALL_SPECS`. Blobs are immutable:
+  replacing a file is a new attachment; only `name` ever changes.
 - **The bucket is private and gated like a table**: `storage.objects` has a
   `private.is_member()` policy scoped to the bucket, it only takes
   `application/octet-stream`, and its size limit is `ATTACHMENT_MAX_BYTES` plus

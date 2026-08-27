@@ -4,6 +4,8 @@
 //
 //   - a file added on this device is uploaded once there is a connection;
 //   - a file opened on this device is downloaded once and kept;
+//   - every document's files are fetched and kept, so a document can be seen
+//     with no connection wherever it was added;
 //   - after a sync, files of rows that are gone are dropped here, and objects
 //     in the bucket that no row refers to any more are removed there.
 //
@@ -29,8 +31,9 @@ function statusOf(error: { message: string }): number | undefined {
 
 /**
  * Whether a refusal is about the request itself — too large, a type the bucket
- * does not take — rather than about the moment (no session, throttled, the
- * server down). Retrying the former can never succeed.
+ * does not take, an object that is not there — rather than about the moment
+ * (no session, throttled, the server down). Retrying the former can never
+ * succeed.
  */
 function isPermanent(status: number | undefined): boolean {
   return (
@@ -64,6 +67,18 @@ export async function uploadPending(): Promise<void> {
   }
 }
 
+/** An object's bytes from the bucket, or null when the bucket does not have
+ *  it (the device that added it hasn't uploaded it yet). A failure that may
+ *  pass later — no session, throttled, the network — is thrown. */
+async function downloadObject(id: string): Promise<Uint8Array | null> {
+  const { data, error } = await bucket().download(id);
+  if (error) {
+    if (isPermanent(statusOf(error))) return null;
+    throw error;
+  }
+  return data ? new Uint8Array(await data.arrayBuffer()) : null;
+}
+
 /**
  * The encrypted file of an attachment: the copy kept on this device, else the
  * bucket's, kept from then on. Null when this device has none and cannot get
@@ -73,11 +88,30 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
   const local = await engine.getAttachmentFile(id);
   if (local) return local;
   if (!navigator.onLine) return null;
-  const { data, error } = await bucket().download(id);
-  if (error || !data) return null;
-  const bytes = new Uint8Array(await data.arrayBuffer());
+  let bytes: Uint8Array | null;
+  try {
+    bytes = await downloadObject(id);
+  } catch {
+    return null;
+  }
+  if (!bytes) return null;
   await engine.putAttachmentFile(id, bytes, true);
   return bytes;
+}
+
+/**
+ * Fetch every document's file this device lacks, so a document can be seen
+ * with no connection wherever it was added. One the bucket does not have yet
+ * is left for a later run; a failure that may pass later stops the run, with
+ * the rest left for the next.
+ */
+async function fetchDocumentFiles(): Promise<void> {
+  const held = new Set(await engine.listAttachmentFileIds());
+  for (const attachment of await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)) {
+    if (attachment.owner_kind !== 'document' || held.has(attachment.id)) continue;
+    const bytes = await downloadObject(attachment.id);
+    if (bytes) await engine.putAttachmentFile(attachment.id, bytes, true);
+  }
 }
 
 /** Remove an attachment's object from the bucket, best effort: what this
@@ -121,9 +155,11 @@ async function sweepOrphans(): Promise<void> {
 }
 
 /** Everything the files need after the tables have synced. Order matters:
- *  uploads first so a just-added file is never taken for an orphan. */
+ *  uploads first so a just-added file is never taken for an orphan, and the
+ *  prune before the fetch so nothing is fetched for a row that is gone. */
 export async function syncAttachmentFiles(): Promise<void> {
   await uploadPending();
   await engine.pruneAttachmentFiles();
+  await fetchDocumentFiles();
   await sweepOrphans();
 }

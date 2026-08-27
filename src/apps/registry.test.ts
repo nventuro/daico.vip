@@ -25,13 +25,14 @@ describe('apps registry', () => {
     const tables = specs.map((s) => s.table);
     expect(tables).toEqual([
       'household_key',
-      'chores',
       'attachments',
+      'chores',
       'shopping_items',
       'guides',
       'guide_chapters',
       'dates',
       'recipes',
+      'documents',
     ]);
     expect(new Set(tables).size).toBe(tables.length);
   });

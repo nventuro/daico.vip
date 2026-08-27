@@ -7,9 +7,9 @@ import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
 import FormFooter from '../../components/FormFooter';
+import AttachmentGrid from '../../components/AttachmentGrid';
 import type { ChoreInput } from './useChores';
 import DueDateChips from './DueDateChips';
-import AttachmentGrid from './AttachmentGrid';
 
 interface ChoreFormProps {
   chore: Chore;
@@ -68,7 +68,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
       </FormField>
 
       <FormField label="Adjuntos" group>
-        <AttachmentGrid choreId={chore.id} />
+        <AttachmentGrid owner={{ kind: 'chore', id: chore.id }} ownerPath={`/tareas/${chore.id}`} />
       </FormField>
 
       <FormFooter
