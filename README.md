@@ -215,7 +215,8 @@ leave it, so the server only ever stores ciphertext.
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
 - **In the app**: an entry's edit form shows its attachments as a grid; Agregar
-  opens the device's own picker, then a screen that names the file. The grid,
+  asks the device for a file (on a phone: the camera, the photos or a PDF, each
+  through its own picker), then a screen that names the file. The grid,
   the viewer and the naming screen are shared (`src/components/Attachment*`);
   each app's attachment routes are thin wrappers naming the entry in the URL
   as the owner. A chore with attachments carries the same mark as one with
