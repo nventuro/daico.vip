@@ -84,6 +84,28 @@ const CHECKS = [
             and exists (select 1 from aclexplode(d.defaclacl) a
                         where a.grantee = 'anon'::regrole)`,
   },
+  {
+    // Sync integrity rather than access control: `updated_at` marks the
+    // offline-synced tables, and without the guard a pushed stale edit would
+    // overwrite a newer row and devices would stop converging.
+    name: 'every public table with updated_at has the private.last_write_wins() trigger',
+    sql: `select c.relname as violation
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relkind = 'r'
+            and exists (select 1 from pg_attribute a
+                        where a.attrelid = c.oid and a.attname = 'updated_at'
+                          and not a.attisdropped)
+            and not exists (
+              select 1 from pg_trigger t
+              join pg_proc p on p.oid = t.tgfoid
+              join pg_namespace pn on pn.oid = p.pronamespace
+              where t.tgrelid = c.oid and not t.tgisinternal
+                and pn.nspname = 'private' and p.proname = 'last_write_wins'
+                and (t.tgtype & 2) <> 0     -- before
+                and (t.tgtype & 16) <> 0    -- update
+                and (t.tgtype & 1) <> 0)    -- row
+          `,
+  },
 ];
 
 const client = new Client({

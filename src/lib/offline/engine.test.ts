@@ -1,0 +1,447 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Chore, ShoppingItem } from '../../types';
+import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
+import { localDb } from './testing/sqlocalInMemory';
+import * as engine from './engine';
+
+vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
+
+const T0 = '2026-08-27T10:00:00.000Z';
+const T1 = '2026-08-27T10:00:01.000Z';
+const T2 = '2026-08-27T10:00:02.000Z';
+
+/** Pin the clock the store stamps `created_at` / `updated_at` with. */
+function at(iso: string): void {
+  vi.setSystemTime(new Date(iso));
+}
+
+type Bookkeeping = { pending_op: string | null; synced: number };
+
+/** The local-only sync columns of a row, or null when the row is gone. */
+async function bookkeeping(table: string, id: string): Promise<Bookkeeping | null> {
+  const rows = await localDb().sql<Bookkeeping>(
+    `SELECT pending_op, synced FROM ${table} WHERE id = ?`,
+    id,
+  );
+  return rows[0] ?? null;
+}
+
+/** `Chore` as a plain record, the shape the store takes rows in. */
+type ChoreRow = { [K in keyof Chore]: Chore[K] };
+
+/** A row as the server would send it, with every column present. */
+function serverChore(
+  id: string,
+  updatedAt: string,
+  patch: Partial<Omit<Chore, 'id' | 'updated_at'>> = {},
+): ChoreRow {
+  return {
+    id,
+    title: `Chore ${id}`,
+    notes: null,
+    done: false,
+    due_on: null,
+    created_at: T0,
+    updated_at: updatedAt,
+    ...patch,
+  };
+}
+
+/** A clean, synced local copy of `chore` (as if pulled from the server). */
+async function pulled(chore: ChoreRow): Promise<void> {
+  await engine.reconcile(CHORES_SPEC, [chore]);
+}
+
+const newChore = { title: 'Regar', notes: null, done: false, due_on: null };
+
+function watch(table: string): { calls: number; stop: () => void } {
+  const watcher = { calls: 0, stop: () => {} };
+  watcher.stop = engine.subscribe(table, () => {
+    watcher.calls += 1;
+  });
+  return watcher;
+}
+
+beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  at(T0);
+  await engine.clearAll();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('local schema', () => {
+  it('gives every spec table the app columns plus the bookkeeping ones', async () => {
+    for (const spec of ALL_SPECS) {
+      const info = await localDb().sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
+      expect(info.map((c) => c.name)).toEqual([
+        'id',
+        ...spec.columns.map((c) => c.name),
+        'created_at',
+        'updated_at',
+        'pending_op',
+        'synced',
+      ]);
+    }
+  });
+
+  it('accepts every spec order clause', async () => {
+    for (const spec of ALL_SPECS) {
+      await expect(engine.listVisible(spec)).resolves.toEqual([]);
+    }
+  });
+});
+
+describe('insert', () => {
+  it('stores the row with a client-generated uuid, timestamps and a queued upsert', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      { id, ...newChore, created_at: T0, updated_at: T0 },
+    ]);
+    expect(await bookkeeping('chores', id)).toEqual({ pending_op: 'upsert', synced: 0 });
+  });
+
+  it('maps booleans and missing values', async () => {
+    const checked = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: true });
+    const unchecked = await engine.insert(SHOPPING_SPEC, { name: 'Leche', checked: false });
+    const items = await engine.listVisible<ShoppingItem>(SHOPPING_SPEC);
+    expect(items.find((i) => i.id === checked)).toMatchObject({ checked: true, position: null });
+    expect(items.find((i) => i.id === unchecked)).toMatchObject({ checked: false, position: null });
+  });
+
+  it('notifies the table subscribers', async () => {
+    const watcher = watch('chores');
+    await engine.insert(CHORES_SPEC, newChore);
+    watcher.stop();
+    expect(watcher.calls).toBe(1);
+  });
+});
+
+describe('listVisible', () => {
+  it('orders rows by the spec clause', async () => {
+    const later = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-02' });
+    const noDate = await engine.insert(CHORES_SPEC, newChore);
+    const done = await engine.insert(CHORES_SPEC, { ...newChore, done: true, due_on: '2026-01-01' });
+    const sooner = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-01' });
+    const ids = (await engine.listVisible<Chore>(CHORES_SPEC)).map((c) => c.id);
+    expect(ids).toEqual([sooner, later, noDate, done]);
+  });
+
+  it('breaks ties by creation time', async () => {
+    const first = await engine.insert(CHORES_SPEC, newChore);
+    at(T1);
+    const second = await engine.insert(CHORES_SPEC, newChore);
+    const ids = (await engine.listVisible<Chore>(CHORES_SPEC)).map((c) => c.id);
+    expect(ids).toEqual([first, second]);
+  });
+
+  it('hides rows queued for deletion', async () => {
+    await pulled(serverChore('a', T0));
+    await engine.remove(CHORES_SPEC, 'a');
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+  });
+});
+
+describe('update', () => {
+  it('patches the given columns and bumps updated_at', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    at(T1);
+    await engine.update(CHORES_SPEC, id, { title: 'Regar plantas', due_on: '2026-09-01' });
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      { id, ...newChore, title: 'Regar plantas', due_on: '2026-09-01', created_at: T0, updated_at: T1 },
+    ]);
+  });
+
+  it('ignores keys that are not spec columns', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await engine.update(CHORES_SPEC, id, { id: 'other', created_at: T2, bogus: 1, title: 'x' });
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      { id, ...newChore, title: 'x', created_at: T0, updated_at: T0 },
+    ]);
+  });
+
+  it('stores an undefined value as null', async () => {
+    const id = await engine.insert(CHORES_SPEC, { ...newChore, notes: 'con manguera' });
+    await engine.update(CHORES_SPEC, id, { notes: undefined });
+    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].notes).toBeNull();
+  });
+
+  it('queues a clean synced row for upsert again', async () => {
+    await pulled(serverChore('a', T0));
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+    at(T1);
+    await engine.update(CHORES_SPEC, 'a', { done: true });
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: 'upsert', synced: 1 });
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T1, { done: true }),
+    ]);
+  });
+
+  it('leaves a row queued for deletion alone', async () => {
+    await pulled(serverChore('a', T0));
+    at(T1);
+    await engine.remove(CHORES_SPEC, 'a');
+    at(T2);
+    await engine.update(CHORES_SPEC, 'a', { title: 'x' });
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['a']);
+    expect(await engine.getPendingUpserts(CHORES_SPEC)).toEqual([]);
+    const [row] = await localDb().sql<Chore>('SELECT * FROM chores WHERE id = ?', 'a');
+    expect(row).toMatchObject({ title: 'Chore a', updated_at: T1 });
+  });
+
+  it('notifies the table subscribers', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    const watcher = watch('chores');
+    await engine.update(CHORES_SPEC, id, { title: 'x' });
+    watcher.stop();
+    expect(watcher.calls).toBe(1);
+  });
+});
+
+describe('remove', () => {
+  it('turns a synced row into a hidden tombstone queued for deletion', async () => {
+    await pulled(serverChore('a', T0));
+    at(T1);
+    await engine.remove(CHORES_SPEC, 'a');
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['a']);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: 'delete', synced: 1 });
+    const [row] = await localDb().sql<Chore>('SELECT * FROM chores WHERE id = ?', 'a');
+    expect(row.updated_at).toBe(T1);
+  });
+
+  it('also leaves a tombstone for a row not yet marked synced, whose push may be in flight', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await engine.remove(CHORES_SPEC, id);
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+    expect(await engine.getPendingUpserts(CHORES_SPEC)).toEqual([]);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual([id]);
+  });
+
+  it('is a no-op for an unknown id', async () => {
+    await engine.insert(CHORES_SPEC, newChore);
+    await engine.remove(CHORES_SPEC, 'nope');
+    expect(await engine.listVisible(CHORES_SPEC)).toHaveLength(1);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual([]);
+  });
+
+  it('notifies the table subscribers', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    const watcher = watch('chores');
+    await engine.remove(CHORES_SPEC, id);
+    watcher.stop();
+    expect(watcher.calls).toBe(1);
+  });
+});
+
+describe('clearAll', () => {
+  it('wipes every table, tombstones included, and the image cache', async () => {
+    await engine.insert(CHORES_SPEC, newChore);
+    await pulled(serverChore('a', T0));
+    await engine.remove(CHORES_SPEC, 'a');
+    await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false });
+    await engine.putCachedImage('img', { mime: 'image/png', data: 'AAAA' });
+
+    await engine.clearAll();
+
+    for (const spec of ALL_SPECS) {
+      expect(await localDb().sql(`SELECT id FROM ${spec.table}`)).toEqual([]);
+    }
+    expect(await engine.getCachedImage('img')).toBeNull();
+  });
+
+  it('notifies every table', async () => {
+    const watchers = ALL_SPECS.map((spec) => watch(spec.table));
+    await engine.clearAll();
+    for (const watcher of watchers) {
+      watcher.stop();
+      expect(watcher.calls).toBe(1);
+    }
+  });
+});
+
+describe('subscribe', () => {
+  it('calls every listener of the table, and no other table', async () => {
+    const chores = [watch('chores'), watch('chores')];
+    const shopping = watch('shopping_items');
+    await engine.insert(CHORES_SPEC, newChore);
+    for (const watcher of [...chores, shopping]) watcher.stop();
+    expect(chores.map((w) => w.calls)).toEqual([1, 1]);
+    expect(shopping.calls).toBe(0);
+  });
+
+  it('stops after unsubscribe', async () => {
+    const watcher = watch('chores');
+    watcher.stop();
+    await engine.insert(CHORES_SPEC, newChore);
+    expect(watcher.calls).toBe(0);
+  });
+});
+
+describe('image cache', () => {
+  it('returns null for an image never fetched', async () => {
+    expect(await engine.getCachedImage('missing')).toBeNull();
+  });
+
+  it('stores an image and replaces it on the same key', async () => {
+    await engine.putCachedImage('img', { mime: 'image/png', data: 'AAAA' });
+    expect(await engine.getCachedImage('img')).toEqual({ mime: 'image/png', data: 'AAAA' });
+    await engine.putCachedImage('img', { mime: 'image/jpeg', data: 'BBBB' });
+    expect(await engine.getCachedImage('img')).toEqual({ mime: 'image/jpeg', data: 'BBBB' });
+  });
+});
+
+describe('sync queues', () => {
+  it('getPendingUpserts returns queued inserts and edits in server shape', async () => {
+    const id = await engine.insert(CHORES_SPEC, { ...newChore, done: true });
+    await pulled(serverChore('clean', T0));
+    await pulled(serverChore('edited', T0));
+    at(T1);
+    await engine.update(CHORES_SPEC, 'edited', { notes: 'n' });
+    await pulled(serverChore('gone', T0));
+    await engine.remove(CHORES_SPEC, 'gone');
+
+    const pending = await engine.getPendingUpserts<Chore>(CHORES_SPEC);
+    expect(pending).toHaveLength(2);
+    expect(pending).toContainEqual({ id, ...newChore, done: true, created_at: T0, updated_at: T0 });
+    expect(pending).toContainEqual(serverChore('edited', T1, { notes: 'n' }));
+    for (const row of pending) expect(Object.keys(row)).not.toContain('pending_op');
+  });
+
+  it('getPendingDeletes returns only tombstones', async () => {
+    await engine.insert(CHORES_SPEC, newChore);
+    await pulled(serverChore('a', T0));
+    await pulled(serverChore('b', T0));
+    await engine.remove(CHORES_SPEC, 'b');
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['b']);
+  });
+
+  it('markUpserted clears the queue and marks the row synced when nothing changed since the push', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await engine.markUpserted(CHORES_SPEC, id, T0);
+    expect(await bookkeeping('chores', id)).toEqual({ pending_op: null, synced: 1 });
+    expect(await engine.getPendingUpserts(CHORES_SPEC)).toEqual([]);
+  });
+
+  it('markUpserted keeps a row queued when it was edited after the push started', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    at(T1);
+    await engine.update(CHORES_SPEC, id, { title: 'newer' });
+    await engine.markUpserted(CHORES_SPEC, id, T0);
+    expect((await bookkeeping('chores', id))?.pending_op).toBe('upsert');
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([{ id, title: 'newer' }]);
+  });
+
+  it('markUpserted leaves tombstones alone', async () => {
+    await pulled(serverChore('a', T0));
+    at(T1);
+    await engine.remove(CHORES_SPEC, 'a');
+    await engine.markUpserted(CHORES_SPEC, 'a', T1);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['a']);
+  });
+
+  it('markDeleted drops the tombstone and nothing else', async () => {
+    await pulled(serverChore('a', T0));
+    await pulled(serverChore('b', T0));
+    await engine.remove(CHORES_SPEC, 'a');
+    await engine.markDeleted(CHORES_SPEC, 'a');
+    await engine.markDeleted(CHORES_SPEC, 'b');
+    expect(await bookkeeping('chores', 'a')).toBeNull();
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([{ id: 'b' }]);
+  });
+});
+
+describe('reconcile', () => {
+  it('inserts unknown server rows as clean synced rows', async () => {
+    await engine.reconcile(CHORES_SPEC, [serverChore('a', T0, { done: true, notes: 'n' })]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T0, { done: true, notes: 'n' }),
+    ]);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
+  it('stores server columns that are missing as null', async () => {
+    await engine.reconcile(CHORES_SPEC, [
+      { id: 'a', title: 't', done: false, created_at: T0, updated_at: T0 },
+    ]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T0, { title: 't' })]);
+  });
+
+  it('applies a newer server version over a clean local row', async () => {
+    await pulled(serverChore('a', T0));
+    await pulled(serverChore('a', T1, { title: 'edited elsewhere', done: true, created_at: T1 }));
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T1, { title: 'edited elsewhere', done: true, created_at: T1 }),
+    ]);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
+  it('keeps the local row when the server version is older or the same', async () => {
+    await pulled(serverChore('a', T1));
+    await pulled(serverChore('a', T0, { title: 'stale' }));
+    await pulled(serverChore('a', T1, { title: 'same instant' }));
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T1)]);
+  });
+
+  it('compares timestamps by instant, whatever their format', async () => {
+    await pulled(serverChore('a', T0));
+    await pulled(serverChore('a', '2026-08-27T10:00:00.000+00:00', { title: 'same instant' }));
+    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].title).toBe('Chore a');
+    await pulled(serverChore('a', '2026-08-27T07:00:01.000-03:00', { title: 'one second later' }));
+    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].title).toBe('one second later');
+  });
+
+  it('leaves a row with a queued upsert alone even when the server is newer', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await pulled(serverChore(id, T2, { title: 'server' }));
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      { id, ...newChore, created_at: T0, updated_at: T0 },
+    ]);
+    expect(await bookkeeping('chores', id)).toEqual({ pending_op: 'upsert', synced: 0 });
+  });
+
+  it('leaves a tombstone alone even when the server is newer', async () => {
+    await pulled(serverChore('a', T0));
+    at(T1);
+    await engine.remove(CHORES_SPEC, 'a');
+    await pulled(serverChore('a', T2, { title: 'server' }));
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['a']);
+  });
+
+  it('removes clean synced rows the server no longer has', async () => {
+    await engine.reconcile(CHORES_SPEC, [serverChore('a', T0), serverChore('b', T0)]);
+    await engine.reconcile(CHORES_SPEC, [serverChore('b', T0)]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('b', T0)]);
+    expect(await bookkeeping('chores', 'a')).toBeNull();
+  });
+
+  it('keeps rows with queued changes the server does not have', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await pulled(serverChore('gone', T0));
+    await engine.remove(CHORES_SPEC, 'gone');
+    await engine.reconcile(CHORES_SPEC, []);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([{ id }]);
+    expect(await engine.getPendingDeletes(CHORES_SPEC)).toEqual(['gone']);
+  });
+
+  it('only touches the given table', async () => {
+    const item = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false });
+    await engine.markUpserted(SHOPPING_SPEC, item, T0);
+    await engine.reconcile(CHORES_SPEC, []);
+    expect(await engine.listVisible<ShoppingItem>(SHOPPING_SPEC)).toMatchObject([{ id: item }]);
+  });
+
+  it('notifies subscribers only when something changed', async () => {
+    const watcher = watch('chores');
+    await engine.reconcile(CHORES_SPEC, [serverChore('a', T0)]);
+    await engine.reconcile(CHORES_SPEC, [serverChore('a', T0)]);
+    await engine.reconcile(CHORES_SPEC, [serverChore('a', T1)]);
+    await engine.reconcile(CHORES_SPEC, []);
+    watcher.stop();
+    expect(watcher.calls).toBe(3);
+  });
+});

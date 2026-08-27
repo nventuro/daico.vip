@@ -73,15 +73,27 @@ Chromium-only APIs are available everywhere.
   these). `updated_at` is the **last-write-wins key and is client-owned** — set at
   edit time and sent by the client. **Never add a trigger that bumps `updated_at`
   on update**: a server-side bump would use sync time and break LWW ordering for
-  edits made offline. The standard table/RLS/grant rules above still apply in the
-  same migration.
+  edits made offline. The one trigger every synced table **must** have is
+  `private.last_write_wins()` (`before update`, see
+  `20260827040000_last_write_wins.sql`): it skips an update carrying an older
+  `updated_at` than the stored row, so a stale offline edit can't overwrite a
+  newer one on push and devices converge. `db:verify` checks every table with
+  `updated_at` has it. The standard table/RLS/grant rules above still apply in
+  the same migration.
 - **To add an offline table:** write the migration (uuid PK + `updated_at` + the
-  usual RLS/policy/grants), add a `TableSpec` to `src/lib/offline/specs.ts` and to
-  `ALL_SPECS`, list it in the owning module's `specs` (`src/apps/<id>/index.ts`),
+  usual RLS/policy/grants + the `last_write_wins` trigger), add a `TableSpec` to
+  `src/lib/offline/specs.ts` and to `ALL_SPECS`, list it in the owning module's
+  `specs` (`src/apps/<id>/index.ts`),
   then add a thin typed hook over `useOfflineTable` (see `useShoppingList` /
   `useChores`). Do **not** hand-write sync or SQL — the generic
   `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
   the LWW reconcile. Conflict policy is last-write-wins with "delete wins".
+- **The engine and sync are tested against real SQLite** (`src/lib/offline/*.test.ts`,
+  run by `npm test`, so also in CI). `testing/sqlocalInMemory.ts` replaces `sqlocal`
+  with the real client running in-process on an in-memory database (no Worker, no
+  OPFS), and `testing/fakeSupabase.ts` stands in for the server with calls a test
+  can hold or fail to reproduce timings against the network. A change to CRUD,
+  the sync order, or the conflict policy must come with a test there.
 - **Guides are read-only imported content.** `guides` / `guide_chapters` are
   normal offline-synced tables that the app never writes (grants are `select`
   only; rows come from `npm run guides:import`). `guide_images` is deliberately

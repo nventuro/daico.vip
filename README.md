@@ -72,9 +72,12 @@ Three pieces make this work:
 
 - **Sync engine** (`src/lib/offline/sync.ts`). On load, on reconnect, and on app
   focus it pushes queued local changes and pulls the server state. Conflicts use
-  **last-write-wins** by an `updated_at` timestamp set at edit time; deletes win
-  over a concurrent edit. Each row carries a client-generated UUID so an
-  offline-created row has a stable identity before it ever reaches the server.
+  **last-write-wins** by an `updated_at` timestamp set at edit time, enforced on
+  both sides: the pull applies only newer rows, and a trigger on every table
+  skips a pushed row older than the stored one, so devices converge instead of
+  overwriting each other. Deletes win over a concurrent edit. Each row carries a
+  client-generated UUID so an offline-created row has a stable identity before
+  it ever reaches the server.
 
 The membership check is also offline-tolerant: it falls back to the last-known
 verdict cached per user, so a member isn't locked out with no signal. This is only

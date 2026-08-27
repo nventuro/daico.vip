@@ -35,12 +35,18 @@ export async function syncAll(): Promise<void> {
   try {
     do {
       rerun = false;
-      for (const spec of ALL_SPECS) await syncTable(spec);
+      for (const spec of ALL_SPECS) {
+        try {
+          await syncTable(spec);
+        } catch (err) {
+          // Network blip, expired token, a column the server doesn't have yet…
+          // Queued changes stay put; we retry on the next trigger (online
+          // event, app focus, or the next user action). Caught per table so
+          // one table that keeps failing doesn't block the rest.
+          console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, err);
+        }
+      }
     } while (rerun && navigator.onLine);
-  } catch (err) {
-    // Network blip, expired token, etc. Queued changes stay put; we retry on
-    // the next trigger (online event, app focus, or the next user action).
-    console.warn('[offline] sync failed, will retry later:', err);
   } finally {
     syncing = false;
   }

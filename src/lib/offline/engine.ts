@@ -198,21 +198,18 @@ export async function update(spec: TableSpec, id: string, patch: Row): Promise<v
 }
 
 /**
- * Delete a row. One never pushed to the server (synced = 0) is dropped
- * outright; an already-synced row becomes a local tombstone so the delete can
- * be replayed on the next sync.
+ * Delete a row: it becomes a local tombstone so the delete is replayed on the
+ * next sync. A row not yet marked synced gets one too — whether the server
+ * already has it is only known once its push completes, and a delete pushed
+ * for a row the server never had is harmless.
  */
 export async function remove(spec: TableSpec, id: string): Promise<void> {
-  const ts = nowIso();
   const c = await db();
-  await c.transaction(async (tx) => {
-    await tx.sql(`DELETE FROM ${spec.table} WHERE id = ? AND synced = 0`, id);
-    await tx.sql(
-      `UPDATE ${spec.table} SET pending_op = 'delete', updated_at = ? WHERE id = ? AND synced = 1`,
-      ts,
-      id,
-    );
-  });
+  await c.sql(
+    `UPDATE ${spec.table} SET pending_op = 'delete', updated_at = ? WHERE id = ?`,
+    nowIso(),
+    id,
+  );
   emit(spec.table);
 }
 
