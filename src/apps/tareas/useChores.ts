@@ -4,8 +4,17 @@ import { CHORES_SPEC } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 
-/** Local-first chores: add / toggle / delete, syncing in the background. Every
- *  action is instant and works offline. */
+/** Everything the user decides about a chore; the row's own columns minus the
+ *  engine-managed ones and `done`. */
+export interface ChoreInput {
+  title: string;
+  /** yyyy-mm-dd, or null for no due date. */
+  due_on: string | null;
+  notes: string | null;
+}
+
+/** Local-first chores: add / edit / complete / delete, syncing in the
+ *  background. Every action is instant and works offline. */
 export function useChores() {
   const { items, loading, error, mutate } = useOfflineTable<Chore>(CHORES_SPEC);
 
@@ -25,8 +34,13 @@ export function useChores() {
     [mutate],
   );
 
-  const toggleDone = useCallback(
-    (chore: Chore) => mutate(() => engine.update(CHORES_SPEC, chore.id, { done: !chore.done })),
+  const save = useCallback(
+    (id: string, patch: Partial<ChoreInput>) => mutate(() => engine.update(CHORES_SPEC, id, patch)),
+    [mutate],
+  );
+
+  const setDone = useCallback(
+    (id: string, done: boolean) => mutate(() => engine.update(CHORES_SPEC, id, { done })),
     [mutate],
   );
 
@@ -35,5 +49,5 @@ export function useChores() {
     [mutate],
   );
 
-  return { items, loading, error, add, toggleDone, remove };
+  return { items, loading, error, add, save, setDone, remove };
 }

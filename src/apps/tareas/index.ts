@@ -7,6 +7,7 @@ import { useChoresUpcoming } from './useChoresUpcoming';
 import { searchChores } from './search';
 
 const ChoresPage = lazy(() => import('./ChoresPage'));
+const ChoreEditPage = lazy(() => import('./ChoreEditPage'));
 
 const tareas: AppModule = {
   id: 'tareas',
@@ -14,7 +15,10 @@ const tareas: AppModule = {
   hue: 'app-tareas',
   icon: IconListCheck,
   specs: [CHORES_SPEC],
-  routes: [{ index: true, Component: ChoresPage }],
+  routes: [
+    { index: true, Component: ChoresPage },
+    { path: ':id', Component: ChoreEditPage },
+  ],
   useStatus: useChoresStatus,
   useUpcoming: useChoresUpcoming,
   search: searchChores,

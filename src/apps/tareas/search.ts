@@ -15,6 +15,6 @@ export async function searchChores(query: string): Promise<SearchHit[]> {
     .map((chore) => ({
       title: chore.title,
       subtitle: chore.due_on ? relativeDay(today, chore.due_on) : undefined,
-      to: '/tareas',
+      to: `/tareas/${chore.id}`,
     }));
 }

@@ -1,5 +1,9 @@
 import { type FormEvent, useState } from 'react';
 import type { DateEntry } from '../../types';
+import FormField from '../../components/FormField';
+import TextInput from '../../components/TextInput';
+import TextArea from '../../components/TextArea';
+import FormFooter from '../../components/FormFooter';
 import type { DateInput } from './useDates';
 import DateFields, { type DateFieldsValue } from './DateFields';
 
@@ -8,10 +12,6 @@ interface DateFormProps {
   onSave: (input: DateInput) => void;
   onRemove: () => void;
 }
-
-const FIELD = 'flex flex-col gap-1 text-sm text-muted';
-const CONTROL =
-  'rounded-xl border border-border bg-surface-raised px-3 py-2 text-base text-on-surface outline-none transition-colors focus:border-primary';
 
 /** Edits every field of one date. Keyed by the entry's id by its caller, so the
  *  local draft starts from the entry once and never chases it afterwards. */
@@ -34,18 +34,16 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className={FIELD}>
-        <span>Título</span>
-        <input
+      <FormField label="Título">
+        <TextInput
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Título"
           autoCapitalize="sentences"
           required
-          className={CONTROL}
         />
-      </label>
+      </FormField>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <DateFields
@@ -58,33 +56,21 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
         />
       </div>
 
-      <label className={FIELD}>
-        <span>Notas</span>
-        <textarea
+      <FormField label="Notas">
+        <TextArea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           aria-label="Notas"
           rows={4}
-          className={CONTROL}
         />
-      </label>
+      </FormField>
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded-full px-3 py-2 text-sm text-error transition-colors hover:bg-border-subtle"
-        >
-          Eliminar fecha
-        </button>
-        <button
-          type="submit"
-          disabled={!title.trim()}
-          className="rounded-full bg-primary px-4 py-2 text-on-primary transition-colors hover:bg-primary-hover disabled:bg-disabled"
-        >
-          Guardar
-        </button>
-      </div>
+      <FormFooter
+        removeLabel="Eliminar fecha"
+        confirmQuestion="¿Eliminar la fecha?"
+        onRemove={onRemove}
+        submitDisabled={!title.trim()}
+      />
     </form>
   );
 }

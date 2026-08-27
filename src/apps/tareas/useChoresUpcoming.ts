@@ -13,7 +13,7 @@ export function useChoresUpcoming(): Upcoming[] {
     () =>
       items.flatMap((chore): Upcoming[] =>
         !chore.done && chore.due_on != null && daysUntil(today, chore.due_on) <= CHORE_NOTICE_DAYS
-          ? [{ title: chore.title, on: chore.due_on, to: '/tareas', appId: 'tareas' }]
+          ? [{ title: chore.title, on: chore.due_on, to: `/tareas/${chore.id}`, appId: 'tareas' }]
           : [],
       ),
     [items, today],

@@ -55,6 +55,13 @@ export function daysUntil(today: string, date: string): number {
   return (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / MS_PER_DAY;
 }
 
+/** The yyyy-mm-dd date `days` calendar days after `date` (negative goes back). */
+export function addDays(date: string, days: number): string {
+  const [year, month, day] = parseIso(date);
+  const target = new Date(Date.UTC(year, month - 1, day + days));
+  return toIso(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate());
+}
+
 /**
  * The yyyy-mm-dd date `months` calendar months after `date`. When the target
  * month is shorter, the day is clamped to its last day (31/01 + 1 → 28/02, or
@@ -69,25 +76,30 @@ export function addMonths(date: string, months: number): string {
   return toIso(targetYear, targetMonth, Math.min(day, lastDay));
 }
 
+/** One es-AR date part (a weekday or month name), lower-case and without the abbreviation dot. */
+function namePart(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('es-AR', options).toLowerCase().replace(/\.$/, '');
+}
+
 /**
- * A short label for `date` relative to `today` (both yyyy-mm-dd): "hoy",
- * "mañana", "ayer", then "en N días" / "hace N días" up to RELATIVE_DAY_LIMIT
- * days away; further out, the weekday plus dd/mm (e.g. "sáb 28/03").
+ * A short label for `date` relative to `today` (both yyyy-mm-dd), the way a
+ * person would say it: "hoy", "mañana", "ayer"; the weekday alone ("viernes")
+ * up to RELATIVE_DAY_LIMIT days ahead, which is close enough for the name to be
+ * unambiguous; "hace N días" the same distance back; and beyond that the date
+ * itself, "vie 18 sept" within the current year or "15 ene 2027" outside it.
  */
 export function relativeDay(today: string, date: string): string {
   const days = daysUntil(today, date);
   if (days === 0) return 'hoy';
   if (days === 1) return 'mañana';
   if (days === -1) return 'ayer';
-  if (Math.abs(days) <= RELATIVE_DAY_LIMIT) {
-    return days > 0 ? `en ${days} días` : `hace ${-days} días`;
-  }
   const [year, month, day] = parseIso(date);
-  const weekday = new Date(year, month - 1, day)
-    .toLocaleDateString('es-AR', { weekday: 'short' })
-    .toLowerCase()
-    .replace(/\.$/, '');
-  return `${weekday} ${formatDayMonth(date)}`;
+  const target = new Date(year, month - 1, day);
+  if (days > 0 && days <= RELATIVE_DAY_LIMIT) return namePart(target, { weekday: 'long' });
+  if (days < 0 && -days <= RELATIVE_DAY_LIMIT) return `hace ${-days} días`;
+  const monthName = namePart(target, { month: 'short' });
+  if (year !== parseIso(today)[0]) return `${day} ${monthName} ${year}`;
+  return `${namePart(target, { weekday: 'short' })} ${day} ${monthName}`;
 }
 
 /**

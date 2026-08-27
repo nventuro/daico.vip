@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { IconCheck, IconX } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
+import { IconCheck, IconChevronRight, IconX } from '@tabler/icons-react';
 
 interface ChecklistItemProps {
   /** Whether the item is completed (done / bought). */
@@ -9,11 +10,20 @@ interface ChecklistItemProps {
   /** Optional secondary line under the label (e.g. a due date). */
   subtitle?: ReactNode;
   onToggle: () => void;
-  onRemove: () => void;
-  /** Accessible label/title for the toggle (whole-row) button. */
+  /** Accessible label/title for the toggle button. */
   toggleLabel: string;
+  /**
+   * Where the row opens. When set, only the check circle toggles and the rest
+   * of the row is a link there (with a chevron saying so); when unset the
+   * whole row toggles.
+   */
+  to?: string;
+  /** Small marks shown before the chevron of a linked row (e.g. "has notes"). */
+  trailing?: ReactNode;
+  /** Remove button at the row's end; omitted when not given. */
+  onRemove?: () => void;
   /** Accessible label/title for the remove button. */
-  removeLabel: string;
+  removeLabel?: string;
   /** Optional drag handle (reorderable lists), rendered leftmost on the row. */
   dragHandle?: ReactNode;
   /** Ref for the row element, used by drag-and-drop to track it. */
@@ -24,22 +34,47 @@ interface ChecklistItemProps {
   dragging?: boolean;
 }
 
-/** A single checklist row shared by the chores and shopping lists: the whole row
- *  is one tap target that toggles completion, with a separate remove button and
- *  an optional drag handle for manual ordering. */
+/**
+ * A single checklist row shared by the chores and shopping lists. Two shapes:
+ * a plain row is one tap target that toggles completion (with an optional
+ * remove button and drag handle); a row with `to` splits into a check circle
+ * that toggles and a body that opens the item, so a thumb landing on the text
+ * never completes anything by accident.
+ */
 export default function ChecklistItem({
   checked,
   label,
   subtitle,
   onToggle,
-  onRemove,
   toggleLabel,
+  to,
+  trailing,
+  onRemove,
   removeLabel,
   dragHandle,
   containerRef,
   style,
   dragging = false,
 }: ChecklistItemProps) {
+  const circle = (
+    <span
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        checked ? 'border-primary bg-primary text-on-primary' : 'border-neutral-hover text-transparent'
+      }`}
+    >
+      <IconCheck size={14} stroke={3} />
+    </span>
+  );
+
+  const text = (
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className={`truncate ${checked ? 'text-muted line-through' : 'text-on-surface'}`}>
+        {label}
+      </span>
+      {subtitle}
+    </span>
+  );
+
   return (
     <li
       ref={containerRef}
@@ -49,38 +84,44 @@ export default function ChecklistItem({
       }`}
     >
       {dragHandle}
-      <button
-        onClick={onToggle}
-        aria-label={toggleLabel}
-        title={toggleLabel}
-        className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pr-3' : 'px-3'}`}
-      >
-        <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            checked
-              ? 'border-primary bg-primary text-on-primary'
-              : 'border-neutral-hover text-transparent'
-          }`}
-        >
-          <IconCheck size={14} stroke={3} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span
-            className={`truncate ${checked ? 'text-muted line-through' : 'text-on-surface'}`}
+      {to ? (
+        <>
+          {/* Padded to a 44px-wide target of its own, so it is deliberate to hit. */}
+          <button
+            onClick={onToggle}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+            className={`flex shrink-0 items-center py-3 pr-2 ${dragHandle ? 'pl-1' : 'pl-3'}`}
           >
-            {label}
-          </span>
-          {subtitle}
-        </span>
-      </button>
-      <button
-        onClick={onRemove}
-        aria-label={removeLabel}
-        title={removeLabel}
-        className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-error"
-      >
-        <IconX size={18} stroke={1.5} />
-      </button>
+            {circle}
+          </button>
+          <Link to={to} className="flex min-w-0 flex-1 items-center gap-2 py-3 pr-2 pl-1">
+            {text}
+            {trailing}
+            <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
+          </Link>
+        </>
+      ) : (
+        <button
+          onClick={onToggle}
+          aria-label={toggleLabel}
+          title={toggleLabel}
+          className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pr-3' : 'px-3'}`}
+        >
+          {circle}
+          {text}
+        </button>
+      )}
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label={removeLabel}
+          title={removeLabel}
+          className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-error"
+        >
+          <IconX size={18} stroke={1.5} />
+        </button>
+      )}
     </li>
   );
 }

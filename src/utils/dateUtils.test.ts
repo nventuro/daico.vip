@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  addDays,
   addMonths,
   daysUntil,
   formatDayMonth,
@@ -36,6 +37,14 @@ describe('daysUntil', () => {
   });
 });
 
+describe('addDays', () => {
+  it('moves forward and back across month and year ends', () => {
+    expect(addDays('2026-03-14', 1)).toBe('2026-03-15');
+    expect(addDays('2026-03-31', 1)).toBe('2026-04-01');
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+  });
+});
+
 describe('addMonths', () => {
   it('clamps the day to the target month', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
@@ -56,13 +65,27 @@ describe('relativeDay', () => {
     expect(relativeDay(TODAY, '2026-03-13')).toBe('ayer');
   });
 
-  it('counts days within the relative range', () => {
-    expect(relativeDay(TODAY, '2026-03-17')).toBe('en 3 días');
-    expect(relativeDay(TODAY, '2026-03-10')).toBe('hace 4 días');
+  it('names the weekday up to the limit ahead', () => {
+    expect(relativeDay(TODAY, '2026-03-16')).toBe('lunes');
+    expect(relativeDay(TODAY, '2026-03-17')).toBe('martes');
+    expect(relativeDay(TODAY, '2026-03-20')).toBe('viernes');
   });
 
-  it('falls back to weekday + dd/mm further out', () => {
-    expect(relativeDay(TODAY, '2026-03-28')).toBe('sáb 28/03');
+  it('counts days back up to the limit', () => {
+    expect(relativeDay(TODAY, '2026-03-12')).toBe('hace 2 días');
+    expect(relativeDay(TODAY, '2026-03-08')).toBe('hace 6 días');
+  });
+
+  it('spells the date beyond the limit, so a weekday never names two days', () => {
+    // 7 days out is a Saturday again, like today.
+    expect(relativeDay(TODAY, '2026-03-21')).toBe('sáb 21 mar');
+    expect(relativeDay(TODAY, '2026-03-07')).toBe('sáb 7 mar');
+    expect(relativeDay(TODAY, '2026-09-18')).toBe('vie 18 sept');
+  });
+
+  it('adds the year outside the current one', () => {
+    expect(relativeDay(TODAY, '2027-01-15')).toBe('15 ene 2027');
+    expect(relativeDay(TODAY, '2025-12-24')).toBe('24 dic 2025');
   });
 });
 

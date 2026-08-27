@@ -8,6 +8,12 @@ import {
   REPEAT_KINDS,
   type RepeatKind,
 } from '../../types';
+import {
+  CHIP_BASE_CLASS,
+  CHIP_IDLE_CLASS,
+  CONTROL_CLASS,
+  FIELD_CLASS,
+} from '../../components/controlClasses';
 import type { DateInput } from './useDates';
 import { noticeLabel, repeatLabel } from './labels';
 
@@ -27,11 +33,8 @@ interface DateFieldsProps {
   layout: 'chips' | 'form';
 }
 
-const CHIP = 'flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 text-sm text-muted';
+const CHIP = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`;
 const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
-const FIELD = 'flex flex-col gap-1 text-sm text-muted';
-const FIELD_CONTROL =
-  'rounded-xl border border-border bg-surface-raised px-3 py-2 text-base text-on-surface outline-none transition-colors focus:border-primary';
 
 /** The date, repeat and notice controls shared by the add bar and the edit
  *  form. Controlled: every change is reported as a patch of the value. */
@@ -44,11 +47,11 @@ export default function DateFields({
   layout,
 }: DateFieldsProps) {
   const chips = layout === 'chips';
-  const control = chips ? CHIP_CONTROL : FIELD_CONTROL;
+  const control = chips ? CHIP_CONTROL : CONTROL_CLASS;
 
   function field(label: string, icon: ReactNode, input: ReactNode) {
     return (
-      <label className={chips ? CHIP : FIELD}>
+      <label className={chips ? CHIP : FIELD_CLASS}>
         {chips ? icon : <span>{label}</span>}
         {input}
       </label>

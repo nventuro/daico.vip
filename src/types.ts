@@ -155,8 +155,15 @@ export const MS_PER_DAY = 86_400_000;
 /** Months in a year, for calendar-month arithmetic. */
 export const MONTHS_PER_YEAR = 12;
 
-/** Beyond ±this many days a relative date label switches to weekday + dd/mm. */
+/**
+ * Beyond ±this many days a relative date label switches to the spelled date.
+ * Within it, days ahead are named by weekday alone, so this must stay under 7
+ * or a name could mean either of two days.
+ */
 export const RELATIVE_DAY_LIMIT = 6;
+
+/** How long (ms) an undo bar stays up after marking a task done. */
+export const UNDO_MS = 5000;
 
 /** Privacy-enhanced YouTube embed base; append the video id. */
 export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';

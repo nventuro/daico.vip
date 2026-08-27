@@ -4,13 +4,14 @@ import { IconChevronRight } from '@tabler/icons-react';
 interface CompletedSectionProps {
   /** Section heading, e.g. "Compradas" / "Hechas". */
   label: string;
-  /** Number of completed items (the section hides itself when zero). */
+  /** Number of completed items; the section hides itself when zero. */
   count: number;
   children: ReactNode;
 }
 
 /** Collapsible bottom section that holds completed items so they stay out of the
- *  way without being deleted. Collapsed by default. */
+ *  way without being deleted. Collapsed by default; the heading names the section
+ *  without counting it, since how many are done changes nothing. */
 export default function CompletedSection({ label, count, children }: CompletedSectionProps) {
   const [open, setOpen] = useState(false);
 
@@ -28,7 +29,7 @@ export default function CompletedSection({ label, count, children }: CompletedSe
           stroke={2}
           className={`transition-transform ${open ? 'rotate-90' : ''}`}
         />
-        {label} ({count})
+        {label}
       </button>
       {open && <ul className="space-y-2">{children}</ul>}
     </div>

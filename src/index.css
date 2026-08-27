@@ -28,8 +28,14 @@
   /* Disabled state */
   --color-disabled: #d6d3d1;
 
+  /* Inverse surface (toasts and undo bars that float over the page) */
+  --color-surface-inverse: #1c1917;
+  --color-on-surface-inverse: #faf9f7;
+
   /* Feedback */
   --color-error: #ef4444;
+  --color-error-hover: #dc2626;
+  --color-on-error: #ffffff;
   --color-warning: #f59e0b;
   --color-success: #16a34a;
 }

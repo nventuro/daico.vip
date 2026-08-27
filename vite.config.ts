@@ -61,6 +61,16 @@ export default defineConfig({
   // SQLocal's worker code-splits, which Vite's default IIFE worker format can't
   // bundle — emit ES module workers instead (supported on all modern browsers).
   worker: { format: 'es' },
+  build: {
+    rollupOptions: {
+      output: {
+        // The Supabase client is the one large dependency in the startup bundle;
+        // giving it its own chunk keeps the main one comfortably under the size
+        // Rollup warns at, and lets the client's cache entry survive app updates.
+        manualChunks: { supabase: ['@supabase/supabase-js'] },
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
   },

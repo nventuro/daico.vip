@@ -113,6 +113,19 @@ a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
   desktop Firefox ≥ 111 — both target browsers qualify.
 - Local data is wiped on sign-out (shared-device hygiene).
 
+## Tareas
+
+Tasks live in the `chores` table (offline-synced like the others): a title, an
+optional due date (`due_on`, a plain date) and optional notes. On the list the
+check circle is the only thing that marks a task done — the rest of the row
+opens it at `/tareas/:id`, where every field is edited and the task can be
+deleted behind a confirmation. Marking one done shows a brief undo bar. Done
+tasks stay under "Hechas" until deleted from their page. Due dates are shown
+the way a person says them (`relativeDay` in `src/utils/dateUtils.ts`): "hoy",
+"mañana", the weekday alone up to six days out, "hace N días" for a recent
+overdue, and the spelled date beyond that. A new task has no due date unless
+one of the quick chips (Hoy · Mañana · calendar) is tapped.
+
 ## Fechas
 
 Dates are calendar entries — birthdays, appointments, renewals — kept in the

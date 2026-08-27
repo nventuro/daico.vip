@@ -1,5 +1,10 @@
 import { type FormEvent, useState } from 'react';
 import { RECIPE_QUANTITY_MIN, type Recipe } from '../../types';
+import FormField from '../../components/FormField';
+import TextInput from '../../components/TextInput';
+import TextArea from '../../components/TextArea';
+import Button from '../../components/Button';
+import FormFooter from '../../components/FormFooter';
 import type { RecipeInput } from './useRecipes';
 
 interface RecipeFormProps {
@@ -7,10 +12,6 @@ interface RecipeFormProps {
   onSave: (input: RecipeInput) => void;
   onRemove: () => void;
 }
-
-const FIELD = 'flex flex-col gap-1 text-sm text-muted';
-const CONTROL =
-  'rounded-xl border border-border bg-surface-raised px-3 py-2 text-base text-on-surface outline-none transition-colors focus:border-primary';
 
 /** An empty ingredients block, ready for the first item. */
 const INGREDIENTS_SNIPPET = ':::ingredients\n- \n:::\n';
@@ -42,83 +43,62 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className={FIELD}>
-        <span>Título</span>
-        <input
+      <FormField label="Título">
+        <TextInput
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Título"
           autoCapitalize="sentences"
           required
-          className={CONTROL}
         />
-      </label>
+      </FormField>
 
       <div className="grid grid-cols-2 gap-4">
-        <label className={FIELD}>
-          <span>Minutos</span>
-          <input
+        <FormField label="Minutos">
+          <TextInput
             type="number"
             inputMode="numeric"
             min={RECIPE_QUANTITY_MIN}
             value={minutes}
             onChange={(e) => setMinutes(e.target.value)}
             aria-label="Minutos"
-            className={CONTROL}
           />
-        </label>
-        <label className={FIELD}>
-          <span>Porciones</span>
-          <input
+        </FormField>
+        <FormField label="Porciones">
+          <TextInput
             type="number"
             inputMode="numeric"
             min={RECIPE_QUANTITY_MIN}
             value={servings}
             onChange={(e) => setServings(e.target.value)}
             aria-label="Porciones"
-            className={CONTROL}
           />
-        </label>
+        </FormField>
       </div>
 
-      <label className={FIELD}>
-        <span>Receta (Markdown)</span>
-        <textarea
+      <FormField label="Receta (Markdown)">
+        <TextArea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           aria-label="Receta (Markdown)"
           rows={14}
-          className={`${CONTROL} font-mono`}
+          className="font-mono"
         />
-      </label>
+      </FormField>
 
       <div>
-        <button
-          type="button"
-          onClick={insertIngredients}
-          className="rounded-full border border-border px-3 py-2 text-sm text-muted-strong transition-colors hover:bg-border-subtle"
-        >
+        <Button variant="outline" size="sm" onClick={insertIngredients}>
           Insertar ingredientes
-        </button>
+        </Button>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded-full px-3 py-2 text-sm text-error transition-colors hover:bg-border-subtle"
-        >
-          Eliminar receta
-        </button>
-        <button
-          type="submit"
-          disabled={!title.trim()}
-          className="rounded-full bg-primary px-4 py-2 text-on-primary transition-colors hover:bg-primary-hover disabled:bg-disabled"
-        >
-          Guardar
-        </button>
-      </div>
+      <FormFooter
+        removeLabel="Eliminar receta"
+        confirmQuestion="¿Eliminar la receta?"
+        onRemove={onRemove}
+        submitDisabled={!title.trim()}
+      />
     </form>
   );
 }

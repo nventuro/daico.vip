@@ -144,6 +144,15 @@ Chromium-only APIs are available everywhere.
 - **Date format**: always dd/mm order, never mm/dd. Use `formatDate` (long locale) or
   `formatDateShort` (dd/mm/yyyy) from `src/utils/dateUtils.ts`.
 - **Icon-only controls**: must have an accessible label (`aria-label` + `title`).
+- **Forms and buttons are built from the shared primitives in `src/components/`**:
+  `FormField`, `TextInput`, `TextArea`, `Chip` (one of a row of choices), `Button`
+  (variants `primary` / `outline` / `danger` / `dangerText`), `FormFooter` (an
+  edit form's delete-with-confirm + submit row) and `UndoBar`. Never hand-write
+  control or button classes in a page; a control with no component of its own
+  takes its classes from `src/components/controlClasses.ts`. This is what keeps
+  every app looking like one app.
+- **Nothing is destroyed on a single tap**: a delete goes through `FormFooter`'s
+  confirm, or is reversible for a moment through `UndoBar` (`useUndo`).
 - **No duplicated logic**: extract shared computation; check for existing helpers first.
 - **Zero lint errors**: run `npm run lint` after changes and fix everything before done.
 - **Zero build warnings**: run `npm run build` after changes and fix everything before done.

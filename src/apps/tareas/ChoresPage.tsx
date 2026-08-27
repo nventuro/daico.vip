@@ -1,31 +1,46 @@
 import { useState } from 'react';
-import { IconCalendarEvent } from '@tabler/icons-react';
-import type { Chore } from '../../types';
+import { IconNotes } from '@tabler/icons-react';
+import { UNDO_MS, type Chore } from '../../types';
 import { useChores } from './useChores';
-import { formatDateShort, todayIso } from '../../utils/dateUtils';
+import { relativeDay, todayIso } from '../../utils/dateUtils';
+import { useUndo } from '../../hooks/useUndo';
 import OfflineBanner from '../../components/OfflineBanner';
 import ChecklistItem from '../../components/ChecklistItem';
 import CompletedSection from '../../components/CompletedSection';
 import AddBar from '../../components/AddBar';
+import UndoBar from '../../components/UndoBar';
+import DueDateChips from './DueDateChips';
 
 export default function ChoresPage() {
-  const { items: chores, loading, error, add, toggleDone, remove } = useChores();
+  const { items: chores, loading, error, add, setDone } = useChores();
+  const undo = useUndo<Chore>(UNDO_MS);
 
   const today = todayIso();
 
   const [newTitle, setNewTitle] = useState('');
-  const [newDueOn, setNewDueOn] = useState(today);
+  const [newDueOn, setNewDueOn] = useState<string | null>(null);
 
   function addChore() {
     const title = newTitle.trim();
     if (!title) return;
     setNewTitle('');
-    setNewDueOn(today);
-    void add(title, newDueOn || null);
+    setNewDueOn(null);
+    void add(title, newDueOn);
+  }
+
+  function toggle(chore: Chore) {
+    void setDone(chore.id, !chore.done);
+    if (!chore.done) undo.offer(chore);
+  }
+
+  function undoDone(chore: Chore) {
+    undo.clear();
+    void setDone(chore.id, false);
   }
 
   const active = chores.filter((c) => !c.done);
   const completed = chores.filter((c) => c.done);
+  const justDone = undo.value;
 
   function renderChore(chore: Chore) {
     const overdue = !chore.done && chore.due_on != null && chore.due_on < today;
@@ -34,22 +49,21 @@ export default function ChoresPage() {
         key={chore.id}
         checked={chore.done}
         label={chore.title}
+        to={`/tareas/${chore.id}`}
         subtitle={
           chore.due_on ? (
-            <span
-              className={`mt-0.5 inline-flex items-center gap-1 text-xs ${
-                overdue ? 'text-error' : 'text-muted'
-              }`}
-            >
-              <IconCalendarEvent size={13} stroke={1.5} />
-              {formatDateShort(chore.due_on)}
+            <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
+              {relativeDay(today, chore.due_on)}
             </span>
           ) : undefined
         }
-        onToggle={() => void toggleDone(chore)}
-        onRemove={() => void remove(chore)}
+        trailing={
+          chore.notes ? (
+            <IconNotes size={16} stroke={1.5} className="shrink-0 text-muted" aria-label="Tiene notas" />
+          ) : undefined
+        }
+        onToggle={() => toggle(chore)}
         toggleLabel={chore.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
-        removeLabel="Eliminar tarea"
       />
     );
   }
@@ -83,17 +97,9 @@ export default function ChoresPage() {
         onSubmit={addChore}
         placeholder="Agregar una tarea..."
         inputLabel="Nueva tarea"
+        notice={justDone && <UndoBar message="Tarea hecha" onAction={() => undoDone(justDone)} />}
       >
-        <label className="flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 text-sm text-muted">
-          <IconCalendarEvent size={18} stroke={1.5} />
-          <input
-            type="date"
-            value={newDueOn}
-            onChange={(e) => setNewDueOn(e.target.value)}
-            aria-label="Fecha límite"
-            className="bg-transparent text-sm text-muted-strong outline-none"
-          />
-        </label>
+        <DueDateChips value={newDueOn} onChange={setNewDueOn} today={today} />
       </AddBar>
     </div>
   );
