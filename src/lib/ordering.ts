@@ -64,3 +64,17 @@ export function keyForMove(items: Positioned[], fromId: string, toId: string): s
     return null;
   }
 }
+
+/**
+ * The key for a row put back where `wanted` sorted among `items` (in visible
+ * order): just before the first key greater than it, after any equal one. The
+ * key is minted between those neighbours rather than reusing `wanted`, so a row
+ * restored after deletion can never share a key with one added meanwhile. Rows
+ * with a null key sit at the end and count as an open end.
+ */
+export function keyForSlot(items: Positioned[], wanted: string | null): string {
+  if (wanted == null) return keyForAppend(items);
+  const at = items.findIndex((i) => i.position == null || i.position > wanted);
+  if (at === -1) return keyForAppend(items);
+  return positionBetween(at > 0 ? items[at - 1].position : null, items[at].position);
+}

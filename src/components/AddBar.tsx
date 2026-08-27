@@ -11,14 +11,14 @@ interface AddBarProps {
   inputLabel: string;
   /** Optional secondary controls (e.g. a date picker) shown under the input row. */
   children?: ReactNode;
-  /** Something to show above the bar for a moment, e.g. an undo bar. */
+  /** What belongs above the input row: a transient undo bar, or a list-level action. */
   notice?: ReactNode;
 }
 
 /** Bottom-anchored add bar — within thumb reach for one-handed use. Shared by the
  *  chores and shopping lists; pages pass extra controls (like a date picker) as
- *  children and transient notices (like an undo bar) as `notice`, so both stay
- *  pinned with the bar. */
+ *  children and what goes above the input (an undo bar, a list-level action) as
+ *  `notice`, so both stay pinned with the bar. */
 export default function AddBar({
   value,
   onChange,

@@ -34,7 +34,8 @@ export const SHOPPING_SPEC: TableSpec = {
     // Client-owned fractional-index key for manual drag ordering (see ordering.ts).
     { name: 'position', ddl: 'TEXT' },
   ],
-  orderBy: 'checked ASC, position ASC NULLS LAST, created_at ASC',
+  // A struck (bought) item keeps its place in the list, so the order ignores `checked`.
+  orderBy: 'position ASC NULLS LAST, created_at ASC',
 };
 
 export const CHORES_SPEC: TableSpec = {

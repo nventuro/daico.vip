@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { keyForAppend, keyForMove, positionBetween, type Positioned } from './ordering';
+import { keyForAppend, keyForMove, keyForSlot, positionBetween, type Positioned } from './ordering';
 
 /** A list of n items in sort-key order, keyed by a fresh fractional sequence
  *  ('a0','a1',...) — i.e. the state right after the migration backfill. */
@@ -92,5 +92,42 @@ describe('keyForMove', () => {
     ];
     expect(() => keyForMove(corrupt, 'r', 'q')).not.toThrow();
     expect(keyForMove(corrupt, 'r', 'q')).toBeNull();
+  });
+});
+
+describe('keyForSlot', () => {
+  /** Ids in sort-key order once `id` is added with `key`. */
+  function orderWith(items: Positioned[], id: string, key: string): string[] {
+    return [...items, { id, position: key }]
+      .sort((a, b) => (a.position! < b.position! ? -1 : 1))
+      .map((i) => i.id);
+  }
+
+  it('puts the row back between the neighbours it had', () => {
+    const items = makeList(4);
+    const [gone] = items.splice(2, 1);
+    const key = keyForSlot(items, gone.position);
+    expect(orderWith(items, gone.id, key)).toEqual(['0', '1', '2', '3']);
+  });
+
+  it('never reuses a key that was taken meanwhile', () => {
+    const items = makeList(3);
+    const [gone] = items.splice(2, 1);
+    items.push({ id: 'new', position: keyForAppend(items) }); // lands on the old key
+    expect(items[2].position).toBe(gone.position);
+    const key = keyForSlot(items, gone.position);
+    expect(key).not.toBe(gone.position);
+    expect(orderWith(items, gone.id, key)).toEqual(['0', '1', 'new', '2']);
+  });
+
+  it('appends when the slot was at the end, or the row had no key', () => {
+    const items = makeList(3);
+    expect(orderWith(items, 'x', keyForSlot(items, 'zz'))).toEqual(['0', '1', '2', 'x']);
+    expect(keyForSlot(items, null)).toBe(keyForAppend(items));
+  });
+
+  it('treats unkeyed rows as an open end', () => {
+    const items: Positioned[] = [{ id: 'a', position: 'a0' }, { id: 'n', position: null }];
+    expect(keyForSlot(items, 'a5') > 'a0').toBe(true);
   });
 });

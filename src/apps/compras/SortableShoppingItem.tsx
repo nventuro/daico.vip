@@ -7,16 +7,11 @@ import ChecklistItem from '../../components/ChecklistItem';
 interface SortableShoppingItemProps {
   item: ShoppingItem;
   onToggle: () => void;
-  onRemove: () => void;
 }
 
 /** A shopping-list row wired for drag reordering: dragging the left handle moves
- *  it; the rest of the row toggles / removes as usual. */
-export default function SortableShoppingItem({
-  item,
-  onToggle,
-  onRemove,
-}: SortableShoppingItemProps) {
+ *  it; a tap anywhere else strikes the item through, or un-strikes it. */
+export default function SortableShoppingItem({ item, onToggle }: SortableShoppingItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
@@ -25,10 +20,9 @@ export default function SortableShoppingItem({
     <ChecklistItem
       checked={item.checked}
       label={item.name}
+      circle={false}
       onToggle={onToggle}
-      onRemove={onRemove}
-      toggleLabel={item.checked ? 'Marcar como pendiente' : 'Marcar como comprado'}
-      removeLabel="Eliminar"
+      toggleLabel={item.checked ? 'Destachar' : 'Tachar'}
       containerRef={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       dragging={isDragging}

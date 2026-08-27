@@ -121,6 +121,15 @@ describe('insert', () => {
 });
 
 describe('listVisible', () => {
+  it('keeps a struck shopping item in its place', async () => {
+    const first = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: 'a0' });
+    const second = await engine.insert(SHOPPING_SPEC, { name: 'Leche', checked: false, position: 'a1' });
+    const third = await engine.insert(SHOPPING_SPEC, { name: 'Yerba', checked: false, position: 'a2' });
+    await engine.update(SHOPPING_SPEC, second, { checked: true });
+    const ids = (await engine.listVisible<ShoppingItem>(SHOPPING_SPEC)).map((i) => i.id);
+    expect(ids).toEqual([first, second, third]);
+  });
+
   it('orders rows by the spec clause', async () => {
     const later = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-02' });
     const noDate = await engine.insert(CHORES_SPEC, newChore);

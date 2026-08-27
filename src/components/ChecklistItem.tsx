@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IconCheck, IconChevronRight, IconX } from '@tabler/icons-react';
+import { IconCheck, IconChevronRight } from '@tabler/icons-react';
 
 interface ChecklistItemProps {
   /** Whether the item is completed (done / bought). */
@@ -20,10 +20,13 @@ interface ChecklistItemProps {
   to?: string;
   /** Small marks shown before the chevron of a linked row (e.g. "has notes"). */
   trailing?: ReactNode;
-  /** Remove button at the row's end; omitted when not given. */
-  onRemove?: () => void;
-  /** Accessible label/title for the remove button. */
-  removeLabel?: string;
+  /**
+   * Whether to draw the check circle. Without it, completion reads only as a
+   * strike through the label — for a list where the whole row is the toggle
+   * and there is nothing else to read on it. A linked row always has its
+   * circle, since that is its toggle.
+   */
+  circle?: boolean;
   /** Optional drag handle (reorderable lists), rendered leftmost on the row. */
   dragHandle?: ReactNode;
   /** Ref for the row element, used by drag-and-drop to track it. */
@@ -37,9 +40,9 @@ interface ChecklistItemProps {
 /**
  * A single checklist row shared by the chores and shopping lists. Two shapes:
  * a plain row is one tap target that toggles completion (with an optional
- * remove button and drag handle); a row with `to` splits into a check circle
- * that toggles and a body that opens the item, so a thumb landing on the text
- * never completes anything by accident.
+ * drag handle); a row with `to` splits into a check circle that toggles and
+ * a body that opens the item, so a thumb landing on the text never completes
+ * anything by accident.
  */
 export default function ChecklistItem({
   checked,
@@ -49,14 +52,13 @@ export default function ChecklistItem({
   toggleLabel,
   to,
   trailing,
-  onRemove,
-  removeLabel,
+  circle = true,
   dragHandle,
   containerRef,
   style,
   dragging = false,
 }: ChecklistItemProps) {
-  const circle = (
+  const check = (
     <span
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
         checked ? 'border-primary bg-primary text-on-primary' : 'border-neutral-hover text-transparent'
@@ -93,7 +95,7 @@ export default function ChecklistItem({
             title={toggleLabel}
             className={`flex shrink-0 items-center py-3 pr-2 ${dragHandle ? 'pl-1' : 'pl-3'}`}
           >
-            {circle}
+            {check}
           </button>
           <Link to={to} className="flex min-w-0 flex-1 items-center gap-2 py-3 pr-2 pl-1">
             {text}
@@ -108,18 +110,8 @@ export default function ChecklistItem({
           title={toggleLabel}
           className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pr-3' : 'px-3'}`}
         >
-          {circle}
+          {circle && check}
           {text}
-        </button>
-      )}
-      {onRemove && (
-        <button
-          onClick={onRemove}
-          aria-label={removeLabel}
-          title={removeLabel}
-          className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-error"
-        >
-          <IconX size={18} stroke={1.5} />
         </button>
       )}
     </li>

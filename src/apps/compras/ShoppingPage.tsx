@@ -14,18 +14,20 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { ShoppingItem } from '../../types';
+import { UNDO_MS, type ShoppingItem } from '../../types';
 import { useShoppingList } from './useShoppingList';
 import { keyForMove } from '../../lib/ordering';
+import { useUndo } from '../../hooks/useUndo';
 import OfflineBanner from '../../components/OfflineBanner';
-import ChecklistItem from '../../components/ChecklistItem';
 import SortableShoppingItem from './SortableShoppingItem';
-import CompletedSection from '../../components/CompletedSection';
 import AddBar from '../../components/AddBar';
+import Button from '../../components/Button';
+import UndoBar from '../../components/UndoBar';
 
 export default function ShoppingPage() {
-  const { items, loading, error, add, toggle, remove, move } = useShoppingList();
+  const { items, loading, error, add, toggle, removeChecked, restore, move } = useShoppingList();
   const [name, setName] = useState('');
+  const undo = useUndo<ShoppingItem[]>(UNDO_MS);
 
   // Optimistic ordering: a drag reorder is reflected here synchronously so the
   // dropped row stays in its new slot, instead of snapping back for a frame
@@ -53,34 +55,28 @@ export default function ShoppingPage() {
     void add(value);
   }
 
-  const active = view.filter((i) => !i.checked);
-  const completed = view.filter((i) => i.checked);
-
-  function handleDragEnd({ active: dragged, over }: DragEndEvent) {
-    if (!over || dragged.id === over.id) return;
-    const key = keyForMove(active, String(dragged.id), String(over.id));
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    const key = keyForMove(view, String(active.id), String(over.id));
     if (key == null) return;
-    // Active items are the leading slice of `view` (sorted unchecked-first), so
-    // their indices are valid indices into `view`.
-    const from = active.findIndex((i) => i.id === dragged.id);
-    const to = active.findIndex((i) => i.id === over.id);
+    const from = view.findIndex((i) => i.id === active.id);
+    const to = view.findIndex((i) => i.id === over.id);
     setView((v) => arrayMove(v, from, to));
-    void move(String(dragged.id), key);
+    void move(String(active.id), key);
   }
 
-  function renderCompleted(item: ShoppingItem) {
-    return (
-      <ChecklistItem
-        key={item.id}
-        checked={item.checked}
-        label={item.name}
-        onToggle={() => void toggle(item)}
-        onRemove={() => void remove(item)}
-        toggleLabel="Marcar como pendiente"
-        removeLabel="Eliminar"
-      />
-    );
+  async function clearStruck() {
+    const removed = await removeChecked();
+    if (removed?.length) undo.offer(removed);
   }
+
+  function undoClear(removed: ShoppingItem[]) {
+    undo.clear();
+    void restore(removed);
+  }
+
+  const hasStruck = view.some((i) => i.checked);
+  const justCleared = undo.value;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -91,39 +87,20 @@ export default function ShoppingPage() {
 
         {loading ? (
           <p className="text-muted">Cargando...</p>
+        ) : view.length === 0 ? (
+          <p className="py-10 text-center text-muted">
+            La lista está vacía. Agregá lo que necesites comprar.
+          </p>
         ) : (
-          <>
-            {active.length === 0 ? (
-              <p className="py-10 text-center text-muted">
-                La lista está vacía. Agregá lo que necesites comprar.
-              </p>
-            ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={active.map((i) => i.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <ul className="space-y-2">
-                    {active.map((item) => (
-                      <SortableShoppingItem
-                        key={item.id}
-                        item={item}
-                        onToggle={() => void toggle(item)}
-                        onRemove={() => void remove(item)}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-            )}
-            <CompletedSection label="Compradas" count={completed.length}>
-              {completed.map(renderCompleted)}
-            </CompletedSection>
-          </>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+              <ul className="space-y-2">
+                {view.map((item) => (
+                  <SortableShoppingItem key={item.id} item={item} onToggle={() => void toggle(item)} />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
@@ -133,6 +110,15 @@ export default function ShoppingPage() {
         onSubmit={submit}
         placeholder="Agregar producto..."
         inputLabel="Nuevo producto"
+        notice={
+          justCleared ? (
+            <UndoBar message="Tachados borrados" onAction={() => undoClear(justCleared)} />
+          ) : hasStruck ? (
+            <Button variant="dangerOutline" size="sm" onClick={() => void clearStruck()}>
+              Borrar tachados
+            </Button>
+          ) : undefined
+        }
       />
     </div>
   );
