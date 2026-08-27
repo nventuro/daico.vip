@@ -3,6 +3,7 @@ import type { Recipe } from '../../types';
 import { RECIPES_SPEC } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a recipe; the row's own columns minus the
  *  engine-managed ones. */
@@ -22,7 +23,7 @@ export function useRecipes() {
    *  can open it for writing; undefined for a blank title or a failed write. */
   const add = useCallback(
     (title: string): Promise<string | undefined> => {
-      const value = title.trim();
+      const value = lowercaseTrimmed(title);
       if (!value) return Promise.resolve(undefined);
       return mutate(() =>
         engine.insert(RECIPES_SPEC, { title: value, body: '', minutes: null, servings: null }),

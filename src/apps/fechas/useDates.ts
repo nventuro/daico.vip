@@ -3,6 +3,7 @@ import type { DateEntry, RepeatKind } from '../../types';
 import { DATES_SPEC } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a date; the row's own columns minus the
  *  engine-managed ones. */
@@ -28,7 +29,7 @@ export function useDates() {
 
   const add = useCallback(
     (input: DateInput) => {
-      const title = input.title.trim();
+      const title = lowercaseTrimmed(input.title);
       if (!title) return Promise.resolve();
       return mutate(() => engine.insert(DATES_SPEC, withInterval({ ...input, title }, input.repeat)));
     },

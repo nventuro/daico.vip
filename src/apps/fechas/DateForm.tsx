@@ -5,6 +5,7 @@ import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
 import FormFooter from '../../components/FormFooter';
 import { hasChanges } from '../../utils/formUtils';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 import type { DateInput } from './useDates';
 import DateFields, { type DateFieldsValue } from './DateFields';
 
@@ -26,7 +27,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
     notice_days: entry.notice_days,
   });
 
-  const input: DateInput = { title: title.trim(), ...fields, notes: notes.trim() || null };
+  const input: DateInput = { title: lowercaseTrimmed(title), ...fields, notes: notes.trim() || null };
   const canSave = input.title !== '' && input.occurs_on !== '' && hasChanges(input, entry);
 
   function handleSubmit(e: FormEvent) {
@@ -43,7 +44,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Título"
-          autoCapitalize="sentences"
+          autoCapitalize="none"
           required
         />
       </FormField>

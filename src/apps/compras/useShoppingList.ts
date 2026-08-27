@@ -4,6 +4,7 @@ import { SHOPPING_SPEC } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { keyForAppend } from '../../lib/ordering';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Local-first shopping list: add / toggle / delete / reorder items, syncing in
  *  the background. Every action is instant and works offline. */
@@ -12,7 +13,7 @@ export function useShoppingList() {
 
   const add = useCallback(
     (name: string) => {
-      const value = name.trim().slice(0, SHOPPING_ITEM_NAME_MAX);
+      const value = lowercaseTrimmed(name).slice(0, SHOPPING_ITEM_NAME_MAX);
       if (!value) return Promise.resolve();
       return mutate(async () => {
         // Append after the last active item (items are kept in position order).

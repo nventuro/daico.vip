@@ -6,6 +6,7 @@ import TextArea from '../../components/TextArea';
 import Button from '../../components/Button';
 import FormFooter from '../../components/FormFooter';
 import { hasChanges } from '../../utils/formUtils';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 import type { RecipeInput } from './useRecipes';
 
 interface RecipeFormProps {
@@ -32,7 +33,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
   const [body, setBody] = useState(recipe.body);
 
   const input: RecipeInput = {
-    title: title.trim(),
+    title: lowercaseTrimmed(title),
     body,
     minutes: parseQuantity(minutes),
     servings: parseQuantity(servings),
@@ -57,7 +58,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Título"
-          autoCapitalize="sentences"
+          autoCapitalize="none"
           required
         />
       </FormField>

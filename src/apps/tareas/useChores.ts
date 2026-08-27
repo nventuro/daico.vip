@@ -3,6 +3,7 @@ import type { Chore } from '../../types';
 import { CHORES_SPEC } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a chore; the row's own columns minus the
  *  engine-managed ones and `done`. */
@@ -20,7 +21,7 @@ export function useChores() {
 
   const add = useCallback(
     (title: string, dueOn: string | null) => {
-      const value = title.trim();
+      const value = lowercaseTrimmed(title);
       if (!value) return Promise.resolve();
       return mutate(() =>
         engine.insert(CHORES_SPEC, {

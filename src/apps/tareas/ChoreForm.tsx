@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react';
 import type { Chore } from '../../types';
 import { formatDate, todayIso } from '../../utils/dateUtils';
 import { hasChanges } from '../../utils/formUtils';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
@@ -23,7 +24,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
   const [notes, setNotes] = useState(chore.notes ?? '');
   const today = todayIso();
 
-  const input: ChoreInput = { title: title.trim(), due_on: dueOn, notes: notes.trim() || null };
+  const input: ChoreInput = { title: lowercaseTrimmed(title), due_on: dueOn, notes: notes.trim() || null };
   const canSave = input.title !== '' && hasChanges(input, chore);
 
   function handleSubmit(e: FormEvent) {
@@ -40,7 +41,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Título"
-          autoCapitalize="sentences"
+          autoCapitalize="none"
           required
         />
       </FormField>

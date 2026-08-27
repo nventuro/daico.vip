@@ -2,3 +2,9 @@
 export function countLabel(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`;
 }
+
+/** `text` trimmed and lower-cased: the form titles and item names are saved in,
+ *  so entries read the same however they were typed. */
+export function lowercaseTrimmed(text: string): string {
+  return text.trim().toLowerCase();
+}

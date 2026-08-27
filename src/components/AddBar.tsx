@@ -51,7 +51,7 @@ export default function AddBar({
             placeholder={placeholder}
             aria-label={inputLabel}
             enterKeyHint="done"
-            autoCapitalize="sentences"
+            autoCapitalize="none"
             className="flex-1 rounded-full border border-border bg-surface-raised px-4 py-3 text-base outline-none transition-colors placeholder:text-muted focus:border-primary"
           />
           <button
