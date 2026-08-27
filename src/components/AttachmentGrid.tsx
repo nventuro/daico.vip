@@ -20,7 +20,7 @@ interface AttachmentGridProps {
  * screen that names the picked file.
  */
 export default function AttachmentGrid({ owner, ownerPath }: AttachmentGridProps) {
-  const { items, add } = useAttachments(owner);
+  const { items, error, add } = useAttachments(owner);
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
@@ -67,6 +67,7 @@ export default function AttachmentGrid({ owner, ownerPath }: AttachmentGridProps
         </label>
       </div>
       {problem && <p className="text-sm text-error">{problem}</p>}
+      {error && <p className="text-sm text-error">Error: {error}</p>}
     </>
   );
 }
