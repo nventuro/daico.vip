@@ -1,7 +1,44 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { SUPABASE_URL } from './src/config';
+import { YOUTUBE_EMBED_URL } from './src/types';
+
+// The page's Content-Security-Policy, carried as a <meta> tag because the static
+// host can't set response headers. The point is `script-src`: no inline and no
+// third-party script can run, and a script can't send anything anywhere but
+// Supabase. `'wasm-unsafe-eval'` lets SQLite compile its wasm; `'unsafe-inline'`
+// on styles covers the inline `style` attributes React sets, which is not an
+// exfiltration path worth fighting. Injected at build only: the dev server
+// needs an inline script (Fast Refresh) and a websocket the policy would deny.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self'",
+  `connect-src 'self' ${SUPABASE_URL}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  'font-src https://fonts.gstatic.com',
+  "img-src 'self' data:",
+  `frame-src ${new URL(YOUTUBE_EMBED_URL).origin}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+].join('; ');
+
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'content-security-policy',
+    apply: 'build',
+    transformIndexHtml: () => [
+      {
+        tag: 'meta',
+        attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
+        // Before every other tag in <head>: a policy governs only what loads after it.
+        injectTo: 'head-prepend',
+      },
+    ],
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -58,6 +95,7 @@ export default defineConfig({
       },
       devOptions: { enabled: false },
     }),
+    contentSecurityPolicy(),
   ],
   // SQLocal and the SQLite wasm ship a worker + wasm that must not be pre-bundled
   // by Vite's dep optimizer, or the custom SAH-pool worker fails to resolve its
