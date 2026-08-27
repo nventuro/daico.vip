@@ -7,9 +7,22 @@ import { removeAttachmentObject } from '../../lib/attachmentFiles';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { formatBytes, lowercaseTrimmed } from '../../utils/textUtils';
 
+/**
+ * The attachment MIME type for `file`, or null when it is not one we take.
+ * Trusts `file.type` when it is one of ours; otherwise falls back to the
+ * filename extension, since some devices report `image/jpg` or no type at all
+ * for a perfectly good picture.
+ */
+export function attachmentType(file: File): string | null {
+  if (file.type in ATTACHMENT_FILE_TYPES) return file.type;
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  const match = Object.entries(ATTACHMENT_FILE_TYPES).find(([, ext]) => ext === extension);
+  return match ? match[0] : null;
+}
+
 /** Why `file` cannot be attached, in the user's words, or null when it can. */
 export function attachmentProblem(file: File): string | null {
-  if (!(file.type in ATTACHMENT_FILE_TYPES)) {
+  if (!attachmentType(file)) {
     return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) o PDF.';
   }
   if (file.size > ATTACHMENT_MAX_BYTES) {
@@ -35,9 +48,15 @@ export function useAttachments(choreId?: string) {
     [all, choreId],
   );
 
+  // Adds the attachment the moment the file is picked (before it is named), so
+  // the file is safely stored and shown at once and nothing depends on state
+  // surviving the trip through the device's file picker, which on some phones
+  // reloads the app. The name is set afterwards, on its own screen.
   const add = useCallback(
-    (ownerId: string, file: File, name: string, masterKey: CryptoKey) =>
+    (ownerId: string, file: File, masterKey: CryptoKey) =>
       mutate(async () => {
+        const mime = attachmentType(file);
+        if (!mime) throw new Error(`Unsupported attachment type ${file.type}`);
         const { data, wrappedFileKey } = await encryptFile(
           masterKey,
           new Uint8Array(await file.arrayBuffer()),
@@ -51,14 +70,20 @@ export function useAttachments(choreId?: string) {
           {
             owner_kind: 'chore',
             owner_id: ownerId,
-            name: lowercaseTrimmed(name),
-            mime: file.type,
+            name: '',
+            mime,
             size: file.size,
             wrapped_file_key: wrappedFileKey,
           },
           id,
         );
       }),
+    [mutate],
+  );
+
+  const rename = useCallback(
+    (id: string, name: string) =>
+      mutate(() => engine.update(ATTACHMENTS_SPEC, id, { name: lowercaseTrimmed(name) })),
     [mutate],
   );
 
@@ -72,5 +97,5 @@ export function useAttachments(choreId?: string) {
     [mutate],
   );
 
-  return { items, loading, error, add, remove };
+  return { items, loading, error, add, rename, remove };
 }

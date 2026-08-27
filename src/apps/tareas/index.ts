@@ -25,7 +25,7 @@ const tareas: AppModule = {
   routes: [
     { index: true, Component: ChoresPage },
     { path: ':id', Component: ChoreEditPage },
-    { path: ':id/nuevo', Component: NewAttachmentPage },
+    { path: ':id/nuevo/:attachmentId', Component: NewAttachmentPage },
     { path: ':id/:attachmentId', Component: AttachmentPage },
   ],
   useUpcoming: useChoresUpcoming,

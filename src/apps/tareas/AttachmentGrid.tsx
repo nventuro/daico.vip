@@ -2,9 +2,9 @@ import { useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconPlus } from '@tabler/icons-react';
 import { ATTACHMENT_FILE_TYPES } from '../../types';
+import { useMasterKey } from '../../hooks/useMasterKey';
 import AttachmentTile from './AttachmentTile';
 import { attachmentProblem, useAttachments } from './useAttachments';
-import { setAttachmentDraft } from './attachmentDraft';
 
 const ACCEPT = Object.keys(ATTACHMENT_FILE_TYPES).join(',');
 
@@ -14,20 +14,25 @@ const ACCEPT = Object.keys(ATTACHMENT_FILE_TYPES).join(',');
  * that names the picked file.
  */
 export default function AttachmentGrid({ choreId }: { choreId: string }) {
-  const { items } = useAttachments(choreId);
+  const { items, add } = useAttachments(choreId);
+  const masterKey = useMasterKey();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  function pick(e: ChangeEvent<HTMLInputElement>) {
+  async function pick(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Cleared so picking the same file again still counts as a change.
     e.target.value = '';
-    if (!file) return;
+    if (!file || busy) return;
     const refused = attachmentProblem(file);
     setProblem(refused);
-    if (refused) return;
-    setAttachmentDraft(file);
-    navigate(`/tareas/${choreId}/nuevo`);
+    if (refused || masterKey.status !== 'unlocked') return;
+    // Store it now; the next screen only gives it a name.
+    setBusy(true);
+    const id = await add(choreId, file, masterKey.key);
+    setBusy(false);
+    if (id) navigate(`/tareas/${choreId}/nuevo/${id}`);
   }
 
   return (
@@ -49,6 +54,7 @@ export default function AttachmentGrid({ choreId }: { choreId: string }) {
             type="file"
             accept={ACCEPT}
             onChange={pick}
+            disabled={busy}
             aria-label="Agregar adjunto"
             className="sr-only"
           />

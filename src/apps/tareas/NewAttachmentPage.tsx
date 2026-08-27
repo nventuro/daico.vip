@@ -3,41 +3,53 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { IconFileText } from '@tabler/icons-react';
 import { formatBytes } from '../../utils/textUtils';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
-import { useMasterKey } from '../../hooks/useMasterKey';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import Button from '../../components/Button';
 import { useChores } from './useChores';
 import { useAttachments } from './useAttachments';
-import { takeAttachmentDraft } from './attachmentDraft';
+import { useAttachmentFile } from './useAttachmentFile';
 
-/** Names the file just picked for a chore and adds it. Reached only from the
- *  picker: with no picked file in hand it goes back to the chore. */
+/**
+ * Names the attachment just added to a chore (the file is already stored, so a
+ * reload here loses nothing — it only leaves the attachment unnamed). Cancelar
+ * undoes the add; Guardar keeps it, named or not.
+ */
 export default function NewAttachmentPage() {
-  const { id } = useParams();
+  const { id, attachmentId } = useParams();
   const navigate = useNavigate();
-  const [file] = useState(takeAttachmentDraft);
   const { items: chores } = useChores();
-  const { add } = useAttachments(id);
-  const masterKey = useMasterKey();
+  const { items, loading, rename, remove } = useAttachments(id);
+  const attachment = items.find((a) => a.id === attachmentId);
+  const isImage = attachment?.mime.startsWith('image/') ?? false;
+  const view = useAttachmentFile(isImage ? attachment : undefined, false);
+  const preview = useObjectUrl(view.status === 'ready' ? view.file : null);
   const [name, setName] = useState('');
-  const [saving, setSaving] = useState(false);
-  const preview = useObjectUrl(file?.type.startsWith('image/') ? file : null);
+  const [busy, setBusy] = useState(false);
 
   const chorePath = `/tareas/${id}`;
-  if (!file || !id) return <Navigate to={chorePath} replace />;
+  // Loaded and not there: it was undone, or the link is stale.
+  if (!loading && !attachment) return <Navigate to={chorePath} replace />;
+  if (!attachment) return <p className="text-muted">Cargando...</p>;
   const chore = chores.find((c) => c.id === id);
 
-  async function handleSubmit(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
-    if (!file || !id || masterKey.status !== 'unlocked' || saving) return;
-    setSaving(true);
-    await add(id, file, name, masterKey.key);
+    if (!attachment || busy) return;
+    setBusy(true);
+    await rename(attachment.id, name);
+    navigate(chorePath);
+  }
+
+  async function cancel() {
+    if (!attachment || busy) return;
+    setBusy(true);
+    await remove(attachment);
     navigate(chorePath);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={save} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-sm text-muted">
         <span>{chore ? `${chore.title} · nuevo adjunto` : 'Nuevo adjunto'}</span>
         <div className="flex h-60 items-center justify-center overflow-hidden border border-border bg-surface-raised">
@@ -46,13 +58,11 @@ export default function NewAttachmentPage() {
           ) : (
             <span className="flex flex-col items-center gap-1">
               <IconFileText size={48} stroke={1.25} />
-              <span className="text-xs font-medium tracking-widest">PDF</span>
+              {!isImage && <span className="text-xs font-medium tracking-widest">PDF</span>}
             </span>
           )}
         </div>
-        <span className="text-xs">
-          {file.name} · {formatBytes(file.size)}
-        </span>
+        <span className="text-xs">{formatBytes(attachment.size)}</span>
       </div>
 
       <FormField label="Nombre">
@@ -67,11 +77,11 @@ export default function NewAttachmentPage() {
       </FormField>
 
       <div className="mt-2 flex items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => navigate(chorePath)}>
+        <Button variant="outline" onClick={cancel} disabled={busy}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving || masterKey.status !== 'unlocked'}>
-          Agregar
+        <Button type="submit" disabled={busy}>
+          Guardar
         </Button>
       </div>
     </form>
