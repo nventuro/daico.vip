@@ -24,7 +24,6 @@ export function useOfflineTable<T extends { id: string }>(spec: TableSpec) {
   const reload = useCallback(async () => {
     try {
       setItems(await engine.listVisible<T>(spec));
-      setError(null);
     } catch (e) {
       setError(errMessage(e));
     }
@@ -67,9 +66,11 @@ export function useOfflineTable<T extends { id: string }>(spec: TableSpec) {
 
   // Every mutation writes locally first (instant), then nudges a sync. The
   // write's change event is what refreshes `items`, on this and every other
-  // instance alike.
+  // instance alike. A failed mutation stays reported until the next one: the
+  // reloads that follow it must not wipe the message before it is even seen.
   const mutate = useCallback(
     async <R>(op: () => Promise<R>): Promise<R | undefined> => {
+      setError(null);
       let result: R | undefined;
       try {
         result = await op();
