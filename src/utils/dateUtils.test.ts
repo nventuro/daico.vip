@@ -4,6 +4,7 @@ import {
   addMonths,
   daysUntil,
   formatDayMonth,
+  formatWeekdayDay,
   monthLabel,
   relativeDay,
   todayIso,
@@ -96,6 +97,13 @@ describe('monthLabel', () => {
 
   it('appends the year otherwise', () => {
     expect(monthLabel('2027-01', 2026)).toBe('Enero 2027');
+  });
+});
+
+describe('formatWeekdayDay', () => {
+  it('names the weekday and day, with the month only when asked', () => {
+    expect(formatWeekdayDay('2026-03-14', false)).toBe('Sábado 14');
+    expect(formatWeekdayDay('2026-04-01', true)).toBe('Miércoles 1 abr');
   });
 });
 

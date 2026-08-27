@@ -6,6 +6,7 @@ import AppFrame from './AppFrame';
 import HomePage from './HomePage';
 
 const SearchPage = lazy(() => import('./SearchPage'));
+const ProximoPage = lazy(() => import('./ProximoPage'));
 
 const routes: RouteObject[] = [
   {
@@ -16,6 +17,11 @@ const routes: RouteObject[] = [
         path: 'buscar',
         element: <AppFrame name="Buscar" hue="primary" />,
         children: [{ index: true, Component: SearchPage }],
+      },
+      {
+        path: 'proximo',
+        element: <AppFrame name="Próximo" hue="primary" />,
+        children: [{ index: true, Component: ProximoPage }],
       },
       ...apps.map((app) => ({
         path: app.id,

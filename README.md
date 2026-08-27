@@ -26,6 +26,12 @@ and shows the results grouped by app, in registry order. Matching is case- and
 accent-insensitive (`noquis` finds "Ñoquis"), and since each adapter reads the
 app's local store it works with no connection.
 
+**Próximo** is the home screen's list of what is coming up: every module's
+`useUpcoming()` entries merged and sorted soonest-first. The home screen shows
+the first `UPCOMING_MAX_ROWS` (4); when there are more, "Ver todo" opens
+`/proximo`, the same entries in full, grouped by day ("Vencidas", "Hoy",
+"Mañana", the weekday for the rest of the week, then one group per month).
+
 ### Adding an app
 
 1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`, `hue`,

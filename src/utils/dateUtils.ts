@@ -102,6 +102,14 @@ export function relativeDay(today: string, date: string): string {
   return `${namePart(target, { weekday: 'short' })} ${day} ${monthName}`;
 }
 
+/** A day heading: "Jueves 27", or "Jueves 27 ago" when `withMonth`. */
+export function formatWeekdayDay(dateStr: string, withMonth: boolean): string {
+  const [year, month, day] = parseIso(dateStr);
+  const date = new Date(year, month - 1, day);
+  const weekday = capitalize(namePart(date, { weekday: 'long' }));
+  return withMonth ? `${weekday} ${day} ${namePart(date, { month: 'short' })}` : `${weekday} ${day}`;
+}
+
 /**
  * The month of a yyyy-mm string as a heading: "Marzo" when it falls in
  * `currentYear`, "Marzo 2027" otherwise.

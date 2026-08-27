@@ -176,7 +176,8 @@ Chromium-only APIs are available everywhere.
   (no `bg-${hue}`).
 - Pages don't render the app's title or a back link — the shell's app frame does.
 - `useStatus`, `useUpcoming` and `search` on a module are optional adapters; a
-  module without them simply doesn't contribute to the home screen or search.
+  module without them simply doesn't contribute to the home screen, the Próximo
+  page or search.
   `search(query)` is a plain async function (not a hook) over the module's local
   store (`engine.listVisible`), never a network call, so search works offline.
 

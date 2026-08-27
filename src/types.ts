@@ -174,6 +174,9 @@ export const YOUTUBE_WATCH_URL = 'https://www.youtube.com/watch?v=';
 /** How many days ahead a pending chore shows on the home screen's upcoming list. */
 export const CHORE_NOTICE_DAYS = 3;
 
+/** Most upcoming entries the home screen shows before offering the full list. */
+export const UPCOMING_MAX_ROWS = 4;
+
 /** Notice window (days ahead) a new date gets unless the user picks another. */
 export const DATE_NOTICE_DAYS_DEFAULT = 7;
 
