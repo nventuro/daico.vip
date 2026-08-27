@@ -31,6 +31,21 @@ export function sameUpcoming(a: Upcoming[], b: Upcoming[]): boolean {
   );
 }
 
+/**
+ * `byApp` with `items` as `appId`'s entries — or `byApp` itself when the app
+ * has already reported exactly these, so a re-report changes nothing. An app's
+ * first report always counts, even with nothing in it: that is how it is told
+ * from one still to come.
+ */
+export function withReport<K extends string>(
+  byApp: Partial<Record<K, Upcoming[]>>,
+  appId: K,
+  items: Upcoming[],
+): Partial<Record<K, Upcoming[]>> {
+  const reported = byApp[appId];
+  return reported && sameUpcoming(reported, items) ? byApp : { ...byApp, [appId]: items };
+}
+
 /** A run of upcoming entries under one day (or month) heading. */
 export interface UpcomingGroup {
   key: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Upcoming } from '../apps/types';
-import { groupByDay, sameUpcoming, sortUpcoming } from './upcoming';
+import type { AppId, Upcoming } from '../apps/types';
+import { groupByDay, sameUpcoming, sortUpcoming, withReport } from './upcoming';
 
 const chore: Upcoming = { title: 'Regar', on: '2026-03-14', to: '/tareas', appId: 'tareas' };
 const birthday: Upcoming = { title: 'Cumple', on: '2026-03-13', to: '/fechas/1', appId: 'fechas' };
@@ -73,5 +73,20 @@ describe('groupByDay', () => {
 
   it('is empty for no rows', () => {
     expect(groupByDay([], TODAY)).toEqual([]);
+  });
+});
+
+describe('withReport', () => {
+  it("counts an app's first report even when it has nothing", () => {
+    const reported = withReport({}, 'documentos', []);
+    expect('documentos' in reported).toBe(true);
+    expect(reported.documentos).toEqual([]);
+  });
+
+  it('returns the same object when an app re-reports the same entries', () => {
+    const first: Partial<Record<AppId, Upcoming[]>> = withReport({}, 'tareas', [chore]);
+    expect(withReport(first, 'tareas', [{ ...chore }])).toBe(first);
+    expect(withReport(first, 'tareas', [])).not.toBe(first);
+    expect(withReport(first, 'fechas', [])).not.toBe(first);
   });
 });

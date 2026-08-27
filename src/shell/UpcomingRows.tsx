@@ -1,7 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import type { AppId, Upcoming } from '../apps/types';
 import { apps } from '../apps/registry';
-import { sameUpcoming, sortUpcoming } from '../lib/upcoming';
+import { sortUpcoming, withReport } from '../lib/upcoming';
 import UpcomingSource from './UpcomingSource';
 
 interface UpcomingRowsProps {
@@ -19,9 +19,7 @@ export default function UpcomingRows({ children }: UpcomingRowsProps) {
   // Bail out by value: a source re-reports the same entries after every one of
   // its renders, and taking a fresh object each time would re-render it again.
   const onItems = useCallback((appId: AppId, items: Upcoming[]) => {
-    setByApp((prev) =>
-      sameUpcoming(prev[appId] ?? [], items) ? prev : { ...prev, [appId]: items },
-    );
+    setByApp((prev) => withReport(prev, appId, items));
   }, []);
 
   const sources = apps.filter((m) => m.useUpcoming);
