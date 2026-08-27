@@ -4,8 +4,10 @@ import { IconLogout, IconSearch } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import { useDbOwnership } from '../hooks/useDbOwnership';
+import { useMasterKey } from '../hooks/useMasterKey';
 import LoginScreen from '../components/LoginScreen';
 import NoAccess from '../components/NoAccess';
+import UnlockScreen from '../components/UnlockScreen';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
 const TabConflict = lazy(() => import('../components/TabConflict'));
@@ -14,6 +16,7 @@ export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
   const online = useOnline();
   const dbOwnership = useDbOwnership();
+  const masterKey = useMasterKey();
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccess />;
@@ -24,6 +27,10 @@ export default function MainLayout() {
         <TabConflict />
       </Suspense>
     );
+  // A device without the household's master key stops here until the phrase
+  // is typed: the documents it would show are unreadable without it.
+  if (masterKey.status === 'loading') return null;
+  if (masterKey.status === 'locked') return <UnlockScreen />;
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">

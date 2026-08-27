@@ -23,6 +23,18 @@ type SyncedRow = { id: string; updated_at: string } & Record<string, unknown>;
 let syncing = false;
 let rerun = false;
 
+// Work that belongs to a sync but lives beside the tables — files in a storage
+// bucket — runs once every table has had its turn, so it sees the pulled rows.
+const afterSyncListeners = new Set<() => Promise<void>>();
+
+/** Run `listener` at the end of every sync run; returns the unsubscribe. */
+export function afterSync(listener: () => Promise<void>): () => void {
+  afterSyncListeners.add(listener);
+  return () => {
+    afterSyncListeners.delete(listener);
+  };
+}
+
 /** Best-effort sync of all tables. Never throws — pending changes simply stay
  *  queued for a later attempt. */
 export async function syncAll(): Promise<void> {
@@ -47,6 +59,14 @@ export async function syncAll(): Promise<void> {
         }
       }
     } while (rerun && navigator.onLine);
+    for (const listener of afterSyncListeners) {
+      try {
+        await listener();
+      } catch (err) {
+        // Same contract as a table: whatever it left undone waits for the next run.
+        console.warn('[offline] after-sync work failed, will retry later:', err);
+      }
+    }
   } finally {
     syncing = false;
   }

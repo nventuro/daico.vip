@@ -19,7 +19,7 @@ const CONTENT_SECURITY_POLICY = [
   `connect-src 'self' ${SUPABASE_URL}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:",
   `frame-src ${new URL(YOUTUBE_EMBED_URL).origin}`,
   "object-src 'none'",
   "base-uri 'self'",

@@ -1,18 +1,34 @@
 // =============================================================================
 // In-memory stand-in for the Supabase client, covering exactly the PostgREST
 // calls the sync engine makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
-// and `from(t).select(columns)`. A test installs it with
+// and `from(t).select(columns)`, plus the Storage calls the attachment files
+// make: `storage.from(b).upload / download / remove / list`. A test installs it with
 //   vi.mock('../supabase', () => import('./testing/fakeSupabase'))
-// and drives the server through `server`: seed rows, inspect the calls made,
-// and hold or fail calls to reproduce timings between the app and the network.
+// and drives the server through `server`: seed rows and objects, inspect the
+// calls made, and hold or fail calls to reproduce timings between the app and
+// the network.
 // =============================================================================
 export type ServerRow = Record<string, unknown> & { id: string };
-export type ServerOp = 'upsert' | 'delete' | 'select';
+export type ServerOp = 'upsert' | 'delete' | 'select' | 'upload' | 'download' | 'remove' | 'list';
 export interface ServerCall {
   op: ServerOp;
+  /** The table, or the bucket for a storage call. */
   table: string;
-  /** The row an upsert or delete targets. */
+  /** The row an upsert or delete targets; the object a storage call targets. */
   id?: string;
+}
+
+/** An object in a fake bucket. */
+export interface ServerObject {
+  name: string;
+  data: Uint8Array<ArrayBuffer>;
+  /** ISO timestamp. */
+  created_at: string;
+}
+
+/** The shape of a failed storage call's error, as supabase-js reports it. */
+interface StorageFailure extends Error {
+  status?: number;
 }
 
 type Interceptor = (call: ServerCall) => Promise<void> | void;
@@ -23,14 +39,21 @@ function matches(call: ServerCall, op: ServerOp, table: string | undefined): boo
 
 export class FakeServer {
   private tables = new Map<string, Map<string, ServerRow>>();
+  private buckets = new Map<string, Map<string, ServerObject>>();
   private interceptors = new Set<Interceptor>();
   /** Every call made, in order. */
   readonly calls: ServerCall[] = [];
 
   reset(): void {
     this.tables.clear();
+    this.buckets.clear();
     this.interceptors.clear();
     this.calls.length = 0;
+  }
+
+  /** Stop failing or holding calls; rows, objects and the call log stay. */
+  restore(): void {
+    this.interceptors.clear();
   }
 
   rows(table: string): ServerRow[] {
@@ -41,10 +64,26 @@ export class FakeServer {
     for (const row of rows) this.table(table).set(row.id, { ...row });
   }
 
-  /** Make matching calls fail (as a returned PostgREST-style error) until `reset`. */
-  fail(op: ServerOp, table?: string, message = 'fake server failure'): void {
+  objects(bucket: string): ServerObject[] {
+    return [...this.bucket(bucket).values()].map((object) => ({ ...object }));
+  }
+
+  seedObjects(bucket: string, objects: ServerObject[]): void {
+    for (const object of objects) this.bucket(bucket).set(object.name, { ...object });
+  }
+
+  /**
+   * Make matching calls fail (as a returned PostgREST/Storage-style error)
+   * until `reset`. `status` is what a storage call reports as the HTTP status;
+   * without it the failure reads as a network one.
+   */
+  fail(op: ServerOp, table?: string, message = 'fake server failure', status?: number): void {
     this.interceptors.add((call) => {
-      if (matches(call, op, table)) throw new Error(message);
+      if (matches(call, op, table)) {
+        const error: StorageFailure = new Error(message);
+        if (status !== undefined) error.status = status;
+        throw error;
+      }
     });
   }
 
@@ -103,6 +142,53 @@ export class FakeServer {
     };
   }
 
+  storage(bucket: string) {
+    const objects = this.bucket(bucket);
+    const storageError = (error: Error | null) =>
+      error ? { message: error.message, status: (error as StorageFailure).status } : null;
+    return {
+      upload: async (path: string, body: Blob, options?: { upsert?: boolean }) => {
+        let error = await this.run({ op: 'upload', table: bucket, id: path });
+        if (!error && objects.has(path) && !options?.upsert) {
+          const duplicate: StorageFailure = new Error('The resource already exists');
+          duplicate.status = 409;
+          error = duplicate;
+        }
+        if (!error) {
+          objects.set(path, {
+            name: path,
+            data: new Uint8Array(await body.arrayBuffer()),
+            created_at: new Date().toISOString(),
+          });
+        }
+        return { data: error ? null : { path }, error: storageError(error) };
+      },
+      download: async (path: string) => {
+        const error = await this.run({ op: 'download', table: bucket, id: path });
+        const object = objects.get(path);
+        if (error || !object) {
+          return { data: null, error: storageError(error ?? new Error('Object not found')) };
+        }
+        return { data: new Blob([object.data]), error: null };
+      },
+      remove: async (paths: string[]) => {
+        const error = await this.run({ op: 'remove', table: bucket });
+        if (!error) for (const path of paths) objects.delete(path);
+        return { data: error ? null : [], error: storageError(error) };
+      },
+      list: async (_prefix?: string, options?: { limit?: number; offset?: number }) => {
+        const error = await this.run({ op: 'list', table: bucket });
+        if (error) return { data: null, error: storageError(error) };
+        const offset = options?.offset ?? 0;
+        const limit = options?.limit ?? 100;
+        const data = [...objects.values()]
+          .slice(offset, offset + limit)
+          .map(({ name, created_at }) => ({ name, created_at }));
+        return { data, error: null };
+      },
+    };
+  }
+
   private table(name: string): Map<string, ServerRow> {
     let rows = this.tables.get(name);
     if (!rows) {
@@ -110,6 +196,15 @@ export class FakeServer {
       this.tables.set(name, rows);
     }
     return rows;
+  }
+
+  private bucket(name: string): Map<string, ServerObject> {
+    let objects = this.buckets.get(name);
+    if (!objects) {
+      objects = new Map();
+      this.buckets.set(name, objects);
+    }
+    return objects;
   }
 
   private async run(call: ServerCall): Promise<Error | null> {
@@ -125,4 +220,7 @@ export class FakeServer {
 
 export const server = new FakeServer();
 
-export const supabase = { from: (table: string) => server.from(table) };
+export const supabase = {
+  from: (table: string) => server.from(table),
+  storage: { from: (bucket: string) => server.storage(bucket) },
+};

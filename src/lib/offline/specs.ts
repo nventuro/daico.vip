@@ -98,9 +98,38 @@ export const RECIPES_SPEC: TableSpec = {
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
+export const HOUSEHOLD_KEY_SPEC: TableSpec = {
+  table: 'household_key',
+  columns: [
+    { name: 'kdf', ddl: 'TEXT NOT NULL' },
+    { name: 'salt', ddl: 'TEXT NOT NULL' },
+    { name: 'iterations', ddl: 'INTEGER NOT NULL' },
+    { name: 'wrapped_master_key', ddl: 'TEXT NOT NULL' },
+  ],
+  orderBy: 'created_at ASC',
+};
+
+export const ATTACHMENTS_SPEC: TableSpec = {
+  table: 'attachments',
+  columns: [
+    { name: 'owner_kind', ddl: 'TEXT NOT NULL' },
+    { name: 'owner_id', ddl: 'TEXT NOT NULL' },
+    { name: 'name', ddl: "TEXT NOT NULL DEFAULT ''" },
+    { name: 'mime', ddl: 'TEXT NOT NULL' },
+    { name: 'size', ddl: 'INTEGER NOT NULL' },
+    { name: 'wrapped_file_key', ddl: 'TEXT NOT NULL' },
+  ],
+  orderBy: 'created_at ASC',
+};
+
+/** Tables the shell itself owns, synced before any app's. */
+export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC];
+
 /** Every offline-synced table, in sync order. */
 export const ALL_SPECS: TableSpec[] = [
+  ...SHELL_SPECS,
   CHORES_SPEC,
+  ATTACHMENTS_SPEC,
   SHOPPING_SPEC,
   GUIDES_SPEC,
   GUIDE_CHAPTERS_SPEC,

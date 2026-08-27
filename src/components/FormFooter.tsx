@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Button from './Button';
 
 interface FormFooterProps {
@@ -10,13 +10,16 @@ interface FormFooterProps {
   submitLabel?: string;
   /** Forms pass true until the draft differs from the saved record (see `hasChanges`). */
   submitDisabled?: boolean;
+  /** What to show instead of the submit button, for a screen whose main
+   *  action is not saving a form (opening or sharing what it shows). */
+  action?: ReactNode;
 }
 
 /**
  * The bottom row of an edit form: the record's delete action on the left, the
- * form's submit on the right. Deleting takes two taps — the first swaps the
- * row for a confirmation with equal Cancelar / Eliminar pills, so a stray tap
- * on the delete pill can never remove anything.
+ * form's submit (or the screen's own `action`) on the right. Deleting takes two
+ * taps — the first swaps the row for a confirmation with equal Cancelar /
+ * Eliminar pills, so a stray tap on the delete pill can never remove anything.
  */
 export default function FormFooter({
   removeLabel,
@@ -24,6 +27,7 @@ export default function FormFooter({
   onRemove,
   submitLabel = 'Guardar',
   submitDisabled = false,
+  action,
 }: FormFooterProps) {
   const [confirming, setConfirming] = useState(false);
 
@@ -49,9 +53,11 @@ export default function FormFooter({
       <Button variant="dangerOutline" onClick={() => setConfirming(true)}>
         {removeLabel}
       </Button>
-      <Button type="submit" disabled={submitDisabled}>
-        {submitLabel}
-      </Button>
+      {action ?? (
+        <Button type="submit" disabled={submitDisabled}>
+          {submitLabel}
+        </Button>
+      )}
     </div>
   );
 }

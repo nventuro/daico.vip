@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { clearAll } from '../lib/offline/engine';
+import { clearMasterKey } from '../hooks/useMasterKey';
 import { AppContext } from './appContext';
 
 /** localStorage key prefix for the cached membership verdict, keyed by user id. */
@@ -57,6 +58,14 @@ export function AppProvider({
     resolveMembership();
   }, [session]);
 
+  // A member's local data — pending edits, attachment files not yet uploaded —
+  // is only as safe as the browser lets it be: without this, a browser short
+  // on disk may evict the whole origin. Chromium grants it silently to an
+  // installed app; Firefox asks once.
+  useEffect(() => {
+    if (isMember) void navigator.storage?.persist?.().catch(() => {});
+  }, [isMember]);
+
   const signIn = useCallback(() => {
     supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -70,6 +79,7 @@ export function AppProvider({
     // DB worker; merely importing it does not.
     if (session) localStorage.removeItem(MEMBER_CACHE_PREFIX + session.user.id);
     void clearAll().catch(() => {});
+    void clearMasterKey().catch(() => {});
     supabase.auth.signOut();
   }, [session]);
 

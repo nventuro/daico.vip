@@ -54,6 +54,11 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `public` is callable by anyone via the PostgREST `/rpc` API (the security advisor
   flags this). They must always `set search_path = ''` and use fully qualified
   names (e.g. `public.members`).
+- **The built page carries a Content-Security-Policy** (a `<meta>` injected by
+  `vite.config.ts` at build; the static host can't set headers). Scripts run
+  only from the page's own origin and may only talk to Supabase. Anything the
+  app loads from a new origin (a font host, an embed) must be added there or the
+  browser blocks it; `npm run preview` is where the policy is live locally.
 - **`npm run db:verify` asserts these invariants against the live database**
   (RLS on every public table, an `is_member()` policy on each, zero anon
   privileges, no SECURITY DEFINER function or view in `public`, etc.) and fails on
@@ -126,6 +131,47 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   server's RLS is the real authority, so a stale `true` still reads nothing and has
   every queued write rejected on sync. Don't "harden" it by removing the cache, or
   members get locked out at the "Sin acceso" screen with no signal.
+
+## Attachments and the household key — read before touching files or keys
+
+- **Attachment files never reach the server in the clear.** The row
+  (`attachments`: owner, name, mime, size) is an ordinary offline-synced table;
+  the bytes go to the private `attachments` storage bucket, under the row's id,
+  encrypted on the device. Key hierarchy, all in `src/lib/householdKey.ts` (the
+  only crypto code — never add another): the phrase (six words from
+  `src/lib/phraseWords.ts`, held on paper) → PBKDF2 → wraps the **master key**
+  (AES-KW) → wraps a **file key** per attachment (AES-KW) → encrypts the file
+  (AES-GCM). The server holds the wrapped master key (`household_key`, one row)
+  and every wrapped file key, i.e. ciphertext only. A device keeps the master
+  key as a **non-extractable `CryptoKey` in IndexedDB** (`masterKeyStore.ts`);
+  `useMasterKey` is the one place the app reads it. Never send, log or persist
+  the phrase, the master key or a file key anywhere else.
+- **`household_key` is written once, directly to the server, online** (the
+  first member's setup in `UnlockScreen`), never through the engine's queue: the
+  unique index makes a racing second setup fail instead of leaving two keys.
+  Never delete the row and never add a key-rotation path lightly — with the row
+  gone or replaced, every attachment is unreadable.
+- **The gate**: a device without the master key stops at `UnlockScreen` right
+  after login (`MainLayout`), before the home screen; sign-out clears the key
+  (`clearMasterKey`) along with the local data. Losing the phrase is accepted as
+  losing the documents.
+- **Files travel outside the tables**, through `src/lib/attachmentFiles.ts`
+  only: a local-only `attachment_files` table (engine) holds a file added here
+  until its upload goes through (`pending` / `uploaded` / `failed` — a 4xx other
+  than auth/throttling is final and never retried) and keeps a file opened here
+  for offline reading; `afterSync` (registered in `src/apps/tareas/index.ts`)
+  runs uploads, prunes files whose rows are gone, and sweeps bucket objects with
+  no row that are older than `ATTACHMENT_ORPHAN_MIN_AGE_MS`. Never pull files
+  wholesale and never put them in `ALL_SPECS`. Blobs are immutable: replacing a
+  file is a new attachment; only `name` ever changes.
+- **The bucket is private and gated like a table**: `storage.objects` has a
+  `private.is_member()` policy scoped to the bucket, it only takes
+  `application/octet-stream`, and its size limit is `ATTACHMENT_MAX_BYTES` plus
+  the encryption overhead. `db:verify` checks no bucket is public, every bucket
+  has such a policy, and no storage policy reaches `anon`.
+- **Tests**: `householdKey.test.ts` (Node's WebCrypto) and
+  `attachmentFiles.test.ts` (real SQLite + the fake server's `storage`). A
+  change to the file format, the queue states or the sweep must come with one.
 
 ## Privacy — the code is public, the data is private
 

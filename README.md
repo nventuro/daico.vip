@@ -176,6 +176,40 @@ components:
 Links to other guides or chapters are ordinary relative links
 (`/guias/<guide>/<chapter>`).
 
+## Adjuntos
+
+A chore can carry attachments — pictures and PDFs, up to `ATTACHMENT_MAX_BYTES`
+each — that are encrypted on the device before they leave it, so the server
+only ever stores ciphertext.
+
+- **Tables and bucket**: `attachments` (owner, optional name, mime, size, the
+  wrapped file key) is an ordinary offline-synced table; the file bytes live in
+  the private `attachments` storage bucket under the row's id, and on the device
+  in the local-only `attachment_files` table (a file added here waits there
+  until uploaded; one opened here is kept for offline reading). Files are
+  immutable: only the name can change, a different file is a new attachment.
+- **Keys**: a six-word phrase (like a seed phrase, from the BIP-39 Spanish list)
+  derives, through PBKDF2, the key that wraps the household's master key
+  (stored wrapped in `household_key`, one row); the master key wraps one key per
+  file; the file key encrypts the file with AES-GCM. A device unwraps the master
+  key once, when the phrase is typed, and keeps it non-extractable in
+  IndexedDB. Everything the server holds is useless without the phrase, and the
+  phrase exists only on paper: losing it loses the documents.
+- **The phrase gate**: a device without the master key stops right after login,
+  before the home screen, and asks for the phrase. The very first time (no
+  `household_key` row yet) the app generates the phrase and asks for it to be
+  written down. Signing out forgets the key.
+- **In the app**: a chore's edit form shows its attachments as a grid; Agregar
+  opens the device's own picker, then a screen that names the file. A row with
+  attachments carries the same mark as one with notes. Opening an attachment
+  shows it (an image inline, a PDF as an icon) with Compartir / Descargar / Abrir
+  to get it out through the device's share sheet or, on desktop, a download or a
+  new tab. A file added offline shows a cloud until it reaches the server.
+- **Sync**: files follow every table sync (`afterSync`): uploads go out, files
+  of deleted rows are dropped, and bucket objects that no row refers to and are
+  older than an hour are removed. A file the bucket refuses for good (too large,
+  wrong type) is marked failed and not retried.
+
 ## Guides
 
 Guides are read-only reference documents (a guide → sections → chapters) that

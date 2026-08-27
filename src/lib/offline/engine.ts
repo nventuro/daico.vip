@@ -19,7 +19,7 @@
 // =============================================================================
 import { SQLocal } from 'sqlocal';
 import { LOCAL_DB_PATH } from '../../types';
-import { ALL_SPECS, type ColumnSpec, type TableSpec } from './specs';
+import { ALL_SPECS, ATTACHMENTS_SPEC, type ColumnSpec, type TableSpec } from './specs';
 import { checkDbOwnership, MultiTabError } from './singleTab';
 
 type Row = Record<string, unknown>;
@@ -49,6 +49,7 @@ function db(): Promise<SQLocal> {
         onInit: (sql) => [
           ...ALL_SPECS.map((spec) => sql(createTableSql(spec))),
           sql(IMAGE_CACHE_SQL),
+          sql(ATTACHMENT_FILES_SQL),
         ],
       });
       return migrateColumns(c).then(() => c);
@@ -90,6 +91,21 @@ const IMAGE_CACHE_SQL = `CREATE TABLE IF NOT EXISTS ${IMAGE_CACHE_TABLE} (
     key TEXT PRIMARY KEY,
     mime TEXT NOT NULL,
     data TEXT NOT NULL
+  )`;
+
+// Attachment files (encrypted, as stored in the bucket) are kept beside their
+// rows but never pulled wholesale: one file can be megabytes. A file added on
+// this device waits here until its upload goes through; one opened here is
+// kept so it shows again with no connection. Local-only, never synced.
+//   - uploaded: 0 | 1 — whether the bucket has this file.
+//   - upload_error: set when the bucket refused it for good (too large, wrong
+//     type): such a file is not retried, only shown as failed.
+export const ATTACHMENT_FILES_TABLE = 'attachment_files';
+const ATTACHMENT_FILES_SQL = `CREATE TABLE IF NOT EXISTS ${ATTACHMENT_FILES_TABLE} (
+    id TEXT PRIMARY KEY,
+    data BLOB NOT NULL,
+    uploaded INTEGER NOT NULL DEFAULT 0,
+    upload_error TEXT
   )`;
 
 function nowIso(): string {
@@ -156,9 +172,13 @@ export async function listVisible<T>(spec: TableSpec): Promise<T[]> {
 
 // ─── Local mutations (instant, offline-safe) ─────────────────────────────────
 
-/** Insert a new row with a client-generated id, queued for upsert; returns the id. */
-export async function insert(spec: TableSpec, values: Row): Promise<string> {
-  const id = crypto.randomUUID();
+/** Insert a new row with a client-generated id (or the one given, for a row
+ *  whose id something else already refers to), queued for upsert; returns the id. */
+export async function insert(
+  spec: TableSpec,
+  values: Row,
+  id: string = crypto.randomUUID(),
+): Promise<string> {
   const ts = nowIso();
   const cols = [
     'id',
@@ -216,7 +236,9 @@ export async function clearAll(): Promise<void> {
     await c.sql(`DELETE FROM ${spec.table}`);
   }
   await c.sql(`DELETE FROM ${IMAGE_CACHE_TABLE}`);
+  await c.sql(`DELETE FROM ${ATTACHMENT_FILES_TABLE}`);
   for (const spec of ALL_SPECS) emit(spec.table);
+  emit(ATTACHMENT_FILES_TABLE);
 }
 
 // ─── Local-only image cache ──────────────────────────────────────────────────
@@ -246,6 +268,108 @@ export async function putCachedImage(key: string, image: CachedImage): Promise<v
     image.mime,
     image.data,
   );
+}
+
+// ─── Local-only attachment files ─────────────────────────────────────────────
+
+/** Where the local copy of an attachment's file stands with the bucket. */
+export type AttachmentUploadState = 'uploaded' | 'pending' | 'failed';
+
+type AttachmentFileRow = {
+  id: string;
+  data: Uint8Array<ArrayBuffer>;
+  uploaded: number;
+  upload_error: string | null;
+};
+
+function uploadState(row: {
+  uploaded: number;
+  upload_error: string | null;
+}): AttachmentUploadState {
+  if (row.uploaded) return 'uploaded';
+  return row.upload_error === null ? 'pending' : 'failed';
+}
+
+/** The locally held file (encrypted) for an attachment, or null if it was never
+ *  added or opened on this device. */
+export async function getAttachmentFile(id: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  const c = await db();
+  const rows = await c.sql<Pick<AttachmentFileRow, 'data'>>(
+    `SELECT data FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`,
+    id,
+  );
+  return rows[0]?.data ?? null;
+}
+
+/** Where an attachment's file stands with the bucket, or null when this device
+ *  holds no copy (then the bucket is the only place it may be). */
+export async function getAttachmentUploadState(id: string): Promise<AttachmentUploadState | null> {
+  const c = await db();
+  const rows = await c.sql<Pick<AttachmentFileRow, 'uploaded' | 'upload_error'>>(
+    `SELECT uploaded, upload_error FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`,
+    id,
+  );
+  return rows[0] ? uploadState(rows[0]) : null;
+}
+
+/** Keep an attachment's file locally: one just added here (`uploaded` false,
+ *  queued for upload) or one fetched from the bucket (`uploaded` true). */
+export async function putAttachmentFile(
+  id: string,
+  data: Uint8Array,
+  uploaded: boolean,
+): Promise<void> {
+  const c = await db();
+  await c.sql(
+    `INSERT OR REPLACE INTO ${ATTACHMENT_FILES_TABLE} (id, data, uploaded, upload_error) VALUES (?, ?, ?, NULL)`,
+    id,
+    data,
+    uploaded ? 1 : 0,
+  );
+  emit(ATTACHMENT_FILES_TABLE);
+}
+
+/** Files still waiting to reach the bucket (not the ones it refused for good). */
+export async function listPendingUploads(): Promise<
+  { id: string; data: Uint8Array<ArrayBuffer> }[]
+> {
+  const c = await db();
+  return c.sql<Pick<AttachmentFileRow, 'id' | 'data'>>(
+    `SELECT id, data FROM ${ATTACHMENT_FILES_TABLE} WHERE uploaded = 0 AND upload_error IS NULL`,
+  );
+}
+
+export async function markAttachmentUploaded(id: string): Promise<void> {
+  const c = await db();
+  await c.sql(
+    `UPDATE ${ATTACHMENT_FILES_TABLE} SET uploaded = 1, upload_error = NULL WHERE id = ?`,
+    id,
+  );
+  emit(ATTACHMENT_FILES_TABLE);
+}
+
+/** Record that the bucket refused this file for good, so it is not retried. */
+export async function markAttachmentUploadFailed(id: string, error: string): Promise<void> {
+  const c = await db();
+  await c.sql(`UPDATE ${ATTACHMENT_FILES_TABLE} SET upload_error = ? WHERE id = ?`, error, id);
+  emit(ATTACHMENT_FILES_TABLE);
+}
+
+export async function deleteAttachmentFile(id: string): Promise<void> {
+  const c = await db();
+  await c.sql(`DELETE FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`, id);
+  emit(ATTACHMENT_FILES_TABLE);
+}
+
+/** Drop the files of attachments that no longer exist here (deleted, on this
+ *  device or elsewhere), pending uploads included: with the row gone there is
+ *  nothing to upload for. */
+export async function pruneAttachmentFiles(): Promise<void> {
+  const c = await db();
+  await c.sql(
+    `DELETE FROM ${ATTACHMENT_FILES_TABLE} WHERE id NOT IN (SELECT id FROM ${ATTACHMENTS_SPEC.table})`,
+  );
+  emit(ATTACHMENT_FILES_TABLE);
 }
 
 // ─── Sync support (used by sync.ts) ──────────────────────────────────────────

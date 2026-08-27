@@ -9,6 +9,7 @@ import TextArea from '../../components/TextArea';
 import FormFooter from '../../components/FormFooter';
 import type { ChoreInput } from './useChores';
 import DueDateChips from './DueDateChips';
+import AttachmentGrid from './AttachmentGrid';
 
 interface ChoreFormProps {
   chore: Chore;
@@ -64,6 +65,10 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
           aria-label="Notas"
           rows={5}
         />
+      </FormField>
+
+      <FormField label="Adjuntos" group>
+        <AttachmentGrid choreId={chore.id} />
       </FormField>
 
       <FormFooter

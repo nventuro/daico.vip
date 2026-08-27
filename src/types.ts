@@ -81,9 +81,58 @@ export interface GuideChapter {
 
 /**
  * A fact about an entry that is drawn as a small icon on its row wherever the
- * entry is listed — in its app and on the home screen alike.
+ * entry is listed — in its app and on the home screen alike. `notes` also
+ * stands for attachments: to the row, something written and something attached
+ * are the same thing.
  */
 export type EntryMark = 'notes' | 'repeat';
+
+/** The kinds of entry an attachment can belong to. */
+export const ATTACHMENT_OWNER_KINDS = ['chore'] as const;
+export type AttachmentOwnerKind = (typeof ATTACHMENT_OWNER_KINDS)[number];
+
+/**
+ * A file — a picture, a PDF — attached to an entry. Only this metadata is a
+ * synced row; the file itself lives encrypted in the attachments bucket under
+ * the row's id, and only ever changes by being replaced with a new attachment.
+ * Like every offline-synced row, `id` is a client-generated UUID and
+ * `updated_at` is the last-write-wins key.
+ */
+export interface Attachment {
+  id: string;
+  owner_kind: AttachmentOwnerKind;
+  owner_id: string;
+  /** What the user called it; empty for an attachment left unnamed. */
+  name: string;
+  mime: string;
+  /** Of the file itself, before encryption, in bytes. */
+  size: number;
+  /** Base64: the file's own key, wrapped under the household's master key. */
+  wrapped_file_key: string;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
+/**
+ * The household's master key, wrapped under a key derived from the phrase the
+ * members hold on paper, with the derivation parameters. One row per
+ * household; synced so a device can unlock offline once it has pulled it.
+ */
+export interface HouseholdKey {
+  id: string;
+  kdf: 'pbkdf2-sha256';
+  /** Base64. */
+  salt: string;
+  iterations: number;
+  /** Base64: the AES-KW wrap of the master key. */
+  wrapped_master_key: string;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
 
 /** How a date repeats: never, every year, or every `repeat_months` months. */
 export const REPEAT_KINDS = ['none', 'yearly', 'months'] as const;
@@ -207,3 +256,39 @@ export const SEARCH_EXCERPT_RADIUS = 40;
 
 /** Most results a single app contributes to a search. */
 export const SEARCH_MAX_HITS_PER_APP = 20;
+
+/** Largest file accepted as an attachment, in bytes. */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** File types accepted as attachments — what both supported browsers can
+ *  show — and the extension a file of each gets when it leaves the app. */
+export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'application/pdf': 'pdf',
+};
+
+/** The storage bucket holding the encrypted attachment files. */
+export const ATTACHMENTS_BUCKET = 'attachments';
+
+/**
+ * How old a bucket object with no attachment row must be before the orphan
+ * sweep removes it. Younger ones may belong to a row another device created
+ * and this one hasn't pulled yet.
+ */
+export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
+
+/** Objects fetched per page when listing the attachments bucket. */
+export const ATTACHMENT_LIST_PAGE = 1000;
+
+/** Words in the household phrase. */
+export const HOUSEHOLD_PHRASE_WORDS = 6;
+
+/** PBKDF2 rounds a phrase goes through to derive the key that wraps the master key. */
+export const HOUSEHOLD_KEY_KDF_ITERATIONS = 600_000;
+
+/** IndexedDB database and store holding this device's unwrapped master key. */
+export const MASTER_KEY_DB = 'daico-keys';
+export const MASTER_KEY_STORE = 'keys';

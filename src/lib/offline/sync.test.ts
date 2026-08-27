@@ -111,12 +111,14 @@ describe('syncAll', () => {
     await syncAll();
 
     expect(callLog()).toEqual([
+      'select:household_key',
       'upsert:chores',
       'upsert:chores',
       'select:chores',
+      'select:attachments',
       'delete:shopping_items',
       'select:shopping_items',
-      ...ALL_SPECS.slice(2).map((spec) => `select:${spec.table}`),
+      ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),
     ]);
   });
 
@@ -185,10 +187,12 @@ describe('syncAll', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);
     expect(callLog()).toEqual([
+      'select:household_key',
       'select:chores',
+      'select:attachments',
       'upsert:shopping_items',
       'select:shopping_items',
-      ...ALL_SPECS.slice(2).map((spec) => `select:${spec.table}`),
+      ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),
     ]);
   });
 

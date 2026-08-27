@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { apps } from './registry';
-import { ALL_SPECS } from '../lib/offline/specs';
+import { ALL_SPECS, SHELL_SPECS } from '../lib/offline/specs';
 
 describe('apps registry', () => {
   it('has unique ids', () => {
@@ -20,11 +20,13 @@ describe('apps registry', () => {
   });
 
   it('owns exactly the offline-synced tables, in sync order', () => {
-    const specs = apps.flatMap((a) => a.specs);
+    const specs = [...SHELL_SPECS, ...apps.flatMap((a) => a.specs)];
     expect(specs).toEqual(ALL_SPECS);
     const tables = specs.map((s) => s.table);
     expect(tables).toEqual([
+      'household_key',
       'chores',
+      'attachments',
       'shopping_items',
       'guides',
       'guide_chapters',

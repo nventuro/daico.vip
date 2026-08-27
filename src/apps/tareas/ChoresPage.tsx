@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { UNDO_MS, type Chore } from '../../types';
 import { useChores } from './useChores';
+import { useAttachments } from './useAttachments';
 import { relativeDay, todayIso } from '../../utils/dateUtils';
 import { useUndo } from '../../hooks/useUndo';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -14,6 +15,8 @@ import { choreMarks } from './marks';
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, setDone } = useChores();
+  const { items: attachments } = useAttachments();
+  const attached = useMemo(() => new Set(attachments.map((a) => a.owner_id)), [attachments]);
   const undo = useUndo<Chore>(UNDO_MS);
 
   const today = todayIso();
@@ -58,7 +61,7 @@ export default function ChoresPage() {
             </span>
           ) : undefined
         }
-        trailing={<EntryMarks marks={choreMarks(chore)} />}
+        trailing={<EntryMarks marks={choreMarks(chore, attached.has(chore.id))} />}
         onToggle={() => toggle(chore)}
         toggleLabel={chore.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
       />

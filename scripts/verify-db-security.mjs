@@ -106,6 +106,32 @@ const CHECKS = [
                 and (t.tgtype & 1) <> 0)    -- row
           `,
   },
+  {
+    // Storage holds the attachment files: a public bucket would hand out
+    // unauthenticated URLs to them.
+    name: 'no storage bucket is public',
+    sql: `select id as violation from storage.buckets where public`,
+  },
+  {
+    name: 'every storage bucket is gated by a private.is_member() policy on storage.objects',
+    sql: `select b.id as violation
+          from storage.buckets b
+          where not exists (
+            select 1 from pg_policies p
+            where p.schemaname = 'storage' and p.tablename = 'objects'
+              and p.roles = '{authenticated}'
+              and coalesce(p.qual,'') ilike '%is_member%'
+              and coalesce(p.qual,'') ilike '%' || b.id || '%'
+              and coalesce(p.with_check,'') ilike '%is_member%'
+              and coalesce(p.with_check,'') ilike '%' || b.id || '%')`,
+  },
+  {
+    name: 'no storage.objects policy applies to anon or to every role',
+    sql: `select policyname as violation
+          from pg_policies
+          where schemaname = 'storage' and tablename = 'objects'
+            and ('anon' = any(roles) or 'public' = any(roles))`,
+  },
 ];
 
 const client = new Client({
