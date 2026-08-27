@@ -24,7 +24,11 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
   const [notes, setNotes] = useState(chore.notes ?? '');
   const today = todayIso();
 
-  const input: ChoreInput = { title: lowercaseTrimmed(title), due_on: dueOn, notes: notes.trim() || null };
+  const input: ChoreInput = {
+    title: lowercaseTrimmed(title),
+    due_on: dueOn,
+    notes: notes.trim() || null,
+  };
   const canSave = input.title !== '' && hasChanges(input, chore);
 
   function handleSubmit(e: FormEvent) {
@@ -48,7 +52,9 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
 
       <FormField label="Fecha" group>
         <DueDateChips value={dueOn} onChange={setDueOn} today={today} />
-        <p className="text-sm text-muted-strong">{dueOn ? formatDate(dueOn) : 'Sin fecha límite'}</p>
+        <p className="text-sm text-muted-strong">
+          {dueOn ? formatDate(dueOn) : 'Sin fecha límite'}
+        </p>
       </FormField>
 
       <FormField label="Notas">

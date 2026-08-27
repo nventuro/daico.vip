@@ -18,7 +18,9 @@ export default function Ingredients({ items }: IngredientsProps) {
 
   if (names.length === 0) return null;
 
-  const missing = names.map((_, index) => index).filter((index) => !have.has(index) && !sent.has(index));
+  const missing = names
+    .map((_, index) => index)
+    .filter((index) => !have.has(index) && !sent.has(index));
 
   function toggle(index: number) {
     setHave((current) => {

@@ -61,7 +61,9 @@ export default function ChecklistItem({
   const check = (
     <span
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-        checked ? 'border-primary bg-primary text-on-primary' : 'border-neutral-hover text-transparent'
+        checked
+          ? 'border-primary bg-primary text-on-primary'
+          : 'border-neutral-hover text-transparent'
       }`}
     >
       <IconCheck size={14} stroke={3} />

@@ -12,7 +12,8 @@ export default function GuideChapterPage() {
   const index = guideChapters.findIndex((c) => c.id === chapterId);
   const chapter = index === -1 ? undefined : guideChapters[index];
   const previous = index > 0 ? guideChapters[index - 1] : undefined;
-  const next = index !== -1 && index < guideChapters.length - 1 ? guideChapters[index + 1] : undefined;
+  const next =
+    index !== -1 && index < guideChapters.length - 1 ? guideChapters[index + 1] : undefined;
 
   useEffect(() => {
     window.scrollTo(0, 0);

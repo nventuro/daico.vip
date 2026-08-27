@@ -107,7 +107,9 @@ export function formatWeekdayDay(dateStr: string, withMonth: boolean): string {
   const [year, month, day] = parseIso(dateStr);
   const date = new Date(year, month - 1, day);
   const weekday = capitalize(namePart(date, { weekday: 'long' }));
-  return withMonth ? `${weekday} ${day} ${namePart(date, { month: 'short' })}` : `${weekday} ${day}`;
+  return withMonth
+    ? `${weekday} ${day} ${namePart(date, { month: 'short' })}`
+    : `${weekday} ${day}`;
 }
 
 /**

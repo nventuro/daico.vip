@@ -8,7 +8,9 @@ import { directivesToElements } from './markdownDirectives';
 // Stub components that echo their props, to prove directives reach the
 // renderer as elements with the expected props.
 const components = {
-  image: (p: { imageKey: string; width: string; align: string }) => <i>{`img:${p.imageKey}:${p.width}:${p.align}`}</i>,
+  image: (p: { imageKey: string; width: string; align: string }) => (
+    <i>{`img:${p.imageKey}:${p.width}:${p.align}`}</i>
+  ),
   youtube: (p: { id: string; start: string }) => <i>{`yt:${p.id}:${p.start}`}</i>,
   spoiler: (p: { children?: React.ReactNode }) => <b>{p.children}</b>,
   ingredients: (p: { items: string }) => <i>{`ing:${p.items.split('\n').join('|')}`}</i>,
@@ -16,7 +18,10 @@ const components = {
 
 const render = (md: string) =>
   renderToStaticMarkup(
-    <ReactMarkdown remarkPlugins={[remarkGfm, remarkDirective, directivesToElements]} components={components}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkDirective, directivesToElements]}
+      components={components}
+    >
       {md}
     </ReactMarkdown>,
   );
@@ -30,7 +35,9 @@ describe('directivesToElements', () => {
   });
 
   it('renders text directives inline within a paragraph', () => {
-    expect(render('Hand: :spoiler[Keep **now**]')).toBe('<p>Hand: <b>Keep <strong>now</strong></b></p>');
+    expect(render('Hand: :spoiler[Keep **now**]')).toBe(
+      '<p>Hand: <b>Keep <strong>now</strong></b></p>',
+    );
   });
 
   it('keeps GFM tables and relative links intact', () => {
@@ -40,7 +47,9 @@ describe('directivesToElements', () => {
 
   it('flattens an ingredients block to one plain-text item per list entry', () => {
     expect(
-      render('Intro\n\n:::ingredients\n- 200 g de harina\n- 2 huevos **grandes**\n- `sal`\n:::\n\nPaso 1'),
+      render(
+        'Intro\n\n:::ingredients\n- 200 g de harina\n- 2 huevos **grandes**\n- `sal`\n:::\n\nPaso 1',
+      ),
     ).toBe('<p>Intro</p>\n<i>ing:200 g de harina|2 huevos grandes|sal</i>\n<p>Paso 1</p>');
   });
 

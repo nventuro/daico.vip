@@ -127,7 +127,10 @@ describe('keyForSlot', () => {
   });
 
   it('treats unkeyed rows as an open end', () => {
-    const items: Positioned[] = [{ id: 'a', position: 'a0' }, { id: 'n', position: null }];
+    const items: Positioned[] = [
+      { id: 'a', position: 'a0' },
+      { id: 'n', position: null },
+    ];
     expect(keyForSlot(items, 'a5') > 'a0').toBe(true);
   });
 });

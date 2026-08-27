@@ -122,9 +122,21 @@ describe('insert', () => {
 
 describe('listVisible', () => {
   it('keeps a struck shopping item in its place', async () => {
-    const first = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: 'a0' });
-    const second = await engine.insert(SHOPPING_SPEC, { name: 'Leche', checked: false, position: 'a1' });
-    const third = await engine.insert(SHOPPING_SPEC, { name: 'Yerba', checked: false, position: 'a2' });
+    const first = await engine.insert(SHOPPING_SPEC, {
+      name: 'Pan',
+      checked: false,
+      position: 'a0',
+    });
+    const second = await engine.insert(SHOPPING_SPEC, {
+      name: 'Leche',
+      checked: false,
+      position: 'a1',
+    });
+    const third = await engine.insert(SHOPPING_SPEC, {
+      name: 'Yerba',
+      checked: false,
+      position: 'a2',
+    });
     await engine.update(SHOPPING_SPEC, second, { checked: true });
     const ids = (await engine.listVisible<ShoppingItem>(SHOPPING_SPEC)).map((i) => i.id);
     expect(ids).toEqual([first, second, third]);
@@ -133,7 +145,11 @@ describe('listVisible', () => {
   it('orders rows by the spec clause', async () => {
     const later = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-02' });
     const noDate = await engine.insert(CHORES_SPEC, newChore);
-    const done = await engine.insert(CHORES_SPEC, { ...newChore, done: true, due_on: '2026-01-01' });
+    const done = await engine.insert(CHORES_SPEC, {
+      ...newChore,
+      done: true,
+      due_on: '2026-01-01',
+    });
     const sooner = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-01' });
     const ids = (await engine.listVisible<Chore>(CHORES_SPEC)).map((c) => c.id);
     expect(ids).toEqual([sooner, later, noDate, done]);
@@ -160,7 +176,14 @@ describe('update', () => {
     at(T1);
     await engine.update(CHORES_SPEC, id, { title: 'Regar plantas', due_on: '2026-09-01' });
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
-      { id, ...newChore, title: 'Regar plantas', due_on: '2026-09-01', created_at: T0, updated_at: T1 },
+      {
+        id,
+        ...newChore,
+        title: 'Regar plantas',
+        due_on: '2026-09-01',
+        created_at: T0,
+        updated_at: T1,
+      },
     ]);
   });
 
@@ -341,7 +364,9 @@ describe('sync queues', () => {
     await engine.update(CHORES_SPEC, id, { title: 'newer' });
     await engine.markUpserted(CHORES_SPEC, id, T0);
     expect((await bookkeeping('chores', id))?.pending_op).toBe('upsert');
-    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([{ id, title: 'newer' }]);
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([
+      { id, title: 'newer' },
+    ]);
   });
 
   it('markUpserted leaves tombstones alone', async () => {
@@ -376,7 +401,9 @@ describe('reconcile', () => {
     await engine.reconcile(CHORES_SPEC, [
       { id: 'a', title: 't', done: false, created_at: T0, updated_at: T0 },
     ]);
-    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T0, { title: 't' })]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T0, { title: 't' }),
+    ]);
   });
 
   it('applies a newer server version over a clean local row', async () => {

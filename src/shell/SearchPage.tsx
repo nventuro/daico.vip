@@ -57,7 +57,7 @@ export default function SearchPage() {
     body = result.groups.map(({ module, hits }) => (
       <section key={module.id}>
         <h2
-          className="mb-2 text-xs font-semibold tracking-wide uppercase text-(--app)"
+          className="mb-2 text-xs font-semibold tracking-wide text-(--app) uppercase"
           style={hueStyle(module.hue)}
         >
           {module.name}
@@ -65,9 +65,14 @@ export default function SearchPage() {
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
           {hits.map((hit, i) => (
             <li key={i}>
-              <Link to={hit.to} className="block px-4 py-3 transition-colors hover:bg-border-subtle">
+              <Link
+                to={hit.to}
+                className="block px-4 py-3 transition-colors hover:bg-border-subtle"
+              >
                 <span className="block truncate">{hit.title}</span>
-                {hit.subtitle && <span className="block truncate text-xs text-muted">{hit.subtitle}</span>}
+                {hit.subtitle && (
+                  <span className="block truncate text-xs text-muted">{hit.subtitle}</span>
+                )}
               </Link>
             </li>
           ))}

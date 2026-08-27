@@ -45,7 +45,7 @@ Chromium-only APIs are available everywhere.
 - **Every new table must, in the same migration: (1) enable RLS, (2) add a
   `private.is_member()` policy, AND (3) `grant` the needed privileges to
   `authenticated`** (e.g. `grant select, insert, update, delete on public.<table>
-  to authenticated`). RLS is a *filter on top of* SQL privileges, not a
+to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   replacement: a role with a policy but no GRANT gets "permission denied for
   table ..." before the policy is ever evaluated. **Never grant to `anon`** —
   anon must stay fully locked out.
@@ -173,6 +173,8 @@ Chromium-only APIs are available everywhere.
   confirm, or is reversible for a moment through `UndoBar` (`useUndo`).
 - **No duplicated logic**: extract shared computation; check for existing helpers first.
 - **Zero lint errors**: run `npm run lint` after changes and fix everything before done.
+- **Prettier-formatted**: run `npm run format` after changes; CI fails on an unformatted
+  file (`npm run format:check`). Tailwind classes are sorted by the Prettier plugin.
 - **Zero build warnings**: run `npm run build` after changes and fix everything before done.
 
 ## App modules
@@ -211,6 +213,7 @@ Chromium-only APIs are available everywhere.
 - `npm run build` — production build
 - `npm run preview` — preview production build
 - `npm run lint` — run ESLint
+- `npm run format` — format everything with Prettier (`format:check` only reports)
 
 ### Database
 

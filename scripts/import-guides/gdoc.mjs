@@ -16,7 +16,8 @@ function decode(text) {
 function realHref(href) {
   try {
     const u = new URL(href);
-    if (u.hostname === 'www.google.com' && u.pathname === '/url') return u.searchParams.get('q') ?? href;
+    if (u.hostname === 'www.google.com' && u.pathname === '/url')
+      return u.searchParams.get('q') ?? href;
   } catch {
     /* relative or malformed: keep as is */
   }
@@ -24,7 +25,11 @@ function realHref(href) {
 }
 
 function styledClasses(style, declaration) {
-  return new Set([...style.matchAll(/\.(c\d+)\{([^}]*)\}/g)].filter((m) => m[2].includes(declaration)).map((m) => m[1]));
+  return new Set(
+    [...style.matchAll(/\.(c\d+)\{([^}]*)\}/g)]
+      .filter((m) => m[2].includes(declaration))
+      .map((m) => m[1]),
+  );
 }
 
 /** Inline content of a block → markdown text. Returns { text, allBold }. */
@@ -50,7 +55,10 @@ function inlineOf(html, bold, italic) {
     if (!isBold) allBold = false;
     text += s[3] !== undefined ? content : wrap(content, isBold, isItalic);
   }
-  text = text.replace(/\u0000LINK(\[[^\]]*\]\([^)]*\))\u0000/g, '$1').replace(/\s+/g, ' ').trim();
+  text = text
+    .replace(/\u0000LINK(\[[^\]]*\]\([^)]*\))\u0000/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
   return { text, allBold: allBold && text.length > 0 };
 }
 
@@ -67,7 +75,10 @@ function wrap(content, isBold, isItalic) {
 function tableToMarkdown(tableHtml, bold, italic) {
   const rows = [...tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)].map((r) =>
     [...r[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/g)].map((c) =>
-      inlineOf(c[1].replace(/<\/p>\s*<p\b[^>]*>/g, '<br>'), bold, italic).text.replace(/\|/g, '\\|'),
+      inlineOf(c[1].replace(/<\/p>\s*<p\b[^>]*>/g, '<br>'), bold, italic).text.replace(
+        /\|/g,
+        '\\|',
+      ),
     ),
   );
   if (!rows.length) return '';
@@ -94,7 +105,8 @@ export function gdocHtmlToMarkdown(html) {
       continue;
     }
     // Paragraphs nested inside table cells are handled by the table branch.
-    if (m.index > 0 && body.lastIndexOf('<table', m.index) > body.lastIndexOf('</table>', m.index)) continue;
+    if (m.index > 0 && body.lastIndexOf('<table', m.index) > body.lastIndexOf('</table>', m.index))
+      continue;
     const { text, allBold } = inlineOf(inner, bold, italic);
     if (!text) {
       // An empty paragraph is deliberate spacing: it ends a list run.
@@ -102,7 +114,8 @@ export function gdocHtmlToMarkdown(html) {
       continue;
     }
     const plain = text.replace(/\*\*/g, '');
-    if (/^h[1-6]$/.test(tag)) blocks.push({ kind: 'block', text: `${'#'.repeat(Number(tag[1]) + 1)} ${plain}` });
+    if (/^h[1-6]$/.test(tag))
+      blocks.push({ kind: 'block', text: `${'#'.repeat(Number(tag[1]) + 1)} ${plain}` });
     else if (/^-{3,}$/.test(plain)) blocks.push({ kind: 'block', text: '---' });
     else if (allBold) blocks.push({ kind: 'block', text: `### ${plain}` });
     else if (/^\[[^\]]*\]\([^)]*\)$/.test(text)) blocks.push({ kind: 'block', text });

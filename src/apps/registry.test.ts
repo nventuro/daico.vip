@@ -23,7 +23,14 @@ describe('apps registry', () => {
     const specs = apps.flatMap((a) => a.specs);
     expect(specs).toEqual(ALL_SPECS);
     const tables = specs.map((s) => s.table);
-    expect(tables).toEqual(['chores', 'shopping_items', 'guides', 'guide_chapters', 'dates', 'recipes']);
+    expect(tables).toEqual([
+      'chores',
+      'shopping_items',
+      'guides',
+      'guide_chapters',
+      'dates',
+      'recipes',
+    ]);
     expect(new Set(tables).size).toBe(tables.length);
   });
 

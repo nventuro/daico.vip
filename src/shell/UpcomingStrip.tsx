@@ -16,7 +16,9 @@ export default function UpcomingStrip() {
       {(rows) =>
         rows.length > 0 && (
           <section className="mb-6">
-            <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Próximo</h2>
+            <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+              Próximo
+            </h2>
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
               {rows.slice(0, UPCOMING_MAX_ROWS).map((row, i) => (
                 <UpcomingRow key={i} row={row} today={today} />

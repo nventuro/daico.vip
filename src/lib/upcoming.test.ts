@@ -25,7 +25,9 @@ describe('sameUpcoming', () => {
     expect(sameUpcoming([chore], [chore, birthday])).toBe(false);
     expect(sameUpcoming([chore], [{ ...chore, on: '2026-03-15' }])).toBe(false);
     expect(sameUpcoming([chore], [{ ...chore, marks: ['notes'] }])).toBe(false);
-    expect(sameUpcoming([{ ...chore, marks: ['notes'] }], [{ ...chore, marks: ['notes'] }])).toBe(true);
+    expect(sameUpcoming([{ ...chore, marks: ['notes'] }], [{ ...chore, marks: ['notes'] }])).toBe(
+      true,
+    );
     expect(sameUpcoming([], [])).toBe(true);
   });
 });
@@ -37,7 +39,18 @@ describe('groupByDay', () => {
 
   it('heads the past, each near day, then whole months', () => {
     const groups = groupByDay(
-      ['2026-03-10', '2026-03-12', '2026-03-14', '2026-03-15', '2026-03-17', '2026-03-20', '2026-03-21', '2026-03-28', '2026-04-02', '2027-01-05'].map(at),
+      [
+        '2026-03-10',
+        '2026-03-12',
+        '2026-03-14',
+        '2026-03-15',
+        '2026-03-17',
+        '2026-03-20',
+        '2026-03-21',
+        '2026-03-28',
+        '2026-04-02',
+        '2027-01-05',
+      ].map(at),
       TODAY,
     );
     expect(groups.map((g) => [g.label, g.rows.length, g.overdue])).toEqual([

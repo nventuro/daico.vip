@@ -59,6 +59,10 @@ describe('column migration', () => {
       due_on: '2026-09-01',
     });
     const rows = await engine.listVisible<Chore>(CHORES_SPEC);
-    expect(rows.find((c) => c.id === id)).toMatchObject({ notes: 'fondo', done: true, due_on: '2026-09-01' });
+    expect(rows.find((c) => c.id === id)).toMatchObject({
+      notes: 'fondo',
+      done: true,
+      due_on: '2026-09-01',
+    });
   });
 });

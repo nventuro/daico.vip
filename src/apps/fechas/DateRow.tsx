@@ -22,10 +22,7 @@ export default function DateRow({ entry, today, onRemove }: DateRowProps) {
 
   return (
     <li className="flex items-stretch rounded-xl border border-border bg-surface-raised shadow-sm">
-      <Link
-        to={`/fechas/${entry.id}`}
-        className="flex min-w-0 flex-1 items-center gap-2 py-3 pl-4"
-      >
+      <Link to={`/fechas/${entry.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-3 pl-4">
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-on-surface">{entry.title}</span>
           <span className={`mt-0.5 text-xs ${past ? 'text-error' : 'text-muted'}`}>

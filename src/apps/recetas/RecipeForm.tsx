@@ -47,7 +47,9 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
   }
 
   function insertIngredients() {
-    setBody((current) => (current.trim() ? `${current.trimEnd()}\n\n${INGREDIENTS_SNIPPET}` : INGREDIENTS_SNIPPET));
+    setBody((current) =>
+      current.trim() ? `${current.trimEnd()}\n\n${INGREDIENTS_SNIPPET}` : INGREDIENTS_SNIPPET,
+    );
   }
 
   return (

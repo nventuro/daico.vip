@@ -12,7 +12,8 @@ export const CONTROL_CLASS =
   'rounded-xl border border-border bg-surface-raised px-3 py-2 text-base text-on-surface outline-none transition-colors focus:border-primary';
 
 /** The shape of a pill chip; pair with one of the two colour sets below. */
-export const CHIP_BASE_CLASS = 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm';
+export const CHIP_BASE_CLASS =
+  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm';
 
 /** Chip colours at rest. */
 export const CHIP_IDLE_CLASS = 'border-border bg-surface-raised text-muted';

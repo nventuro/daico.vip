@@ -5,7 +5,8 @@ import { daysUntil, formatWeekdayDay, monthLabel } from '../utils/dateUtils';
 /** Soonest first; same-day entries by title. Does not modify the input. */
 export function sortUpcoming(items: Upcoming[]): Upcoming[] {
   return [...items].sort(
-    (a, b) => a.on.localeCompare(b.on) || a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }),
+    (a, b) =>
+      a.on.localeCompare(b.on) || a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }),
   );
 }
 

@@ -36,7 +36,9 @@ export default function DatesPage() {
   const groups = useMemo(() => groupByMonth(upcoming, today), [upcoming, today]);
 
   function renderEntry(entry: DateEntry) {
-    return <DateRow key={entry.id} entry={entry} today={today} onRemove={() => void remove(entry)} />;
+    return (
+      <DateRow key={entry.id} entry={entry} today={today} onRemove={() => void remove(entry)} />
+    );
   }
 
   return (

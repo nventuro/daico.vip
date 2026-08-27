@@ -33,7 +33,7 @@ export default function SortableShoppingItem({ item, onToggle }: SortableShoppin
           {...listeners}
           aria-label="Reordenar"
           title="Reordenar"
-          className="flex shrink-0 cursor-grab touch-none items-center pl-3 pr-1 text-muted transition-colors hover:text-muted-strong"
+          className="flex shrink-0 cursor-grab touch-none items-center pr-1 pl-3 text-muted transition-colors hover:text-muted-strong"
         >
           <IconGripVertical size={18} stroke={1.5} />
         </button>

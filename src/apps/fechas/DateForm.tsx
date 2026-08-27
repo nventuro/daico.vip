@@ -27,7 +27,11 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
     notice_days: entry.notice_days,
   });
 
-  const input: DateInput = { title: lowercaseTrimmed(title), ...fields, notes: notes.trim() || null };
+  const input: DateInput = {
+    title: lowercaseTrimmed(title),
+    ...fields,
+    notes: notes.trim() || null,
+  };
   const canSave = input.title !== '' && input.occurs_on !== '' && hasChanges(input, entry);
 
   function handleSubmit(e: FormEvent) {

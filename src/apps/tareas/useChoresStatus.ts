@@ -11,7 +11,9 @@ export function statusLabel(chores: Chore[], today: string): string | null {
   if (pending.length === 0) return null;
   const overdue = pending.filter((chore) => chore.due_on != null && chore.due_on < today).length;
   const pendingLabel = countLabel(pending.length, 'pendiente', 'pendientes');
-  return overdue > 0 ? `${countLabel(overdue, 'vencida', 'vencidas')} · ${pendingLabel}` : pendingLabel;
+  return overdue > 0
+    ? `${countLabel(overdue, 'vencida', 'vencidas')} · ${pendingLabel}`
+    : pendingLabel;
 }
 
 /** Tile subline: how many chores are pending (and overdue), or null when none. */

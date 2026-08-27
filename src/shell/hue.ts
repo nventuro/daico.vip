@@ -6,5 +6,7 @@ import type { AppHue } from '../apps/types';
  *  colour. `'primary'` paints it in the shell's own colour. */
 export function hueStyle(hue: AppHue | 'primary'): CSSProperties {
   // Custom properties are not part of CSSProperties, hence the cast.
-  return { '--app': hue === 'primary' ? 'var(--color-primary)' : `var(--color-${hue})` } as CSSProperties;
+  return {
+    '--app': hue === 'primary' ? 'var(--color-primary)' : `var(--color-${hue})`,
+  } as CSSProperties;
 }

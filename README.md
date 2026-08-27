@@ -54,8 +54,8 @@ background.
 Three pieces make this work:
 
 - **PWA / service worker** (`vite-plugin-pwa`). The first online visit precaches
-  the app shell — including the ~1.5 MB SQLite WebAssembly — so the app *opens and
-  runs* with no network. Installable ("Add to Home Screen") for a fullscreen,
+  the app shell — including the ~1.5 MB SQLite WebAssembly — so the app _opens and
+  runs_ with no network. Installable ("Add to Home Screen") for a fullscreen,
   app-like launch. GitHub Pages serves it over HTTPS, which service workers
   require; no custom headers are needed (see the SQLite note below).
 

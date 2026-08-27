@@ -129,7 +129,10 @@ describe('syncAll', () => {
     ]);
 
     server.reset();
-    server.seed('chores', [serverChore('a', T1, { title: 'edited elsewhere' }), serverChore('c', T1)]);
+    server.seed('chores', [
+      serverChore('a', T1, { title: 'edited elsewhere' }),
+      serverChore('c', T1),
+    ]);
     await syncAll();
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
       serverChore('a', T1, { title: 'edited elsewhere' }),
@@ -244,8 +247,12 @@ describe('changes made while a push is in flight', () => {
     await run;
 
     expect(server.rows('chores')).toMatchObject([{ id, title: 'Regar', updated_at: T0 }]);
-    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([{ id, title: 'newer', updated_at: T1 }]);
-    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([{ id, title: 'newer' }]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([
+      { id, title: 'newer', updated_at: T1 },
+    ]);
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([
+      { id, title: 'newer' },
+    ]);
 
     await syncAll();
     expect(server.rows('chores')).toMatchObject([{ id, title: 'newer', updated_at: T1 }]);

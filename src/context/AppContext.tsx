@@ -75,8 +75,8 @@ export function AppProvider({
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-surface text-on-surface flex items-center justify-center">
-        <p className="text-muted text-lg">Cargando...</p>
+      <div className="flex min-h-dvh items-center justify-center bg-surface text-on-surface">
+        <p className="text-lg text-muted">Cargando...</p>
       </div>
     );
   }

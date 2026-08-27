@@ -27,12 +27,16 @@ export default function IngredientRow({ label, have, sent, onToggle, onSend }: I
       >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            have ? 'border-primary bg-primary text-on-primary' : 'border-neutral-hover text-transparent'
+            have
+              ? 'border-primary bg-primary text-on-primary'
+              : 'border-neutral-hover text-transparent'
           }`}
         >
           <IconCheck size={14} stroke={3} />
         </span>
-        <span className={`min-w-0 flex-1 break-words ${have ? 'text-muted line-through' : 'text-on-surface'}`}>
+        <span
+          className={`min-w-0 flex-1 break-words ${have ? 'text-muted line-through' : 'text-on-surface'}`}
+        >
           {label}
         </span>
       </button>
@@ -44,7 +48,11 @@ export default function IngredientRow({ label, have, sent, onToggle, onSend }: I
         title={sendLabel}
         className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-primary disabled:hover:text-muted"
       >
-        {sent ? <IconCheck size={18} stroke={1.5} /> : <IconShoppingCartPlus size={18} stroke={1.5} />}
+        {sent ? (
+          <IconCheck size={18} stroke={1.5} />
+        ) : (
+          <IconShoppingCartPlus size={18} stroke={1.5} />
+        )}
       </button>
     </li>
   );

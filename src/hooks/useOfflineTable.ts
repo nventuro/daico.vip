@@ -69,7 +69,7 @@ export function useOfflineTable<T extends { id: string }>(spec: TableSpec) {
   // write's change event is what refreshes `items`, on this and every other
   // instance alike.
   const mutate = useCallback(
-    async <R,>(op: () => Promise<R>): Promise<R | undefined> => {
+    async <R>(op: () => Promise<R>): Promise<R | undefined> => {
       let result: R | undefined;
       try {
         result = await op();

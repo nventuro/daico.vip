@@ -53,7 +53,11 @@ function convertToken(token, ctx) {
   if ((m = token.match(/^\{\{image:([^:}]+):?([^}]*)\}\}$/))) {
     return imageDirective(ctx, m[1], m[2] === 'small' ? 50 : 100, 'center', false);
   }
-  if ((m = token.match(/^\{\{image-v2:(https?:\/\/[^}]+?|[^:}]+)(?::([^:}]*))?(?::([^:}]*))?(?::([^:}]*))?\}\}$/))) {
+  if (
+    (m = token.match(
+      /^\{\{image-v2:(https?:\/\/[^}]+?|[^:}]+)(?::([^:}]*))?(?::([^:}]*))?(?::([^:}]*))?\}\}$/,
+    ))
+  ) {
     return imageDirective(ctx, m[1], Number(m[2]) || 100, m[3] || 'center', m[4] === 'spoiled');
   }
   if ((m = token.match(/^\(youtube\)\(([^)]*)\)\(([^)]*)\)$/))) {
@@ -89,7 +93,10 @@ function imageDirective(ctx, ref, width, align, spoiled) {
 // sequences (two characters) inside it; a space is the closest inline reading.
 function inline(line, ctx) {
   return rewriteLinks(
-    line.replace(/\[spoiler:([^\]]*)\]/g, (_, text) => `:spoiler[${text.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()}]`),
+    line.replace(
+      /\[spoiler:([^\]]*)\]/g,
+      (_, text) => `:spoiler[${text.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()}]`,
+    ),
     ctx,
   );
 }

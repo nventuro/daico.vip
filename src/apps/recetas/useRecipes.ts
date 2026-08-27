@@ -33,7 +33,8 @@ export function useRecipes() {
   );
 
   const save = useCallback(
-    (id: string, patch: Partial<RecipeInput>) => mutate(() => engine.update(RECIPES_SPEC, id, patch)),
+    (id: string, patch: Partial<RecipeInput>) =>
+      mutate(() => engine.update(RECIPES_SPEC, id, patch)),
     [mutate],
   );
 

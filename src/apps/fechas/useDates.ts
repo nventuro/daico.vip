@@ -31,7 +31,9 @@ export function useDates() {
     (input: DateInput) => {
       const title = lowercaseTrimmed(input.title);
       if (!title) return Promise.resolve();
-      return mutate(() => engine.insert(DATES_SPEC, withInterval({ ...input, title }, input.repeat)));
+      return mutate(() =>
+        engine.insert(DATES_SPEC, withInterval({ ...input, title }, input.repeat)),
+      );
     },
     [mutate],
   );

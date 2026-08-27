@@ -63,8 +63,7 @@ export function useShoppingList() {
 
   /** Persist a new fractional-index key for a dragged item (see ordering.ts). */
   const move = useCallback(
-    (id: string, position: string) =>
-      mutate(() => engine.update(SHOPPING_SPEC, id, { position })),
+    (id: string, position: string) => mutate(() => engine.update(SHOPPING_SPEC, id, { position })),
     [mutate],
   );
 

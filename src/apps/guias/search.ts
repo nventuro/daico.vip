@@ -30,7 +30,9 @@ export async function searchGuides(query: string): Promise<SearchHit[]> {
     const to = `/guias/${chapter.guide_id}/${chapter.id}`;
     if (matches(chapter.title, query)) return [{ title: chapter.title, subtitle: guideTitle, to }];
     if (matches(chapter.body, query)) {
-      return [{ title: chapter.title, subtitle: excerpt(chapter.body, query, SEARCH_EXCERPT_RADIUS), to }];
+      return [
+        { title: chapter.title, subtitle: excerpt(chapter.body, query, SEARCH_EXCERPT_RADIUS), to },
+      ];
     }
     return [];
   });

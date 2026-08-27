@@ -12,7 +12,9 @@ export async function searchRecipes(query: string): Promise<SearchHit[]> {
       const to = `/recetas/${recipe.id}`;
       if (matches(recipe.title, query)) return [{ title: recipe.title, to }];
       if (matches(recipe.body, query)) {
-        return [{ title: recipe.title, subtitle: excerpt(recipe.body, query, SEARCH_EXCERPT_RADIUS), to }];
+        return [
+          { title: recipe.title, subtitle: excerpt(recipe.body, query, SEARCH_EXCERPT_RADIUS), to },
+        ];
       }
       return [];
     })

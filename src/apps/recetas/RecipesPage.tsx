@@ -44,7 +44,10 @@ export default function RecipesPage() {
             {items.map((recipe) => {
               const meta = metaLine(recipe);
               return (
-                <li key={recipe.id} className="rounded-xl border border-border bg-surface-raised shadow-sm">
+                <li
+                  key={recipe.id}
+                  className="rounded-xl border border-border bg-surface-raised shadow-sm"
+                >
                   <Link to={`/recetas/${recipe.id}`} className="flex flex-col px-4 py-3">
                     <span className="truncate text-on-surface">{recipe.title}</span>
                     {meta && <span className="mt-0.5 text-xs text-muted">{meta}</span>}

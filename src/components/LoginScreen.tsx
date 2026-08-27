@@ -26,9 +26,7 @@ export default function LoginScreen() {
             <IconBrandGoogleFilled size={20} stroke={1.5} />
             Ingresá con Google
           </button>
-          {!online && (
-            <p className="mt-4 text-sm text-muted">Necesitás conexión para ingresar.</p>
-          )}
+          {!online && <p className="mt-4 text-sm text-muted">Necesitás conexión para ingresar.</p>}
         </div>
       </div>
       <Footer className="px-4 pb-8" />

@@ -46,7 +46,10 @@ function db(): Promise<SQLocal> {
       const c = new SQLocal({
         databasePath: LOCAL_DB_PATH,
         processor: new Worker(new URL('./sahpoolWorker.ts', import.meta.url), { type: 'module' }),
-        onInit: (sql) => [...ALL_SPECS.map((spec) => sql(createTableSql(spec))), sql(IMAGE_CACHE_SQL)],
+        onInit: (sql) => [
+          ...ALL_SPECS.map((spec) => sql(createTableSql(spec))),
+          sql(IMAGE_CACHE_SQL),
+        ],
       });
       return migrateColumns(c).then(() => c);
     });
@@ -165,14 +168,7 @@ export async function insert(spec: TableSpec, values: Row): Promise<string> {
     'pending_op',
     'synced',
   ];
-  const params = [
-    id,
-    ...spec.columns.map((c) => toDb(c, values[c.name])),
-    ts,
-    ts,
-    'upsert',
-    0,
-  ];
+  const params = [id, ...spec.columns.map((c) => toDb(c, values[c.name])), ts, ts, 'upsert', 0];
   const placeholders = cols.map(() => '?').join(', ');
   const c = await db();
   await c.sql(`INSERT INTO ${spec.table} (${cols.join(', ')}) VALUES (${placeholders})`, ...params);

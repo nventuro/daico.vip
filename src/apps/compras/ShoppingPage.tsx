@@ -92,11 +92,19 @@ export default function ShoppingPage() {
             La lista está vacía. Agregá lo que necesites comprar.
           </p>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
               <ul className="space-y-2">
                 {view.map((item) => (
-                  <SortableShoppingItem key={item.id} item={item} onToggle={() => void toggle(item)} />
+                  <SortableShoppingItem
+                    key={item.id}
+                    item={item}
+                    onToggle={() => void toggle(item)}
+                  />
                 ))}
               </ul>
             </SortableContext>
