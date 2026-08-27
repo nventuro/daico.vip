@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import type { Chore } from '../../types';
 import { formatDate, todayIso } from '../../utils/dateUtils';
+import { hasChanges } from '../../utils/formUtils';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
@@ -22,11 +23,13 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
   const [notes, setNotes] = useState(chore.notes ?? '');
   const today = todayIso();
 
+  const input: ChoreInput = { title: title.trim(), due_on: dueOn, notes: notes.trim() || null };
+  const canSave = input.title !== '' && hasChanges(input, chore);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const value = title.trim();
-    if (!value) return;
-    onSave({ title: value, due_on: dueOn, notes: notes.trim() || null });
+    if (!canSave) return;
+    onSave(input);
   }
 
   return (
@@ -60,7 +63,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
         removeLabel="Eliminar tarea"
         confirmQuestion="¿Eliminar la tarea?"
         onRemove={onRemove}
-        submitDisabled={!title.trim()}
+        submitDisabled={!canSave}
       />
     </form>
   );

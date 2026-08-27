@@ -8,6 +8,7 @@ interface FormFooterProps {
   confirmQuestion: string;
   onRemove: () => void;
   submitLabel?: string;
+  /** Forms pass true until the draft differs from the saved record (see `hasChanges`). */
   submitDisabled?: boolean;
 }
 
@@ -15,7 +16,7 @@ interface FormFooterProps {
  * The bottom row of an edit form: the record's delete action on the left, the
  * form's submit on the right. Deleting takes two taps — the first swaps the
  * row for a confirmation with equal Cancelar / Eliminar pills, so a stray tap
- * on the quiet red text can never remove anything.
+ * on the delete pill can never remove anything.
  */
 export default function FormFooter({
   removeLabel,
@@ -45,7 +46,7 @@ export default function FormFooter({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <Button variant="dangerText" size="sm" onClick={() => setConfirming(true)}>
+      <Button variant="dangerOutline" onClick={() => setConfirming(true)}>
         {removeLabel}
       </Button>
       <Button type="submit" disabled={submitDisabled}>

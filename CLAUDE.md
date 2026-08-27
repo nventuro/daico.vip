@@ -146,7 +146,7 @@ Chromium-only APIs are available everywhere.
 - **Icon-only controls**: must have an accessible label (`aria-label` + `title`).
 - **Forms and buttons are built from the shared primitives in `src/components/`**:
   `FormField`, `TextInput`, `TextArea`, `Chip` (one of a row of choices), `Button`
-  (variants `primary` / `outline` / `danger` / `dangerText`), `FormFooter` (an
+  (variants `primary` / `outline` / `danger` / `dangerOutline`), `FormFooter` (an
   edit form's delete-with-confirm + submit row) and `UndoBar`. Never hand-write
   control or button classes in a page; a control with no component of its own
   takes its classes from `src/components/controlClasses.ts`. This is what keeps

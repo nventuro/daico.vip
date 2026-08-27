@@ -4,6 +4,7 @@ import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
 import FormFooter from '../../components/FormFooter';
+import { hasChanges } from '../../utils/formUtils';
 import type { DateInput } from './useDates';
 import DateFields, { type DateFieldsValue } from './DateFields';
 
@@ -25,11 +26,13 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
     notice_days: entry.notice_days,
   });
 
+  const input: DateInput = { title: title.trim(), ...fields, notes: notes.trim() || null };
+  const canSave = input.title !== '' && input.occurs_on !== '' && hasChanges(input, entry);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const value = title.trim();
-    if (!value || !fields.occurs_on) return;
-    onSave({ title: value, ...fields, notes: notes.trim() || null });
+    if (!canSave) return;
+    onSave(input);
   }
 
   return (
@@ -69,7 +72,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
         removeLabel="Eliminar fecha"
         confirmQuestion="¿Eliminar la fecha?"
         onRemove={onRemove}
-        submitDisabled={!title.trim()}
+        submitDisabled={!canSave}
       />
     </form>
   );

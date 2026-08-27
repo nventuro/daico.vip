@@ -9,7 +9,7 @@ interface AddBarProps {
   placeholder: string;
   /** Accessible label for the text input. */
   inputLabel: string;
-  /** Optional secondary controls (e.g. a date picker) shown above the input row. */
+  /** Optional secondary controls (e.g. a date picker) shown under the input row. */
   children?: ReactNode;
   /** Something to show above the bar for a moment, e.g. an undo bar. */
   notice?: ReactNode;
@@ -42,7 +42,6 @@ export default function AddBar({
     <div className="sticky bottom-0 -mx-4 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur">
       {notice && <div className="mb-3">{notice}</div>}
       <form onSubmit={handleSubmit}>
-        {children && <div className="mb-2 flex flex-wrap items-center gap-2">{children}</div>}
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -70,6 +69,7 @@ export default function AddBar({
             <IconPlus size={22} stroke={2} />
           </button>
         </div>
+        {children && <div className="mt-2 flex flex-wrap items-center gap-2">{children}</div>}
       </form>
     </div>
   );

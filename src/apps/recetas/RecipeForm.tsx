@@ -5,6 +5,7 @@ import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
 import Button from '../../components/Button';
 import FormFooter from '../../components/FormFooter';
+import { hasChanges } from '../../utils/formUtils';
 import type { RecipeInput } from './useRecipes';
 
 interface RecipeFormProps {
@@ -30,11 +31,18 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
   const [servings, setServings] = useState(recipe.servings?.toString() ?? '');
   const [body, setBody] = useState(recipe.body);
 
+  const input: RecipeInput = {
+    title: title.trim(),
+    body,
+    minutes: parseQuantity(minutes),
+    servings: parseQuantity(servings),
+  };
+  const canSave = input.title !== '' && hasChanges(input, recipe);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const value = title.trim();
-    if (!value) return;
-    onSave({ title: value, body, minutes: parseQuantity(minutes), servings: parseQuantity(servings) });
+    if (!canSave) return;
+    onSave(input);
   }
 
   function insertIngredients() {
@@ -97,7 +105,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
         removeLabel="Eliminar receta"
         confirmQuestion="¿Eliminar la receta?"
         onRemove={onRemove}
-        submitDisabled={!title.trim()}
+        submitDisabled={!canSave}
       />
     </form>
   );
