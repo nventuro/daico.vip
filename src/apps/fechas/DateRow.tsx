@@ -21,8 +21,8 @@ export default function DateRow({ entry, today, onRemove }: DateRowProps) {
   const near = Math.abs(daysUntil(today, date)) <= RELATIVE_DAY_LIMIT;
 
   return (
-    <li className="flex items-stretch rounded-xl border border-border bg-surface-raised shadow-sm">
-      <Link to={`/fechas/${entry.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-3 pl-4">
+    <li className="flex items-stretch border-b border-border">
+      <Link to={`/fechas/${entry.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2.5">
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-on-surface">{entry.title}</span>
           <span className={`mt-0.5 text-xs ${past ? 'text-error' : 'text-muted'}`}>
@@ -36,7 +36,7 @@ export default function DateRow({ entry, today, onRemove }: DateRowProps) {
         onClick={onRemove}
         aria-label="Eliminar fecha"
         title="Eliminar fecha"
-        className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-error"
+        className="flex shrink-0 items-center pl-3 text-muted transition-colors hover:text-error"
       >
         <IconX size={18} stroke={1.5} />
       </button>

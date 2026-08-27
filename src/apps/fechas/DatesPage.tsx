@@ -3,6 +3,7 @@ import { DATE_NOTICE_DAYS_DEFAULT, type DateEntry } from '../../types';
 import { todayIso } from '../../utils/dateUtils';
 import OfflineBanner from '../../components/OfflineBanner';
 import CompletedSection from '../../components/CompletedSection';
+import SectionLabel from '../../components/SectionLabel';
 import AddBar from '../../components/AddBar';
 import { useDates } from './useDates';
 import { groupByMonth, splitByToday } from './recurrence';
@@ -59,10 +60,8 @@ export default function DatesPage() {
             ) : (
               groups.map((group) => (
                 <section key={group.key} className="mb-6">
-                  <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-                    {group.label}
-                  </h2>
-                  <ul className="space-y-2">{group.entries.map(renderEntry)}</ul>
+                  <SectionLabel>{group.label}</SectionLabel>
+                  <ul>{group.entries.map(renderEntry)}</ul>
                 </section>
               ))
             )}

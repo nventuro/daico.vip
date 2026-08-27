@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useShoppingList } from '../apps/compras/useShoppingList';
+import Button from './Button';
 import IngredientRow from './IngredientRow';
 
 interface IngredientsProps {
@@ -41,7 +42,7 @@ export default function Ingredients({ items }: IngredientsProps) {
   }
 
   return (
-    <section className="my-4 rounded-xl border border-border bg-surface-raised">
+    <section className="my-4 border border-border bg-surface-raised">
       <header className="flex items-baseline justify-between gap-2 px-3 pt-3 pb-1">
         <p className="font-semibold">Ingredientes</p>
         <p className="text-xs text-muted">marcá lo que ya tenés</p>
@@ -59,14 +60,9 @@ export default function Ingredients({ items }: IngredientsProps) {
         ))}
       </ul>
       <footer className="flex justify-end border-t border-border px-3 py-2">
-        <button
-          type="button"
-          onClick={() => void sendMissing()}
-          disabled={missing.length === 0}
-          className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary transition-colors hover:bg-primary-hover disabled:bg-disabled"
-        >
+        <Button size="sm" onClick={() => void sendMissing()} disabled={missing.length === 0}>
           Faltan → Compras ({missing.length})
-        </button>
+        </Button>
       </footer>
     </section>
   );

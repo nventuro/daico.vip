@@ -52,7 +52,7 @@ export default function AddBar({
             aria-label={inputLabel}
             enterKeyHint="done"
             autoCapitalize="none"
-            className="flex-1 rounded-full border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary"
+            className="flex-1 border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary"
           />
           <button
             type="submit"
@@ -64,7 +64,7 @@ export default function AddBar({
             disabled={!value.trim()}
             aria-label="Agregar"
             title="Agregar"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary transition-colors hover:bg-primary-hover disabled:bg-disabled"
+            className="flex h-12 w-12 shrink-0 items-center justify-center bg-(--app) text-on-primary transition-opacity hover:opacity-90 disabled:bg-disabled disabled:opacity-100"
           >
             <IconPlus size={22} stroke={2} />
           </button>

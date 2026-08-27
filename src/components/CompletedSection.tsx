@@ -31,7 +31,7 @@ export default function CompletedSection({ label, count, children }: CompletedSe
         />
         {label}
       </button>
-      {open && <ul className="space-y-2">{children}</ul>}
+      {open && <ul>{children}</ul>}
     </div>
   );
 }

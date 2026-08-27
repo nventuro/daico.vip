@@ -9,7 +9,7 @@ export default function OfflineBanner() {
   if (online) return null;
 
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm text-muted-strong">
+    <div className="mb-4 flex items-center gap-2 border border-border bg-surface-raised px-3 py-2 text-sm text-muted-strong">
       <IconWifiOff size={18} stroke={1.5} className="shrink-0 text-warning" />
       Sin conexión — se guarda acá y se sincroniza solo cuando vuelva.
     </div>

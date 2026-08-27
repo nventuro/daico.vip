@@ -79,7 +79,7 @@ export default function ChoresPage() {
             {active.length === 0 ? (
               <p className="py-10 text-center text-muted">No hay tareas. ¡Todo al día!</p>
             ) : (
-              <ul className="space-y-2">{active.map(renderChore)}</ul>
+              <ul>{active.map(renderChore)}</ul>
             )}
             <CompletedSection label="Hechas" count={completed.length}>
               {completed.map(renderChore)}

@@ -9,10 +9,10 @@ export default function NoAccess() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface px-4 text-on-surface">
       <div className="w-full max-w-sm text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-border-subtle text-muted">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center border border-border bg-surface-raised text-muted">
           <IconLock size={28} stroke={1.5} />
         </div>
-        <h2 className="mb-2 text-xl font-semibold">Sin acceso</h2>
+        <h2 className="mb-2 font-display text-2xl font-black tracking-tight">Sin acceso</h2>
         <p className="mb-8 text-muted">
           Esta cuenta no está autorizada para entrar. Si creés que es un error, probá con otra
           cuenta.

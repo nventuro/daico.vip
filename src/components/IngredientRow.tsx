@@ -1,4 +1,5 @@
 import { IconCheck, IconShoppingCartPlus } from '@tabler/icons-react';
+import CheckSquare from './CheckSquare';
 
 interface IngredientRowProps {
   label: string;
@@ -25,15 +26,7 @@ export default function IngredientRow({ label, have, sent, onToggle, onSend }: I
         title={toggleLabel}
         className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
       >
-        <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            have
-              ? 'border-primary bg-primary text-on-primary'
-              : 'border-neutral-hover text-transparent'
-          }`}
-        >
-          <IconCheck size={14} stroke={3} />
-        </span>
+        <CheckSquare checked={have} />
         <span
           className={`min-w-0 flex-1 break-words ${have ? 'text-muted line-through' : 'text-on-surface'}`}
         >

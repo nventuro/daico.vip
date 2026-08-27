@@ -13,12 +13,9 @@ export default function UpcomingRow({ row, today }: { row: Upcoming; today: stri
     <li>
       <Link
         to={row.to}
-        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-border-subtle"
+        className="flex items-center gap-3 py-3 transition-colors hover:bg-border-subtle"
       >
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full bg-(--app)"
-          style={hueStyle(app?.hue ?? 'primary')}
-        />
+        <span className="h-3 w-3 shrink-0 bg-(--app)" style={hueStyle(app?.hue ?? 'primary')} />
         <span className="min-w-0 flex-1 truncate">{row.title}</span>
         <EntryMarks marks={row.marks} />
         <span className={`shrink-0 text-sm ${past ? 'text-error' : 'text-muted'}`}>

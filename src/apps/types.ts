@@ -45,8 +45,6 @@ export interface AppModule {
    *  stay plain `.ts`; pages should be `lazy()` so an app's dependencies load
    *  only when it is opened. */
   routes: RouteObject[];
-  /** Short line shown under the app's tile, or null for nothing. */
-  useStatus?: () => string | null;
   /** Entries for the home screen's upcoming strip. */
   useUpcoming?: () => Upcoming[];
   /** Full-text search over the app's content. */

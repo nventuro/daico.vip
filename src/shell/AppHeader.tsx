@@ -1,21 +1,26 @@
 import { Link, useLocation } from 'react-router-dom';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft, type TablerIcon } from '@tabler/icons-react';
+import Motif from './Motif';
 import { parentPath } from './parentPath';
 
-export default function AppHeader({ name }: { name: string }) {
+/** The band at the top of an app's screens: full-bleed in the app's colour,
+ *  with the way back and the app's icon and name. */
+export default function AppHeader({ name, icon: Icon }: { name: string; icon?: TablerIcon }) {
   const { pathname } = useLocation();
 
   return (
-    <div className="mb-4 flex items-center gap-2">
+    <div className="relative -mx-4 mb-4 flex h-14 items-center gap-2.5 overflow-hidden bg-(--app) px-3 text-on-primary">
+      <Motif band />
       <Link
         to={parentPath(pathname)}
         aria-label="Volver"
         title="Volver"
-        className="-ml-1 rounded-lg p-1 text-muted hover:bg-border-subtle hover:text-muted-strong"
+        className="relative p-1 transition-opacity hover:opacity-80"
       >
-        <IconArrowLeft size={22} stroke={1.5} />
+        <IconArrowLeft size={22} stroke={1.75} />
       </Link>
-      <span className="font-display text-2xl font-bold tracking-tight text-(--app)">{name}</span>
+      {Icon && <Icon size={24} stroke={1.75} className="relative" />}
+      <span className="relative font-display text-2xl font-black tracking-tight">{name}</span>
     </div>
   );
 }

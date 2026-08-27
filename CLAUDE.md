@@ -163,6 +163,10 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   control or button classes in a page; a control with no component of its own
   takes its classes from `src/components/controlClasses.ts`. This is what keeps
   every app looking like one app.
+- **Rows, not cards**: a list is plain rows separated by hairlines — on each row
+  `border-b border-border`, or on the list `divide-y divide-border` — never a
+  bordered box. A group of rows is headed by `SectionLabel`; a done/undone mark
+  is `CheckSquare`. Corners are square everywhere — no `rounded-*`.
 - **Marks on a listed entry** (has notes, repeats, ...) are declared once per app in
   `src/apps/<id>/marks.ts` (`choreMarks`, `dateMarks`) as `EntryMark[]` and drawn by
   `EntryMarks` — the app's own list passes them as `ChecklistItem`'s `trailing`, and
@@ -195,9 +199,8 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   tokens only referenced at runtime). Never build a class name from data
   (no `bg-${hue}`).
 - Pages don't render the app's title or a back link — the shell's app frame does.
-- `useStatus`, `useUpcoming` and `search` on a module are optional adapters; a
-  module without them simply doesn't contribute to the home screen, the Próximo
-  page or search.
+- `useUpcoming` and `search` on a module are optional adapters; a module without
+  them simply doesn't contribute to the Próximo page or search.
   `search(query)` is a plain async function (not a hook) over the module's local
   store (`engine.listVisible`), never a network call, so search works offline.
 

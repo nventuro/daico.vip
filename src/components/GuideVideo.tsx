@@ -13,7 +13,7 @@ export default function GuideVideo({ id, start }: Props) {
 
   if (!online) {
     return (
-      <p className="my-4 rounded-lg bg-border-subtle px-3 py-2 text-sm text-muted">
+      <p className="my-4 bg-border-subtle px-3 py-2 text-sm text-muted">
         <a
           href={`${YOUTUBE_WATCH_URL}${id}&t=${start}`}
           target="_blank"
@@ -28,7 +28,7 @@ export default function GuideVideo({ id, start }: Props) {
   }
 
   return (
-    <div className="my-4 aspect-video w-full overflow-hidden rounded-lg bg-border-subtle">
+    <div className="my-4 aspect-video w-full overflow-hidden bg-border-subtle">
       <iframe
         src={`${YOUTUBE_EMBED_URL}${id}?start=${start}`}
         title="Video de YouTube"

@@ -1,5 +1,6 @@
 import { groupByDay } from '../lib/upcoming';
 import { todayIso } from '../utils/dateUtils';
+import SectionLabel from '../components/SectionLabel';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
 
@@ -16,14 +17,10 @@ export default function ProximoPage() {
         }
         return groupByDay(rows, today).map((group) => (
           <section key={group.key} className="mb-6">
-            <h2
-              className={`mb-2 text-xs font-semibold tracking-wide uppercase ${
-                group.overdue ? 'text-error' : 'text-muted'
-              }`}
-            >
+            <SectionLabel className={group.overdue ? 'text-error' : 'text-muted'}>
               {group.label}
-            </h2>
-            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
+            </SectionLabel>
+            <ul className="divide-y divide-border">
               {group.rows.map((row, i) => (
                 <UpcomingRow key={i} row={row} today={today} />
               ))}

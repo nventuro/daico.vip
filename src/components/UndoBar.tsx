@@ -11,13 +11,13 @@ export default function UndoBar({ message, actionLabel = 'Deshacer', onAction }:
   return (
     <div
       role="status"
-      className="flex items-center justify-between gap-3 rounded-xl bg-surface-inverse px-4 py-2.5 text-sm text-on-surface-inverse shadow-lg"
+      className="flex items-center justify-between gap-3 bg-surface-inverse px-4 py-2.5 text-sm text-on-surface-inverse shadow-lg"
     >
       <span>{message}</span>
       <button
         type="button"
         onClick={onAction}
-        className="font-semibold text-primary-subtle transition-colors hover:underline"
+        className="font-bold text-accent transition-colors hover:underline"
       >
         {actionLabel}
       </button>

@@ -22,12 +22,12 @@ export default function GuideChapterPage() {
   if (loading) return <p className="text-muted">Cargando...</p>;
   if (!guide || !chapter) return <p className="text-muted">Capítulo no encontrado.</p>;
 
-  const navLink = 'inline-flex max-w-[48%] items-center gap-1 text-sm text-primary hover:underline';
+  const navLink = 'inline-flex max-w-[48%] items-center gap-1 text-sm text-(--app) hover:underline';
 
   return (
     <article className="flex flex-col gap-4">
       <p className="text-sm text-muted">{guide.title}</p>
-      <h1 className="font-display text-3xl font-bold">{chapter.title}</h1>
+      <h1 className="font-display text-3xl font-black tracking-tight">{chapter.title}</h1>
       <div className="text-on-surface">
         <GuideMarkdown body={chapter.body} />
       </div>

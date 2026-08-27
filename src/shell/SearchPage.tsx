@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { SEARCH_DEBOUNCE_MS } from '../types';
 import { searchAll, type SearchGroup } from '../apps/search';
+import SectionLabel from '../components/SectionLabel';
 import { hueStyle } from './hue';
 
 interface SearchResult {
@@ -56,19 +57,13 @@ export default function SearchPage() {
   } else {
     body = result.groups.map(({ module, hits }) => (
       <section key={module.id}>
-        <h2
-          className="mb-2 text-xs font-semibold tracking-wide text-(--app) uppercase"
-          style={hueStyle(module.hue)}
-        >
+        <SectionLabel className="text-(--app)" style={hueStyle(module.hue)}>
           {module.name}
-        </h2>
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
+        </SectionLabel>
+        <ul className="divide-y divide-border">
           {hits.map((hit, i) => (
             <li key={i}>
-              <Link
-                to={hit.to}
-                className="block px-4 py-3 transition-colors hover:bg-border-subtle"
-              >
+              <Link to={hit.to} className="block py-2.5 transition-colors hover:bg-border-subtle">
                 <span className="block truncate">{hit.title}</span>
                 {hit.subtitle && (
                   <span className="block truncate text-xs text-muted">{hit.subtitle}</span>
@@ -92,7 +87,7 @@ export default function SearchPage() {
           enterKeyHint="search"
           aria-label="Buscar"
           placeholder="Buscar en todo..."
-          className="w-full rounded-full border border-border bg-surface-raised px-4 py-3 text-base outline-none placeholder:text-muted focus:border-primary"
+          className="w-full border border-border bg-surface-raised px-4 py-3 text-base outline-none placeholder:text-muted focus:border-primary"
         />
       </form>
 

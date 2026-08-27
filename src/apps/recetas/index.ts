@@ -2,7 +2,6 @@ import { lazy } from 'react';
 import { IconChefHat } from '@tabler/icons-react';
 import { RECIPES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
-import { useRecipesStatus } from './useRecipesStatus';
 import { searchRecipes } from './search';
 
 const RecipesPage = lazy(() => import('./RecipesPage'));
@@ -20,7 +19,6 @@ const recetas: AppModule = {
     { path: ':id', Component: RecipePage },
     { path: ':id/editar', Component: RecipeEditPage },
   ],
-  useStatus: useRecipesStatus,
   search: searchRecipes,
 };
 

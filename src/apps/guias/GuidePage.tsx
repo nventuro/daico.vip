@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import type { GuideChapter } from '../../types';
+import SectionLabel from '../../components/SectionLabel';
 import { useGuides } from './useGuides';
 
 /** Chapters grouped by section, preserving the store's reading order. */
@@ -26,22 +27,20 @@ export default function GuidePage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="font-display text-2xl font-bold">{guide.title}</h1>
+        <h1 className="font-display text-2xl font-black tracking-tight">{guide.title}</h1>
         {guide.description && (
           <p className="mt-1 text-sm whitespace-pre-line text-muted">{guide.description}</p>
         )}
       </div>
       {sections.map((section) => (
         <section key={section.title}>
-          <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-            {section.title}
-          </h2>
-          <ol className="divide-y divide-border rounded-xl border border-border bg-surface-raised">
+          <SectionLabel>{section.title}</SectionLabel>
+          <ol className="divide-y divide-border">
             {section.chapters.map((chapter) => (
               <li key={chapter.id}>
                 <Link
                   to={`/guias/${guide.id}/${chapter.id}`}
-                  className="block px-4 py-3 hover:bg-border-subtle"
+                  className="block py-3 hover:bg-border-subtle"
                 >
                   {chapter.title}
                 </Link>

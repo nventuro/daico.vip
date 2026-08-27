@@ -35,10 +35,10 @@ const baseComponents = {
   spoiler: ({ children }: { children?: ReactNode }) => <Spoiler>{children}</Spoiler>,
   ingredients: ({ items }: { items?: string }) => <Ingredients items={items ?? ''} />,
   h1: ({ children }: { children?: ReactNode }) => (
-    <h2 className="mt-8 mb-3 font-display text-2xl font-bold">{children}</h2>
+    <h2 className="mt-8 mb-3 font-display text-2xl font-black">{children}</h2>
   ),
   h2: ({ children }: { children?: ReactNode }) => (
-    <h3 className="mt-6 mb-2 font-display text-xl font-bold">{children}</h3>
+    <h3 className="mt-6 mb-2 font-display text-xl font-black">{children}</h3>
   ),
   h3: ({ children }: { children?: ReactNode }) => (
     <h4 className="mt-5 mb-2 text-lg font-semibold">{children}</h4>
@@ -60,7 +60,7 @@ const baseComponents = {
   ),
   hr: () => <hr className="my-6 border-border" />,
   code: ({ children }: { children?: ReactNode }) => (
-    <code className="rounded bg-border-subtle px-1 font-mono text-sm">{children}</code>
+    <code className="bg-border-subtle px-1 font-mono text-sm">{children}</code>
   ),
   table: ({ children }: { children?: ReactNode }) => (
     <div className="my-4 overflow-x-auto">

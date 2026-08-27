@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
 import { UPCOMING_MAX_ROWS } from '../types';
 import { todayIso } from '../utils/dateUtils';
+import SectionLabel from '../components/SectionLabel';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
 
@@ -15,26 +16,22 @@ export default function UpcomingStrip() {
     <UpcomingRows>
       {(rows) =>
         rows.length > 0 && (
-          <section className="mb-6">
-            <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-              Próximo
-            </h2>
-            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
+          <section>
+            <SectionLabel>Próximo</SectionLabel>
+            <ul className="divide-y divide-border">
               {rows.slice(0, UPCOMING_MAX_ROWS).map((row, i) => (
                 <UpcomingRow key={i} row={row} today={today} />
               ))}
-              {rows.length > UPCOMING_MAX_ROWS && (
-                <li>
-                  <Link
-                    to="/proximo"
-                    className="flex items-center justify-center gap-1 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-border-subtle"
-                  >
-                    Ver todo
-                    <IconChevronRight size={16} stroke={2} />
-                  </Link>
-                </li>
-              )}
             </ul>
+            {rows.length > UPCOMING_MAX_ROWS && (
+              <Link
+                to="/proximo"
+                className="mt-2.5 flex items-center justify-end gap-1 text-sm font-medium transition-opacity hover:opacity-70"
+              >
+                Ver todo
+                <IconChevronRight size={14} stroke={2.25} />
+              </Link>
+            )}
           </section>
         )
       }

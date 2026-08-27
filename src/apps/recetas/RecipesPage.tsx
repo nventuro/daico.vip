@@ -40,15 +40,12 @@ export default function RecipesPage() {
         ) : items.length === 0 ? (
           <p className="py-10 text-center text-muted">Todavía no hay recetas.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul>
             {items.map((recipe) => {
               const meta = metaLine(recipe);
               return (
-                <li
-                  key={recipe.id}
-                  className="rounded-xl border border-border bg-surface-raised shadow-sm"
-                >
-                  <Link to={`/recetas/${recipe.id}`} className="flex flex-col px-4 py-3">
+                <li key={recipe.id} className="border-b border-border">
+                  <Link to={`/recetas/${recipe.id}`} className="flex flex-col py-2.5">
                     <span className="truncate text-on-surface">{recipe.title}</span>
                     {meta && <span className="mt-0.5 text-xs text-muted">{meta}</span>}
                   </Link>

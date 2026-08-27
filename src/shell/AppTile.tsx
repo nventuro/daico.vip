@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { AppModule } from '../apps/types';
 import { hueStyle } from './hue';
-import TileStatus from './TileStatus';
+import Motif from './Motif';
 
 export default function AppTile({ app }: { app: AppModule }) {
   const Icon = app.icon;
@@ -10,12 +10,12 @@ export default function AppTile({ app }: { app: AppModule }) {
     <Link
       to={`/${app.id}`}
       style={hueStyle(app.hue)}
-      className="flex aspect-square flex-col items-center justify-center gap-3 rounded-2xl bg-(--app) p-4 text-on-primary transition-opacity hover:opacity-90 active:opacity-80"
+      className="relative flex aspect-square flex-col items-center justify-center gap-2 overflow-hidden bg-(--app) p-4 text-on-primary transition-opacity hover:opacity-90 active:opacity-80"
     >
-      <Icon size={36} stroke={1.5} />
-      <span className="flex max-w-full min-w-0 flex-col items-center text-center">
-        <span className="font-display text-lg font-bold">{app.name}</span>
-        {app.useStatus && <TileStatus useStatus={app.useStatus} />}
+      <Motif />
+      <Icon size={36} stroke={1.75} className="relative" />
+      <span className="relative max-w-full truncate font-display text-2xl font-black">
+        {app.name}
       </span>
     </Link>
   );

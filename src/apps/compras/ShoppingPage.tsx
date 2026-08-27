@@ -98,7 +98,7 @@ export default function ShoppingPage() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-              <ul className="space-y-2">
+              <ul>
                 {view.map((item) => (
                   <SortableShoppingItem
                     key={item.id}

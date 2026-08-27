@@ -31,14 +31,9 @@ export default function GuideImage({ imageKey, width, align }: Props) {
   return (
     <figure className={`my-4 flex ${JUSTIFY[align] ?? JUSTIFY.center}`}>
       {src ? (
-        <img
-          src={src}
-          alt=""
-          className="h-auto max-w-full rounded-lg"
-          style={{ width: `${width}%` }}
-        />
+        <img src={src} alt="" className="h-auto max-w-full" style={{ width: `${width}%` }} />
       ) : (
-        <span className="rounded-lg bg-border-subtle px-3 py-2 text-sm text-muted">
+        <span className="bg-border-subtle px-3 py-2 text-sm text-muted">
           {src === null ? 'Imagen no disponible sin conexión' : 'Cargando imagen...'}
         </span>
       )}

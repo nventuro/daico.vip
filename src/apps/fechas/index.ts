@@ -2,7 +2,6 @@ import { lazy } from 'react';
 import { IconCalendarEvent } from '@tabler/icons-react';
 import { DATES_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
-import { useDatesStatus } from './useDatesStatus';
 import { useDatesUpcoming } from './useDatesUpcoming';
 import { searchDates } from './search';
 
@@ -19,7 +18,6 @@ const fechas: AppModule = {
     { index: true, Component: DatesPage },
     { path: ':id', Component: DateEditPage },
   ],
-  useStatus: useDatesStatus,
   useUpcoming: useDatesUpcoming,
   search: searchDates,
 };

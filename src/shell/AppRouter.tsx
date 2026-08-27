@@ -25,7 +25,7 @@ const routes: RouteObject[] = [
       },
       ...apps.map((app) => ({
         path: app.id,
-        element: <AppFrame name={app.name} hue={app.hue} />,
+        element: <AppFrame name={app.name} hue={app.hue} icon={app.icon} />,
         children: app.routes,
       })),
     ],

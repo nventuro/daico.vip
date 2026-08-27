@@ -9,10 +9,12 @@ export default function TabConflict() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface px-4 text-on-surface">
       <div className="w-full max-w-sm text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-border-subtle text-muted">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center border border-border bg-surface-raised text-muted">
           <IconAppWindow size={28} stroke={1.5} />
         </div>
-        <h2 className="mb-2 text-xl font-semibold">Ya está abierto en otra pestaña</h2>
+        <h2 className="mb-2 font-display text-2xl font-black tracking-tight">
+          Ya está abierto en otra pestaña
+        </h2>
         <p className="mb-8 text-muted">
           Daico ya está abierto en otra pestaña o ventana. Seguí ahí, o cerrala y recargá acá.
         </p>

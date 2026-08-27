@@ -27,37 +27,32 @@ export default function MainLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b-2 border-on-surface bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <span className="flex items-center gap-2">
-            <img src="/mark.png" alt="" className="h-7 w-7" />
-            <span className="font-display text-xl font-extrabold tracking-tight text-primary">
-              Daico
-            </span>
-          </span>
+          <span className="font-display text-2xl font-black tracking-tight">daico</span>
           <div className="flex items-center gap-1">
             <Link
               to="/buscar"
               aria-label="Buscar"
               title="Buscar"
-              className="flex items-center rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong"
+              className="flex items-center px-2 py-1 text-on-surface transition-opacity hover:opacity-70"
             >
-              <IconSearch size={18} stroke={1.5} />
+              <IconSearch size={20} stroke={1.75} />
             </Link>
             <button
               onClick={signOut}
               disabled={!online}
               aria-label="Cerrar sesión"
               title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted transition-colors hover:bg-border-subtle hover:text-muted-strong disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent disabled:hover:text-disabled"
+              className="flex items-center px-2 py-1 text-on-surface transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:text-disabled disabled:hover:opacity-100"
             >
-              <IconLogout size={18} stroke={1.5} />
+              <IconLogout size={20} stroke={1.75} />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-6">
         <Outlet />
       </main>
     </div>
