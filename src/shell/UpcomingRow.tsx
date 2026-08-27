@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Upcoming } from '../apps/types';
 import { apps } from '../apps/registry';
+import EntryMarks from '../components/EntryMarks';
 import { daysUntil, relativeDay } from '../utils/dateUtils';
 import { hueStyle } from './hue';
 
@@ -19,6 +20,7 @@ export default function UpcomingRow({ row, today }: { row: Upcoming; today: stri
           style={hueStyle(app?.hue ?? 'primary')}
         />
         <span className="min-w-0 flex-1 truncate">{row.title}</span>
+        <EntryMarks marks={row.marks} />
         <span className={`shrink-0 text-sm ${past ? 'text-error' : 'text-muted'}`}>
           {relativeDay(today, row.on)}
         </span>

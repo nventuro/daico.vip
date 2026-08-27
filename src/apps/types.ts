@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 import type { TableSpec } from '../lib/offline/specs';
+import type { EntryMark } from '../types';
 
 export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas' | 'recetas';
 
@@ -28,6 +29,7 @@ export interface Upcoming {
   on: string;
   to: string;
   appId: AppId;
+  marks?: EntryMark[];
 }
 
 /** What the shell needs from a feature to mount it: identity, looks, the

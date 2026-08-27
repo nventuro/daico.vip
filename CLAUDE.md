@@ -163,6 +163,12 @@ Chromium-only APIs are available everywhere.
   control or button classes in a page; a control with no component of its own
   takes its classes from `src/components/controlClasses.ts`. This is what keeps
   every app looking like one app.
+- **Marks on a listed entry** (has notes, repeats, ...) are declared once per app in
+  `src/apps/<id>/marks.ts` (`choreMarks`, `dateMarks`) as `EntryMark[]` and drawn by
+  `EntryMarks` — the app's own list passes them as `ChecklistItem`'s `trailing`, and
+  its `useUpcoming` sets them on each `Upcoming`, so Próximo shows the same marks.
+  Never draw an ad-hoc icon on a row: a mark that is not in `marks.ts` is missing
+  from Próximo. A new kind of mark is a new `EntryMark` member plus its icon.
 - **Nothing is destroyed on a single tap**: a delete goes through `FormFooter`'s
   confirm, or is reversible for a moment through `UndoBar` (`useUndo`).
 - **No duplicated logic**: extract shared computation; check for existing helpers first.

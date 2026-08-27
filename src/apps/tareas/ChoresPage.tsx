@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { IconNotes } from '@tabler/icons-react';
 import { UNDO_MS, type Chore } from '../../types';
 import { useChores } from './useChores';
 import { relativeDay, todayIso } from '../../utils/dateUtils';
 import { useUndo } from '../../hooks/useUndo';
 import OfflineBanner from '../../components/OfflineBanner';
 import ChecklistItem from '../../components/ChecklistItem';
+import EntryMarks from '../../components/EntryMarks';
 import CompletedSection from '../../components/CompletedSection';
 import AddBar from '../../components/AddBar';
 import UndoBar from '../../components/UndoBar';
 import DueDateChips from './DueDateChips';
+import { choreMarks } from './marks';
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, setDone } = useChores();
@@ -57,11 +58,7 @@ export default function ChoresPage() {
             </span>
           ) : undefined
         }
-        trailing={
-          chore.notes ? (
-            <IconNotes size={16} stroke={1.5} className="shrink-0 text-muted" aria-label="Tiene notas" />
-          ) : undefined
-        }
+        trailing={<EntryMarks marks={choreMarks(chore)} />}
         onToggle={() => toggle(chore)}
         toggleLabel={chore.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
       />

@@ -9,6 +9,10 @@ export function sortUpcoming(items: Upcoming[]): Upcoming[] {
   );
 }
 
+function sameMarks(a: Upcoming['marks'] = [], b: Upcoming['marks'] = []): boolean {
+  return a.length === b.length && a.every((mark, i) => mark === b[i]);
+}
+
 /** Whether two lists hold the same entries in the same order. */
 export function sameUpcoming(a: Upcoming[], b: Upcoming[]): boolean {
   return (
@@ -19,7 +23,8 @@ export function sameUpcoming(a: Upcoming[], b: Upcoming[]): boolean {
         item.title === other.title &&
         item.on === other.on &&
         item.to === other.to &&
-        item.appId === other.appId
+        item.appId === other.appId &&
+        sameMarks(item.marks, other.marks)
       );
     })
   );

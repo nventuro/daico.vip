@@ -24,6 +24,8 @@ describe('sameUpcoming', () => {
     expect(sameUpcoming([chore, birthday], [birthday, chore])).toBe(false);
     expect(sameUpcoming([chore], [chore, birthday])).toBe(false);
     expect(sameUpcoming([chore], [{ ...chore, on: '2026-03-15' }])).toBe(false);
+    expect(sameUpcoming([chore], [{ ...chore, marks: ['notes'] }])).toBe(false);
+    expect(sameUpcoming([{ ...chore, marks: ['notes'] }], [{ ...chore, marks: ['notes'] }])).toBe(true);
     expect(sameUpcoming([], [])).toBe(true);
   });
 });

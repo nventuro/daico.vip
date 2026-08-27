@@ -79,6 +79,12 @@ export interface GuideChapter {
   updated_at: string;
 }
 
+/**
+ * A fact about an entry that is drawn as a small icon on its row wherever the
+ * entry is listed — in its app and on the home screen alike.
+ */
+export type EntryMark = 'notes' | 'repeat';
+
 /** How a date repeats: never, every year, or every `repeat_months` months. */
 export const REPEAT_KINDS = ['none', 'yearly', 'months'] as const;
 export type RepeatKind = (typeof REPEAT_KINDS)[number];
