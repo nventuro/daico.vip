@@ -1,0 +1,108 @@
+// =============================================================================
+// What a statement holds once read from the bank's PDF. Each layout the app
+// knows has a parser under parsers/, tried in turn on the positioned words of
+// the pages; the result is the contents that get sealed into the row's
+// payload. Nothing here touches the store.
+// =============================================================================
+import type { StatementFormat } from '../../types';
+
+/** A word of a PDF page with its horizontal extent, in page units. A layout
+ *  is read by where a word sits as much as by what it says. */
+export interface PositionedWord {
+  text: string;
+  x0: number;
+  x1: number;
+}
+
+/** The words of one line of a page, left to right. */
+export type PageLine = PositionedWord[];
+
+/** One movement on the statement: a purchase, one installment of one, or a
+ *  charge of the bank's own. */
+export interface StatementLine {
+  /** yyyy-mm-dd */
+  on: string;
+  /** Who made it, as the bank prints the name; null for the bank's own charges. */
+  holder: string | null;
+  /** The merchant line as printed. */
+  description: string;
+  /** Which installment of how many, for a purchase paid in several. */
+  installment: { number: number; of: number } | null;
+  ars_cents: number;
+  usd_cents: number;
+  /** A charge of the bank's own — a tax withheld — rather than a purchase. */
+  charge: boolean;
+  /** Set apart from the month's usual spending, by the user. */
+  one_off: boolean;
+}
+
+/** One card on the statement and what it spent. */
+export interface StatementHolder {
+  holder: string;
+  /** The card's last four digits, on the layouts that print them. */
+  last4: string | null;
+  ars_cents: number;
+  usd_cents: number;
+}
+
+/** One month of installments still to come. */
+export interface InstallmentDue {
+  /** yyyy-mm */
+  month: string;
+  ars_cents: number;
+  /** This amount every month from `month` on, rather than in that month alone. */
+  onward: boolean;
+}
+
+/** Everything read from a statement; what the payload seals. */
+export interface StatementContents {
+  schema: number;
+  format: StatementFormat;
+  /** The bank's own number for it. */
+  number: string;
+  closed_on: string;
+  due_on: string;
+  /** What the previous statement came to. */
+  previous_ars_cents: number;
+  previous_usd_cents: number;
+  /** Of the previous statement, what was left unpaid and carried into the total. */
+  pending_ars_cents: number;
+  pending_usd_cents: number;
+  minimum_ars_cents: number | null;
+  total_ars_cents: number;
+  total_usd_cents: number;
+  /** Pesos per dollar the bank valued the dollar spend at, when it can be told. */
+  usd_rate: number | null;
+  holders: StatementHolder[];
+  lines: StatementLine[];
+  installments_due: InstallmentDue[];
+}
+
+/** A PDF of a known layout that could not be read whole; the message says
+ *  why, in the user's words. Nothing of it is kept. */
+export class StatementError extends Error {}
+
+/** Thrown by a parser whose layout the pages do not follow, so the next one
+ *  is tried. */
+export class UnknownLayout extends Error {
+  constructor() {
+    super('Not this layout');
+  }
+}
+
+/** `contents` with a line marked one-off wherever `previous` had the same
+ *  movement marked — for a statement imported again. */
+export function withOneOffsFrom(
+  contents: StatementContents,
+  previous: StatementContents,
+): StatementContents {
+  const key = (line: StatementLine) =>
+    [line.on, line.holder ?? '', line.description, line.ars_cents, line.usd_cents].join(' ');
+  const marked = new Set(previous.lines.filter((line) => line.one_off).map(key));
+  return {
+    ...contents,
+    lines: contents.lines.map((line) =>
+      marked.has(key(line)) ? { ...line, one_off: true } : line,
+    ),
+  };
+}

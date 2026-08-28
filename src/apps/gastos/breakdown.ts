@@ -1,0 +1,128 @@
+// =============================================================================
+// The sums a statement is read through: by category, by who spent, the
+// usual against the one-off, and month by month across statements. All in
+// pesos, a dollar line valued at its own statement's rate.
+// =============================================================================
+import type { SpendingCategory, StatementFormat } from '../../types';
+import { categoryOf, type Rule } from './rules';
+import type { StatementContents, StatementLine } from './statement';
+
+/** Pesos and dollars as pesos, the dollars valued at `usdRate`; dollars
+ *  count for nothing when the rate is unknown. */
+export function inPesos(arsCents: number, usdCents: number, usdRate: number | null): number {
+  return arsCents + (usdRate === null ? 0 : Math.round(usdCents * usdRate));
+}
+
+/** A line's amount in pesos. */
+export function lineCents(line: StatementLine, usdRate: number | null): number {
+  return inPesos(line.ars_cents, line.usd_cents, usdRate);
+}
+
+/** What a statement comes to in pesos. */
+export function totalCents(contents: StatementContents): number {
+  return contents.lines.reduce((acc, line) => acc + lineCents(line, contents.usd_rate), 0);
+}
+
+/** One category's share of a statement: its total and the lines in it, by
+ *  their index in the statement. */
+export interface CategoryShare {
+  category: SpendingCategory | null;
+  cents: number;
+  lines: number[];
+}
+
+/** A statement by category, largest first; the lines nothing places come as
+ *  the null category. */
+export function byCategory(contents: StatementContents, rules: Rule[]): CategoryShare[] {
+  const shares = new Map<SpendingCategory | null, CategoryShare>();
+  contents.lines.forEach((line, i) => {
+    const { category } = categoryOf(line, rules);
+    const share = shares.get(category) ?? { category, cents: 0, lines: [] };
+    share.cents += lineCents(line, contents.usd_rate);
+    share.lines.push(i);
+    shares.set(category, share);
+  });
+  return [...shares.values()].sort((a, b) => b.cents - a.cents);
+}
+
+/** What the usual spending and the one-offs come to. */
+export function usualAndOneOff(contents: StatementContents): { usual: number; oneOff: number } {
+  let usual = 0;
+  let oneOff = 0;
+  for (const line of contents.lines) {
+    const value = lineCents(line, contents.usd_rate);
+    if (line.one_off) oneOff += value;
+    else usual += value;
+  }
+  return { usual, oneOff };
+}
+
+/** What each card spent, in pesos, in the statement's order; the bank's own
+ *  charges come last under a null holder. */
+export function byHolder(
+  contents: StatementContents,
+): { holder: string | null; last4: string | null; cents: number }[] {
+  const rows: { holder: string | null; last4: string | null; cents: number }[] =
+    contents.holders.map((h) => ({
+      holder: h.holder,
+      last4: h.last4,
+      cents:
+        h.ars_cents +
+        (contents.usd_rate === null ? 0 : Math.round(h.usd_cents * contents.usd_rate)),
+    }));
+  const charges = contents.lines
+    .filter((line) => line.charge)
+    .reduce((acc, line) => acc + lineCents(line, contents.usd_rate), 0);
+  if (charges !== 0) rows.push({ holder: null, last4: null, cents: charges });
+  return rows;
+}
+
+/** The indices of the lines that are installments. */
+export function installmentLines(contents: StatementContents): number[] {
+  return contents.lines.flatMap((line, i) => (line.installment ? [i] : []));
+}
+
+/** `part` as a whole percentage of `whole`; 0 when there is no whole. */
+export function percent(part: number, whole: number): number {
+  return whole === 0 ? 0 : Math.round((part / whole) * 100);
+}
+
+/** The yyyy-mm a statement belongs to: the month it closed. */
+export function monthOf(contents: Pick<StatementContents, 'closed_on'>): string {
+  return contents.closed_on.slice(0, 7);
+}
+
+/** What to sum month by month: everything, the usual spending alone, or one category. */
+export type TrendPick = 'total' | 'usual' | SpendingCategory;
+
+/** One month across every statement that closed in it. */
+export interface MonthTotal {
+  /** yyyy-mm */
+  month: string;
+  cents: number;
+  usual: number;
+  oneOff: number;
+  /** The layouts of the statements the month has. */
+  formats: StatementFormat[];
+}
+
+/** Every month with a statement, newest first, summing what `pick` names. */
+export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick): MonthTotal[] {
+  const months = new Map<string, MonthTotal>();
+  for (const contents of all) {
+    const month = monthOf(contents);
+    const row = months.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0, formats: [] };
+    if (!row.formats.includes(contents.format)) row.formats.push(contents.format);
+    for (const line of contents.lines) {
+      if (pick === 'usual' && line.one_off) continue;
+      if (pick !== 'total' && pick !== 'usual' && categoryOf(line, rules).category !== pick)
+        continue;
+      const value = lineCents(line, contents.usd_rate);
+      row.cents += value;
+      if (line.one_off) row.oneOff += value;
+      else row.usual += value;
+    }
+    months.set(month, row);
+  }
+  return [...months.values()].sort((a, b) => b.month.localeCompare(a.month));
+}

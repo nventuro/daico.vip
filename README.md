@@ -193,6 +193,38 @@ margin a passport often needs) and stays there once expired, until the expiry is
 updated or cleared. Every document's files are kept on every device, so a
 document can be seen with no connection wherever it was added.
 
+## Gastos
+
+Credit-card statements, read on the device from the PDF the bank sends
+(`src/apps/gastos/`). The row in `statements` keeps in the clear only what
+lists it — the layout it was read with (`format`), its closing and due dates,
+its two totals — and everything else (every purchase, who made it, the
+installments to come) travels in `payload`: the parsed statement, gzipped and
+encrypted under the household key exactly like an attachment's file. The PDF
+itself is not kept. A parser per layout lives in `src/apps/gastos/parsers/`
+(Galicia Visa and Galicia Mastercard so far), each tried in turn on the
+positioned words pdf.js extracts; an import whose lines do not add up to the
+printed totals, or whose layout is unknown, is refused and nothing is saved. A
+statement already imported (same layout, same closing date) is replaced on
+request, keeping its one-off marks.
+
+Each purchase is filed under one of a fixed set of categories by **merchant
+rules** (`merchant_rules`: an encrypted pattern, a category in the clear): a
+rule matches when its pattern is contained in the merchant's key — the
+printed merchant line without processor prefixes, reference numbers and
+currency tails — longest rule winning; what no rule places is listed as «Sin
+categoría». There is no built-in list of merchants: where the household shops
+is private, so every rule is its own, written from a line of a statement or
+pasted in bulk on the Reglas page (one per line, the category last). The
+bank's own charges are always `impuestos`. Rules apply on display, so a new
+rule refiles every statement at once. Any line can be marked **puntual** (a one-off), a mark
+kept inside the statement's payload; every view splits spending into base
+and one-offs. The statement page shows the total, the split, the categories
+with their lines and the change against the previous statement of the same
+card, who spent what, and the installments; Tendencias sums every statement
+month by month, in pesos with dollars valued at each statement's own rate. A
+statement shows in Próximo from `STATEMENT_NOTICE_DAYS` before its due date.
+
 ## Markdown dialect
 
 Guide chapters and recipe bodies share one reader (`src/components/Markdown.tsx`):

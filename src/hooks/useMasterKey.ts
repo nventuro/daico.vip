@@ -33,7 +33,11 @@ function subscribe(listener: () => void): () => void {
 
 /** The master key state, kept current as the device unlocks or locks. */
 export function useMasterKey(): MasterKeyState {
-  return useSyncExternalStore(subscribe, () => state);
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  );
 }
 
 /** The master key in hand right now, for code outside React; null while locked. */

@@ -186,6 +186,37 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `attachmentFiles.test.ts` (real SQLite + the fake server's `storage`). A
   change to the file format, the queue states or the sweep must come with one.
 
+## Statements (Gastos) — read before touching them
+
+- **A statement's contents never reach the server in the clear.** The
+  `statements` row carries only `format`, `closed_on`, `due_on` and the two
+  totals; every purchase, holder name and installment lives in `payload`,
+  sealed by `src/apps/gastos/payload.ts` (gzip, then `encryptFile` from
+  `householdKey.ts` — never other crypto) and opened on the device with the
+  master key. A merchant rule's `pattern` is sealed the same way. Keep it so:
+  never add a column that names a merchant, a holder or an amount of a line,
+  and never log or persist opened contents outside the in-memory caches the
+  hooks keep.
+- **The payload is pulled with the table**, so it must stay a few KB: keep
+  the compression, and keep bulky data (the PDF itself) out — no PDF is ever
+  stored. `STATEMENT_CONTENTS_SCHEMA` is bumped when the sealed shape changes.
+- **One parser per bank layout** in `src/apps/gastos/parsers/`, reading the
+  positioned words `pdfWords.ts` gets from pdf.js (loaded only on import). A
+  parser throws `UnknownLayout` when the pages are not its own and a
+  `StatementError` (a message in the user's words) when they are but do not
+  reconcile with the printed totals; an import that fails saves nothing.
+  Column positions are named constants at the top of each parser.
+- **Never commit a real statement**, nor a fixture derived from one: the
+  parser tests build synthetic pages with `parsers/fixture.ts` and invented
+  holders. The privacy rule below applies to test data too.
+- **Categories are the fixed `SPENDING_CATEGORIES`**; a new one is a new
+  member plus its label in `labels.ts`. Filing is done on display by
+  `rules.ts` (the household's own rules only, longest wins; bank charges are
+  always `impuestos`) — nothing stores a category on a line, so a rule change
+  refiles every statement at once. **Never add a built-in merchant list**: the
+  repo is public and where the household shops is private; rules are loaded in
+  bulk on the Reglas page instead.
+
 ## Privacy — the code is public, the data is private
 
 - This repository is public; the database is private. **Never reference any real

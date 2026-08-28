@@ -33,6 +33,8 @@ describe('apps registry', () => {
       'dates',
       'recipes',
       'documents',
+      'statements',
+      'merchant_rules',
     ]);
     expect(new Set(tables).size).toBe(tables.length);
   });

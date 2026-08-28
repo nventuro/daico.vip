@@ -26,6 +26,7 @@
     "@tabler/icons-react": "^3.36.1",
     "@tailwindcss/vite": "^4.1.18",
     "fractional-indexing": "^4.0.0",
+    "pdfjs-dist": "^6.2.108",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-image-crop": "^11.1.2",

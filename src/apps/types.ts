@@ -3,7 +3,7 @@ import type { TablerIcon } from '@tabler/icons-react';
 import type { TableSpec } from '../lib/offline/specs';
 import type { EntryMark } from '../types';
 
-export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas' | 'recetas' | 'documentos';
+export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas' | 'recetas' | 'documentos' | 'gastos';
 
 /** Colour token name (`--color-<hue>` in the theme) an app is painted with. */
 export type AppHue =
@@ -13,7 +13,8 @@ export type AppHue =
   | 'app-recetas'
   | 'app-viajes'
   | 'app-fechas'
-  | 'app-documentos';
+  | 'app-documentos'
+  | 'app-gastos';
 
 /** One result of an app's `search`. */
 export interface SearchHit {

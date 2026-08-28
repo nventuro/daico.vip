@@ -109,6 +109,32 @@ export const DOCUMENTS_SPEC: TableSpec = {
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
+export const STATEMENTS_SPEC: TableSpec = {
+  table: 'statements',
+  columns: [
+    { name: 'format', ddl: 'TEXT NOT NULL' },
+    // yyyy-mm-dd, like dates.occurs_on.
+    { name: 'closed_on', ddl: 'TEXT NOT NULL' },
+    { name: 'due_on', ddl: 'TEXT NOT NULL' },
+    { name: 'total_ars_cents', ddl: 'INTEGER NOT NULL' },
+    { name: 'total_usd_cents', ddl: 'INTEGER NOT NULL' },
+    { name: 'wrapped_key', ddl: 'TEXT NOT NULL' },
+    // Base64 of the encrypted contents: a few KB, small enough to travel with the row.
+    { name: 'payload', ddl: 'TEXT NOT NULL' },
+  ],
+  orderBy: 'closed_on DESC, format ASC',
+};
+
+export const MERCHANT_RULES_SPEC: TableSpec = {
+  table: 'merchant_rules',
+  columns: [
+    { name: 'wrapped_key', ddl: 'TEXT NOT NULL' },
+    { name: 'pattern', ddl: 'TEXT NOT NULL' },
+    { name: 'category', ddl: 'TEXT NOT NULL' },
+  ],
+  orderBy: 'created_at ASC',
+};
+
 export const HOUSEHOLD_KEY_SPEC: TableSpec = {
   table: 'household_key',
   columns: [
@@ -147,4 +173,6 @@ export const ALL_SPECS: TableSpec[] = [
   DATES_SPEC,
   RECIPES_SPEC,
   DOCUMENTS_SPEC,
+  STATEMENTS_SPEC,
+  MERCHANT_RULES_SPEC,
 ];

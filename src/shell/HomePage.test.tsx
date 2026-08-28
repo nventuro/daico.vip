@@ -11,12 +11,21 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs).toEqual(['/tareas', '/compras', '/guias', '/fechas', '/recetas', '/documentos']);
+    expect(hrefs).toEqual([
+      '/tareas',
+      '/compras',
+      '/guias',
+      '/fechas',
+      '/recetas',
+      '/documentos',
+      '/gastos',
+    ]);
     expect(html).toContain('Tareas');
     expect(html).toContain('Compras');
     expect(html).toContain('Guías');
     expect(html).toContain('Fechas');
     expect(html).toContain('Recetas');
     expect(html).toContain('Documentos');
+    expect(html).toContain('Gastos');
   });
 });

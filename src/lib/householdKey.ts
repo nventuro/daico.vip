@@ -43,11 +43,20 @@ export interface EncryptedFile {
   wrappedFileKey: string;
 }
 
-function toBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
+// Spread in slices: a whole file's worth of arguments overruns the call stack.
+const BASE64_CHUNK = 0x8000;
+
+/** Bytes as base64 text, the form a text column carries them in. */
+export function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK));
+  }
+  return btoa(binary);
 }
 
-function fromBase64(text: string): Uint8Array<ArrayBuffer> {
+/** The bytes a base64 text stands for. */
+export function fromBase64(text: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(text), (ch) => ch.charCodeAt(0));
 }
 

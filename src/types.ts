@@ -85,7 +85,7 @@ export interface GuideChapter {
  * stands for attachments: to the row, something written and something attached
  * are the same thing.
  */
-export type EntryMark = 'notes' | 'repeat';
+export type EntryMark = 'notes' | 'repeat' | 'oneOff';
 
 /** The kinds of entry an attachment can belong to. */
 export const ATTACHMENT_OWNER_KINDS = ['chore', 'document'] as const;
@@ -203,6 +203,76 @@ export interface DocumentEntry {
   expires_on: string | null;
   /** How many days ahead of its expiry the document shows on the home screen. */
   notice_days: number;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
+/** The credit-card statement layouts the app can read. */
+export const STATEMENT_FORMATS = ['galicia-visa', 'galicia-mastercard'] as const;
+export type StatementFormat = (typeof STATEMENT_FORMATS)[number];
+
+/** What a purchase is filed under. A fixed set: a merchant rule names one. */
+export const SPENDING_CATEGORIES = [
+  'salidas',
+  'supermercado',
+  'salud',
+  'auto',
+  'hogar',
+  'suscripciones',
+  'entretenimiento',
+  'compras',
+  'viajes',
+  'mascotas',
+  'transporte',
+  'impuestos',
+  'otros',
+] as const;
+export type SpendingCategory = (typeof SPENDING_CATEGORIES)[number];
+
+/**
+ * One credit-card statement, read on the device from the bank's PDF. The row
+ * keeps in the clear only what lists it and announces its due date; the
+ * statement itself — every purchase, who made it, the installments to come —
+ * is `payload`, compressed and encrypted under a key of its own wrapped under
+ * the household's master key, like an attachment's file. Like every
+ * offline-synced row, `id` is a client-generated UUID and `updated_at` is the
+ * last-write-wins key.
+ */
+export interface Statement {
+  id: string;
+  format: StatementFormat;
+  /** The day the bank closed it (yyyy-mm-dd). */
+  closed_on: string;
+  /** The day it is debited (yyyy-mm-dd). */
+  due_on: string;
+  total_ars_cents: number;
+  total_usd_cents: number;
+  /** Base64: the payload's own key, wrapped under the household's master key. */
+  wrapped_key: string;
+  /** Base64: the statement's contents, compressed then encrypted. */
+  payload: string;
+  /** ISO timestamp. */
+  created_at: string;
+  /** ISO timestamp; the last-write-wins conflict key. */
+  updated_at: string;
+}
+
+/**
+ * Files every purchase whose merchant contains `pattern` under `category`, in
+ * every statement. The pattern names where the household shops, so it is
+ * encrypted like a statement's contents; the category alone says nothing.
+ * Like every offline-synced row, `id` is a client-generated UUID and
+ * `updated_at` is the last-write-wins key.
+ */
+export interface MerchantRule {
+  id: string;
+  /** Base64: the pattern's own key, wrapped under the household's master key. */
+  wrapped_key: string;
+  /** Base64: the pattern, encrypted. */
+  pattern: string;
+  category: SpendingCategory;
   /** ISO timestamp. */
   created_at: string;
   /** ISO timestamp; the last-write-wins conflict key. */
@@ -332,6 +402,27 @@ export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 /** Objects fetched per page when listing the attachments bucket. */
 export const ATTACHMENT_LIST_PAGE = 1000;
+
+/** How many days ahead of its due date a statement shows on the home screen. */
+export const STATEMENT_NOTICE_DAYS = 7;
+
+/** Under this many pesos (in cents) an amount written in thousands keeps a
+ *  decimal ("45,7k"); from here on it is whole thousands ("1.235k"). */
+export const COMPACT_AMOUNT_DECIMAL_BELOW_CENTS = 100_000 * 100;
+
+/** Largest PDF taken as a statement, in bytes (input guard). */
+export const STATEMENT_PDF_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Longest merchant pattern a rule takes (input guard). */
+export const MERCHANT_PATTERN_MAX = 60;
+
+/** The most installments a purchase is ever split into. A statement marks an
+ *  installment "3/6"; a "07/26" past this count is a period, not one. */
+export const INSTALLMENTS_MAX = 24;
+
+/** Shape of a statement's contents as sealed in its payload; bump it when
+ *  the shape changes, so an older payload is told apart. */
+export const STATEMENT_CONTENTS_SCHEMA = 1;
 
 /** Words in the household phrase. */
 export const HOUSEHOLD_PHRASE_WORDS = 6;
