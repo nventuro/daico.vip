@@ -80,13 +80,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
 
-  /* The splash in index.html paints before any script runs and stays until
-     React has drawn something into the root, whatever screen that turns out
-     to be. */
-  #root:not(:empty) + #splash {
-    display: none;
-  }
+/* The splash in index.html paints before any script runs and stays until React
+   has drawn something into the root, whatever screen that turns out to be.
+   Outside every layer on purpose: the splash is laid out with utilities, and
+   only an unlayered rule outranks them. */
+#root:not(:empty) + #splash {
+  display: none;
 }
 
 /* Per-app accent colours. `static` because these tokens are only ever

@@ -11,6 +11,7 @@
 // The tables are tiny, so a full pull every sync is simpler than tracking a
 // server-side watermark and is plenty fast.
 // =============================================================================
+import { SYNC_FRESH_MS } from '../../types';
 import { supabase } from '../supabase';
 import { ALL_SPECS, type TableSpec } from './specs';
 import * as engine from './engine';
@@ -97,6 +98,7 @@ export function reportFiles(done: number, total: number): void {
 /** Forget that this device ever completed a run — for when its data is wiped. */
 export function resetSyncStatus(): void {
   writeCompletedAt(null);
+  lastRunAt = null;
   setStatus({ tables: {}, files: null, completedAt: null });
 }
 
@@ -106,6 +108,8 @@ export function resetSyncStatus(): void {
 // afterwards so the latest local changes always get a chance to push.
 let syncing = false;
 let rerun = false;
+// When the last run ended, whatever came of it; null until one has.
+let lastRunAt: number | null = null;
 
 // Work that belongs to a sync but lives beside the tables — files in a storage
 // bucket — runs once every table has had its turn, so it sees the pulled rows.
@@ -171,9 +175,19 @@ export async function syncAll(): Promise<void> {
       setStatus({ completedAt });
     }
   } finally {
+    lastRunAt = Date.now();
     syncing = false;
     setStatus({ syncing: false });
   }
+}
+
+/** Sync unless a run is going on or one ended within SYNC_FRESH_MS. For a
+ *  screen that opens: it wants what is on the server, but moving around the
+ *  app must not sync at every tap. Reconnecting, coming back to the app and
+ *  a local change ask for a run outright. */
+export async function syncIfStale(): Promise<void> {
+  if (syncing || (lastRunAt !== null && Date.now() - lastRunAt < SYNC_FRESH_MS)) return;
+  await syncAll();
 }
 
 async function syncTable(spec: TableSpec): Promise<void> {

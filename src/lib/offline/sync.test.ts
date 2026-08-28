@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Chore } from '../../types';
+import { SYNC_FRESH_MS, type Chore } from '../../types';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
 import { localDb } from './testing/sqlocalInMemory';
 import { server } from './testing/fakeSupabase';
 import * as engine from './engine';
-import { afterSync, getSyncStatus, resetSyncStatus, subscribeSyncStatus, syncAll } from './sync';
+import {
+  afterSync,
+  getSyncStatus,
+  resetSyncStatus,
+  subscribeSyncStatus,
+  syncAll,
+  syncIfStale,
+} from './sync';
 
 vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 vi.mock('../supabase', () => import('./testing/fakeSupabase'));
@@ -329,5 +336,31 @@ describe('sync status', () => {
     expect(getSyncStatus().completedAt).toBe(T0);
     resetSyncStatus();
     expect(getSyncStatus()).toMatchObject({ completedAt: null, tables: {}, files: null });
+  });
+});
+
+describe('syncIfStale', () => {
+  it('runs once, then not again until the last run is old enough', async () => {
+    await syncIfStale();
+    const runCalls = server.calls.length;
+    expect(runCalls).toBeGreaterThan(0);
+
+    at(new Date(new Date(T0).getTime() + SYNC_FRESH_MS - 1).toISOString());
+    await syncIfStale();
+    expect(server.calls.length).toBe(runCalls);
+
+    at(new Date(new Date(T0).getTime() + SYNC_FRESH_MS).toISOString());
+    await syncIfStale();
+    expect(server.calls.length).toBe(runCalls * 2);
+  });
+
+  it('does not queue a rerun while a run is going on', async () => {
+    const { started, release } = server.hold('select', 'chores');
+    const first = syncAll();
+    await started;
+    const second = syncIfStale();
+    release();
+    await Promise.all([first, second]);
+    expect(callLog().filter((c) => c === 'select:chores')).toHaveLength(1);
   });
 });

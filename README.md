@@ -70,8 +70,10 @@ Three pieces make this work:
   and a second tab shows an "already open in another tab" notice. `engine.ts` is
   the source of truth the UI reads/writes; every change is instant and offline-safe.
 
-- **Sync engine** (`src/lib/offline/sync.ts`). On load, on reconnect, and on app
-  focus it pushes queued local changes and pulls the server state. Conflicts use
+- **Sync engine** (`src/lib/offline/sync.ts`). On load, on reconnect, on app
+  focus and after every local change it pushes queued local changes and pulls
+  the server state; a screen that opens asks for a run only when the last one
+  is older than a minute, so moving around the app doesn't sync at every tap. Conflicts use
   **last-write-wins** by an `updated_at` timestamp set at edit time, enforced on
   both sides: the pull applies only newer rows, and a trigger on every table
   skips a pushed row older than the stored one, so devices converge instead of

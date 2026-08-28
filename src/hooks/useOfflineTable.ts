@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TableSpec } from '../lib/offline/specs';
 import * as engine from '../lib/offline/engine';
-import { syncAll } from '../lib/offline/sync';
+import { syncAll, syncIfStale } from '../lib/offline/sync';
 
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -34,18 +34,20 @@ export function useOfflineTable<T extends { id: string }>(spec: TableSpec) {
     await reload();
   }, [reload]);
 
-  // Show local data immediately, then sync in the background.
+  // Show local data immediately, then sync in the background — unless a run
+  // just ended, so that moving between screens doesn't sync at every tap.
   useEffect(() => {
     let active = true;
     (async () => {
       await reload();
       if (active) setLoading(false);
-      syncAndReload();
+      await syncIfStale();
+      await reload();
     })();
     return () => {
       active = false;
     };
-  }, [reload, syncAndReload]);
+  }, [reload]);
 
   // Follow every change to the table, whoever made it.
   useEffect(() => engine.subscribe(spec.table, () => void reload()), [spec.table, reload]);

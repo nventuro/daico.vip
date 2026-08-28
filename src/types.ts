@@ -246,6 +246,10 @@ export const RELATIVE_DAY_LIMIT = 6;
 /** How long (ms) an undo bar stays up after marking a task done. */
 export const UNDO_MS = 5000;
 
+/** How recently (ms) a sync run must have ended for a screen that opens not
+ *  to ask for another: moving around the app must not sync at every tap. */
+export const SYNC_FRESH_MS = 60_000;
+
 /** Privacy-enhanced YouTube embed base; append the video id. */
 export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 
