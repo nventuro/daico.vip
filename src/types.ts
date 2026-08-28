@@ -323,11 +323,19 @@ export const UNDO_MS = 5000;
  *  to ask for another: moving around the app must not sync at every tap. */
 export const SYNC_FRESH_MS = 60_000;
 
+/** How many rows a sync asks the server for at a time. PostgREST answers a
+ *  plain select with at most 1000 rows and says nothing about the rest, so a
+ *  table is read page by page until one comes back short. */
+export const SYNC_PULL_PAGE = 1000;
+
 /** Privacy-enhanced YouTube embed base; append the video id. */
 export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 
 /** YouTube watch page base; append the video id. */
 export const YOUTUBE_WATCH_URL = 'https://www.youtube.com/watch?v=';
+
+/** A YouTube video id, as the `::youtube` directive must carry it. */
+export const YOUTUBE_ID_PATTERN = /^[\w-]{11}$/;
 
 /** How many days ahead a pending chore shows on the home screen's upcoming list. */
 export const CHORE_NOTICE_DAYS = 3;

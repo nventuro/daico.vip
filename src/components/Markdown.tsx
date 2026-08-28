@@ -16,8 +16,10 @@ const linkClass =
 // Custom element names come from the directive plugin; react-markdown's
 // `Components` type only knows HTML tags, hence the cast.
 const baseComponents = {
+  // A path is ours; everything else opens away from the app, `//host` included
+  // — that is another origin, however much it reads like a path.
   a: ({ href = '', children }: { href?: string; children?: ReactNode }) =>
-    href.startsWith('/') ? (
+    href.startsWith('/') && !href.startsWith('//') ? (
       <Link to={href} className={linkClass}>
         {children}
       </Link>

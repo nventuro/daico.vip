@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { SpendingCategory } from '../../types';
@@ -22,6 +22,7 @@ import {
   type CategoryShare,
 } from './breakdown';
 import { categoryOf } from './rules';
+import { withOneOff, type StatementContents } from './statement';
 import {
   CATEGORY_LABELS,
   FORMAT_LABELS,
@@ -67,6 +68,10 @@ export default function StatementPage() {
 
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<number | null>(null);
+  // Marking a line rewrites the whole sealed payload, and what is on screen
+  // only catches up once the row is written and read again. Each tap waits for
+  // the one before it and marks what that one wrote, so no mark is lost.
+  const writing = useRef<Promise<StatementContents> | null>(null);
 
   const shares = useMemo(() => (contents ? byCategory(contents, rules) : []), [contents, rules]);
   const previousByCategory = useMemo(() => {
@@ -115,10 +120,19 @@ export default function StatementPage() {
     setSelected(null);
   }
 
-  async function toggleOneOff(i: number) {
+  function toggleOneOff(i: number) {
     if (masterKey.status !== 'unlocked' || !statement || !contents) return;
-    const lines = contents.lines.map((l, j) => (j === i ? { ...l, one_off: !l.one_off } : l));
-    await replace(statement.id, { ...contents, lines }, masterKey.key);
+    const { key } = masterKey;
+    const id = statement.id;
+    const written = (writing.current ?? Promise.resolve(contents)).then(async (current) => {
+      const marked = withOneOff(current, i);
+      await replace(id, marked, key);
+      return marked;
+    });
+    writing.current = written;
+    void written.finally(() => {
+      if (writing.current === written) writing.current = null;
+    });
   }
 
   async function handleRemove() {
@@ -137,7 +151,7 @@ export default function StatementPage() {
           line={contents.lines[i]}
           cents={cents(i)}
           onSelect={() => setSelected(i)}
-          onToggleOneOff={() => void toggleOneOff(i)}
+          onToggleOneOff={() => toggleOneOff(i)}
         />
       ))}
     </ul>

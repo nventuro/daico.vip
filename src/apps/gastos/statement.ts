@@ -71,6 +71,17 @@ export class UnknownLayout extends Error {
   }
 }
 
+/** The contents with the line at `index` marked one-off, or unmarked when it
+ *  already was. */
+export function withOneOff(contents: StatementContents, index: number): StatementContents {
+  return {
+    ...contents,
+    lines: contents.lines.map((line, i) =>
+      i === index ? { ...line, one_off: !line.one_off } : line,
+    ),
+  };
+}
+
 /** `contents` with a line marked one-off wherever `previous` had the same
  *  movement marked — for a statement imported again. */
 export function withOneOffsFrom(

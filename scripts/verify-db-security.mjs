@@ -11,7 +11,44 @@
 // linked project (`supabase/.temp/pooler-url`, created by `npm run db:link`).
 // Catalog reads only — no application data is touched.
 // =============================================================================
-import { Client, connectionString } from './lib/db.mjs';
+import { Client, clientOptions } from './lib/db.mjs';
+
+// What `authenticated` may hold on each public table — exactly this, no more
+// and no less. RLS filters rows on top of a privilege; a privilege the role
+// never gets is one no policy has to be right about. A new table is a new line
+// here, and a table missing from this map fails the check.
+const CRUD = ['select', 'insert', 'update', 'delete'];
+const TABLE_PRIVILEGES = {
+  members: ['select'],
+  // Imported content the app only ever reads.
+  guides: ['select'],
+  guide_chapters: ['select'],
+  guide_images: ['select'],
+  // Written once, when the first member sets the household's phrase: an update
+  // would replace the wrapped master key and take every attachment and every
+  // statement with it.
+  household_key: ['select', 'insert'],
+  chores: CRUD,
+  shopping_items: CRUD,
+  dates: CRUD,
+  recipes: CRUD,
+  documents: CRUD,
+  statements: CRUD,
+  merchant_rules: CRUD,
+  attachments: CRUD,
+};
+
+// The one shape a policy may have: it grants the authenticated role what
+// private.is_member() says, and nothing else. A `for select` policy has no
+// with_check and a `for insert` one no qual, hence the null on either side.
+const MEMBER_POLICY = 'private.is_member()';
+
+const expectedPrivileges = Object.entries(TABLE_PRIVILEGES)
+  .map(([table, privileges]) => {
+    const listed = privileges.map((p) => p.toUpperCase()).sort();
+    return `('${table}', '${listed.join(',')}')`;
+  })
+  .join(', ');
 
 // Each check returns rows describing VIOLATIONS. Zero rows = pass.
 const CHECKS = [
@@ -39,11 +76,43 @@ const CHECKS = [
           where grantee = 'anon' and table_schema = 'public'`,
   },
   {
-    name: 'authenticated holds only SELECT/INSERT/UPDATE/DELETE on public tables',
-    sql: `select table_name || ' [' || privilege_type || ']' as violation
-          from information_schema.role_table_grants
-          where grantee = 'authenticated' and table_schema = 'public'
-            and privilege_type not in ('SELECT','INSERT','UPDATE','DELETE')`,
+    name: 'authenticated holds exactly the privileges listed for each public table',
+    sql: `with expected(table_name, privileges) as (values ${expectedPrivileges}),
+               present as (
+                 select c.relname::text as table_name
+                 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = 'public' and c.relkind = 'r'
+               ),
+               granted as (
+                 select table_name::text as table_name,
+                        string_agg(distinct privilege_type, ',' order by privilege_type) as privileges
+                 from information_schema.role_table_grants
+                 where grantee = 'authenticated' and table_schema = 'public'
+                 group by table_name
+               )
+          select coalesce(p.table_name, e.table_name)
+                 || ': has ' || coalesce(g.privileges, '(none)')
+                 || ', expected ' || coalesce(e.privileges, '(the table is not listed in verify-db-security.mjs)')
+                 || case when p.table_name is null then ' — listed but no such table' else '' end
+                 as violation
+          from present p
+          full outer join expected e on e.table_name = p.table_name
+          left join granted g on g.table_name = coalesce(p.table_name, e.table_name)
+          where p.table_name is null
+             or e.table_name is null
+             or coalesce(g.privileges, '') <> e.privileges`,
+  },
+  {
+    // Permissive policies OR together, so one policy that says something else
+    // opens the table however careful the others are.
+    name: 'every policy on a public table is the private.is_member() policy',
+    sql: `select p.tablename || ': ' || p.policyname as violation
+          from pg_policies p
+          where p.schemaname = 'public'
+            and (p.roles <> '{authenticated}'::name[]
+                 or coalesce(p.qual, '${MEMBER_POLICY}') <> '${MEMBER_POLICY}'
+                 or coalesce(p.with_check, '${MEMBER_POLICY}') <> '${MEMBER_POLICY}'
+                 or (p.qual is null and p.with_check is null))`,
   },
   {
     name: 'no SECURITY DEFINER function lives in the public schema',
@@ -119,26 +188,26 @@ const CHECKS = [
           where not exists (
             select 1 from pg_policies p
             where p.schemaname = 'storage' and p.tablename = 'objects'
-              and p.roles = '{authenticated}'
-              and coalesce(p.qual,'') ilike '%is_member%'
-              and coalesce(p.qual,'') ilike '%' || b.id || '%'
-              and coalesce(p.with_check,'') ilike '%is_member%'
-              and coalesce(p.with_check,'') ilike '%' || b.id || '%')`,
+              and p.roles = '{authenticated}'::name[]
+              and coalesce(p.qual, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)
+              and coalesce(p.with_check, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id))`,
   },
   {
-    name: 'no storage.objects policy applies to anon or to every role',
+    // Same reasoning as the public tables: one policy saying anything else is
+    // enough, and here it would hand out the household's files.
+    name: 'every policy on storage.objects names a bucket and private.is_member()',
     sql: `select policyname as violation
-          from pg_policies
-          where schemaname = 'storage' and tablename = 'objects'
-            and ('anon' = any(roles) or 'public' = any(roles))`,
+          from pg_policies p
+          where p.schemaname = 'storage' and p.tablename = 'objects'
+            and (p.roles <> '{authenticated}'::name[]
+                 or not exists (
+                   select 1 from storage.buckets b
+                   where coalesce(p.qual, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)
+                     and coalesce(p.with_check, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)))`,
   },
 ];
 
-const client = new Client({
-  connectionString: connectionString(),
-  ssl: { rejectUnauthorized: false },
-  statement_timeout: 15000,
-});
+const client = new Client(clientOptions({ statement_timeout: 15000 }));
 
 let failed = 0;
 await client.connect();

@@ -11,8 +11,9 @@
 // The tables are tiny, so a full pull every sync is simpler than tracking a
 // server-side watermark and is plenty fast.
 // =============================================================================
-import { SYNC_FRESH_MS } from '../../types';
+import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from '../../types';
 import { supabase } from '../supabase';
+import { isPermanentRowError } from '../refusals';
 import { ALL_SPECS, type TableSpec } from './specs';
 import * as engine from './engine';
 
@@ -111,12 +112,16 @@ let rerun = false;
 // When the last run ended, whatever came of it; null until one has.
 let lastRunAt: number | null = null;
 
-// Work that belongs to a sync but lives beside the tables — files in a storage
-// bucket — runs once every table has had its turn, so it sees the pulled rows.
-const afterSyncListeners = new Set<() => Promise<void>>();
+/** Work that belongs to a sync but lives beside the tables — files in a
+ *  storage bucket. It is told which tables came down in the run, so it never
+ *  acts on rows it has not seen. */
+export type AfterSyncListener = (synced: ReadonlySet<string>) => Promise<void>;
+
+// Runs once every table has had its turn, so it sees the pulled rows.
+const afterSyncListeners = new Set<AfterSyncListener>();
 
 /** Run `listener` at the end of every sync run; returns the unsubscribe. */
-export function afterSync(listener: () => Promise<void>): () => void {
+export function afterSync(listener: AfterSyncListener): () => void {
   afterSyncListeners.add(listener);
   return () => {
     afterSyncListeners.delete(listener);
@@ -140,14 +145,18 @@ export async function syncAll(): Promise<void> {
   // The run counts as whole only if its last pass over the tables and every
   // listener went through: then this device holds everything there is.
   let whole = true;
+  // The tables the last pass brought down, for the work that follows them.
+  let synced = new Set<string>();
   try {
     do {
       rerun = false;
       whole = true;
+      synced = new Set<string>();
       for (const spec of ALL_SPECS) {
         setTable(spec.table, 'pulling');
         try {
           await syncTable(spec);
+          synced.add(spec.table);
           setTable(spec.table, 'done');
         } catch (err) {
           // Network blip, expired token, a column the server doesn't have yet…
@@ -156,13 +165,13 @@ export async function syncAll(): Promise<void> {
           // one table that keeps failing doesn't block the rest.
           whole = false;
           setTable(spec.table, 'pending');
-          console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, err);
+          console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
         }
       }
     } while (rerun && navigator.onLine);
     for (const listener of afterSyncListeners) {
       try {
-        await listener();
+        await listener(synced);
       } catch (err) {
         // Same contract as a table: whatever it left undone waits for the next run.
         whole = false;
@@ -190,25 +199,72 @@ export async function syncIfStale(): Promise<void> {
   await syncAll();
 }
 
+/** What a failure can be told in a log. Never the whole error: a rejected
+ *  write comes back quoting the row that caused it, and rows are private. */
+function describe(err: unknown): string {
+  if (err !== null && typeof err === 'object' && 'message' in err) {
+    const { code, message } = err as { code?: string; message?: string };
+    return code ? `${code}: ${message}` : `${message}`;
+  }
+  return `${err}`;
+}
+
+/**
+ * Whether the server will never take this row — it breaks a constraint, or
+ * asks for something this session may not do. Such a row would otherwise stop
+ * every later row of its table on this device, run after run; the caller goes
+ * on instead and leaves it queued, which costs one request a run. Says so in
+ * the log, because nothing else will.
+ */
+function refusedForGood(table: string, error: { code?: string; message?: string }): boolean {
+  if (!isPermanentRowError(error)) return false;
+  console.warn(`[offline] ${table}: the server refused a row, skipping it:`, describe(error));
+  return true;
+}
+
+/** The whole table from the server, a page at a time: PostgREST answers a
+ *  plain select with its first page only and says nothing about the rest, and
+ *  a short read would look exactly like rows deleted elsewhere. Ordered by id
+ *  so the pages stay a partition while other devices write. */
+async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
+  // The table name is dynamic, so supabase-js can't infer a row type — cast
+  // the plain rows we asked for.
+  const columns = ['id', ...spec.columns.map((c) => c.name), 'created_at', 'updated_at'].join(', ');
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += SYNC_PULL_PAGE) {
+    const { data, error } = await supabase
+      .from(spec.table)
+      .select(columns)
+      .order('id')
+      .range(from, from + SYNC_PULL_PAGE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < SYNC_PULL_PAGE) return rows;
+  }
+}
+
 async function syncTable(spec: TableSpec): Promise<void> {
   // 1. Queued creates/updates — the objects are already in server shape.
   for (const row of await engine.getPendingUpserts<SyncedRow>(spec)) {
     const { error } = await supabase.from(spec.table).upsert(row);
-    if (error) throw error;
+    if (error) {
+      if (!refusedForGood(spec.table, error)) throw error;
+      continue;
+    }
     await engine.markUpserted(spec, row.id, row.updated_at);
   }
 
   // 2. Queued deletes (unconditional — "delete wins" under last-write-wins).
   for (const id of await engine.getPendingDeletes(spec)) {
     const { error } = await supabase.from(spec.table).delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+      if (!refusedForGood(spec.table, error)) throw error;
+      continue;
+    }
     await engine.markDeleted(spec, id);
   }
 
-  // 3. Full pull + reconcile. The table name is dynamic, so supabase-js can't
-  // infer a row type — cast the plain rows we asked for.
-  const columns = ['id', ...spec.columns.map((c) => c.name), 'created_at', 'updated_at'].join(', ');
-  const { data, error } = await supabase.from(spec.table).select(columns);
-  if (error) throw error;
-  await engine.reconcile(spec, (data ?? []) as unknown as Record<string, unknown>[]);
+  // 3. Full pull + reconcile.
+  await engine.reconcile(spec, await pull(spec));
 }

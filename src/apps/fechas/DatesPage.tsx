@@ -12,7 +12,7 @@ import DateRow from './DateRow';
 import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DatesPage() {
-  const { items, loading, error, add, remove } = useDates();
+  const { items, loading, error, add } = useDates();
 
   const today = todayIso();
 
@@ -38,9 +38,7 @@ export default function DatesPage() {
   const groups = useMemo(() => groupByMonth(upcoming, today), [upcoming, today]);
 
   function renderEntry(entry: DateEntry) {
-    return (
-      <DateRow key={entry.id} entry={entry} today={today} onRemove={() => void remove(entry)} />
-    );
+    return <DateRow key={entry.id} entry={entry} today={today} />;
   }
 
   return (

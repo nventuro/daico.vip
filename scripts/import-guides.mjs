@@ -18,7 +18,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { Client, connectionString, root } from './lib/db.mjs';
+import { Client, clientOptions, root } from './lib/db.mjs';
 import { stableId } from './import-guides/ids.mjs';
 import { normalizeBody, rewriteLinks } from './import-guides/normalize.mjs';
 import { gdocHtmlToMarkdown } from './import-guides/gdoc.mjs';
@@ -289,7 +289,7 @@ if (previewDir) {
 // ---- write --------------------------------------------------------------------------------
 
 if (!dryRun) {
-  const client = new Client({ connectionString: connectionString() });
+  const client = new Client(clientOptions());
   await client.connect();
   try {
     await client.query('begin');

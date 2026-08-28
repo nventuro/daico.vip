@@ -1,7 +1,7 @@
 // =============================================================================
 // In-memory stand-in for the Supabase client, covering exactly the PostgREST
 // calls the sync engine makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
-// and `from(t).select(columns)`, plus the Storage calls the attachment files
+// and `from(t).select(columns).order(c).range(from, to)`, plus the Storage calls the attachment files
 // make: `storage.from(b).upload / download / remove / list`. A test installs it with
 //   vi.mock('../supabase', () => import('./testing/fakeSupabase'))
 // and drives the server through `server`: seed rows and objects, inspect the
@@ -16,6 +16,8 @@ export interface ServerCall {
   table: string;
   /** The row an upsert or delete targets; the object a storage call targets. */
   id?: string;
+  /** The rows a select asked for, when it asked for a range of them. */
+  range?: { from: number; to: number };
 }
 
 /** An object in a fake bucket. */
@@ -26,12 +28,22 @@ export interface ServerObject {
   created_at: string;
 }
 
-/** The shape of a failed storage call's error, as supabase-js reports it. */
-interface StorageFailure extends Error {
+/** How a call can be refused: the HTTP status a storage call reports, the code
+ *  PostgREST puts on a rejected row, or neither for a failure that never got
+ *  an answer at all. `id` narrows the refusal to one row or object. */
+export interface Refusal {
   status?: number;
+  code?: string;
+  id?: string;
 }
 
+/** The shape of a failed call's error, as supabase-js reports it. */
+interface CallFailure extends Error, Refusal {}
+
 type Interceptor = (call: ServerCall) => Promise<void> | void;
+
+/** What PostgREST returns for a select that names no range — its `max-rows`. */
+const DEFAULT_MAX_ROWS = 1000;
 
 function matches(call: ServerCall, op: ServerOp, table: string | undefined): boolean {
   return call.op === op && (table === undefined || call.table === table);
@@ -74,16 +86,16 @@ export class FakeServer {
 
   /**
    * Make matching calls fail (as a returned PostgREST/Storage-style error)
-   * until `reset`. `status` is what a storage call reports as the HTTP status;
-   * without it the failure reads as a network one.
+   * until `reset`. With no `refusal` the failure reads as a network one.
    */
-  fail(op: ServerOp, table?: string, message = 'fake server failure', status?: number): void {
+  fail(op: ServerOp, table?: string, message = 'fake server failure', refusal: Refusal = {}): void {
     this.interceptors.add((call) => {
-      if (matches(call, op, table)) {
-        const error: StorageFailure = new Error(message);
-        if (status !== undefined) error.status = status;
-        throw error;
-      }
+      if (!matches(call, op, table)) return;
+      if (refusal.id !== undefined && call.id !== refusal.id) return;
+      const error: CallFailure = new Error(message);
+      if (refusal.status !== undefined) error.status = refusal.status;
+      if (refusal.code !== undefined) error.code = refusal.code;
+      throw error;
     });
   }
 
@@ -130,14 +142,42 @@ export class FakeServer {
           return { error };
         },
       }),
-      select: async (columns: string) => {
-        const error = await this.run({ op: 'select', table });
-        if (error) return { data: null, error };
-        const names = columns.split(',').map((name) => name.trim());
-        const data = this.rows(table).map((row) =>
-          Object.fromEntries(names.map((name) => [name, row[name] ?? null])),
-        );
-        return { data, error: null };
+      // Chainable and awaitable at any point, like PostgREST's builder: the
+      // request goes out when the caller awaits it.
+      select: (columns: string) => {
+        let orderBy: string | null = null;
+        let range: { from: number; to: number } | null = null;
+        const run = async () => {
+          const error = await this.run({ op: 'select', table, range: range ?? undefined });
+          if (error) return { data: null, error };
+          const names = columns.split(',').map((name) => name.trim());
+          let rows = this.rows(table);
+          if (orderBy !== null) {
+            rows.sort((a, b) => String(a[orderBy!]).localeCompare(String(b[orderBy!])));
+          }
+          // PostgREST answers a plain select with its first page and says
+          // nothing about the rest; a range asks for the page it names.
+          rows = rows.slice(range?.from ?? 0, (range?.to ?? DEFAULT_MAX_ROWS - 1) + 1);
+          const data = rows.map((row) =>
+            Object.fromEntries(names.map((name) => [name, row[name] ?? null])),
+          );
+          return { data, error: null };
+        };
+        const builder = {
+          order: (column: string) => {
+            orderBy = column;
+            return builder;
+          },
+          range: (from: number, to: number) => {
+            range = { from, to };
+            return builder;
+          },
+          then: <R>(
+            resolve: (value: Awaited<ReturnType<typeof run>>) => R,
+            reject?: (reason: unknown) => R,
+          ) => run().then(resolve, reject),
+        };
+        return builder;
       },
     };
   }
@@ -145,12 +185,12 @@ export class FakeServer {
   storage(bucket: string) {
     const objects = this.bucket(bucket);
     const storageError = (error: Error | null) =>
-      error ? { message: error.message, status: (error as StorageFailure).status } : null;
+      error ? { message: error.message, status: (error as CallFailure).status } : null;
     return {
       upload: async (path: string, body: Blob, options?: { upsert?: boolean }) => {
         let error = await this.run({ op: 'upload', table: bucket, id: path });
         if (!error && objects.has(path) && !options?.upsert) {
-          const duplicate: StorageFailure = new Error('The resource already exists');
+          const duplicate: CallFailure = new Error('The resource already exists');
           duplicate.status = 409;
           error = duplicate;
         }
@@ -168,7 +208,7 @@ export class FakeServer {
         const object = objects.get(path);
         if (error) return { data: null, error: storageError(error) };
         if (!object) {
-          const missing: StorageFailure = new Error('Object not found');
+          const missing: CallFailure = new Error('Object not found');
           missing.status = 404;
           return { data: null, error: storageError(missing) };
         }

@@ -173,7 +173,10 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   device lacks (`fetchDocumentFiles`: a document — a passport, an ID — must be
   readable with no connection, and a household's documents are few and each
   capped), and sweeps bucket objects with no row that are older than
-  `ATTACHMENT_ORPHAN_MIN_AGE_MS`. That fetch is the one exception to files
+  `ATTACHMENT_ORPHAN_MIN_AGE_MS` — only ever against rows the run itself
+  brought down, and never against an empty table: what the sweep cannot tell
+  from an orphan is a file this device has not heard of yet, and the
+  difference is every document the household has. That fetch is the one exception to files
   being fetched on demand: never extend it to another owner kind, never pull
   files wholesale, and never put them in `ALL_SPECS`. Blobs are immutable:
   replacing a file is a new attachment; only `name` ever changes.
@@ -216,7 +219,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   always `impuestos`) — nothing stores a category on a line, so a rule change
   refiles every statement at once. **Never add a built-in merchant list**: the
   repo is public and where the household shops is private; rules are loaded in
-  bulk on the Reglas page instead.
+  bulk on the Categorización page instead.
 
 ## Privacy — the code is public, the data is private
 
@@ -322,7 +325,10 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 
 ### Database
 
-Requires `.env` with `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD`.
+Requires `.env` with `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD`. The
+password bypasses every policy, so the scripts only talk to a server whose
+certificate verifies against Supabase's root (`supabase/ca.crt`, a public
+certificate kept in the repo) — never with verification off.
 
 - `npm run db:link` — link local project to remote Supabase (run once)
 - `npm run db:push` — push pending migrations to remote database, then verify invariants

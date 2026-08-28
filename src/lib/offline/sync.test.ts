@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SYNC_FRESH_MS, type Chore } from '../../types';
+import { SYNC_FRESH_MS, SYNC_PULL_PAGE, type Chore } from '../../types';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
 import { localDb } from './testing/sqlocalInMemory';
 import { server } from './testing/fakeSupabase';
@@ -176,6 +176,54 @@ describe('syncAll', () => {
     await syncAll();
     expect(server.rows('chores')).toMatchObject([{ id }]);
     expect(await bookkeeping('chores', id)).toEqual({ pending_op: null, synced: 1 });
+  });
+
+  it('skips a row the server refuses for good and gets the rest of the table through', async () => {
+    const refused = await engine.insert(CHORES_SPEC, newChore);
+    const rest = await engine.insert(CHORES_SPEC, { ...newChore, title: 'Barrer' });
+    server.fail('upsert', 'chores', 'violates check constraint "chores_title_check"', {
+      code: '23514',
+      id: refused,
+    });
+    await syncAll();
+
+    expect(server.rows('chores').map((r) => r.id)).toEqual([rest]);
+    expect(await bookkeeping('chores', rest)).toEqual({ pending_op: null, synced: 1 });
+    // Still queued: another version of it may yet be one the server takes.
+    expect(await bookkeeping('chores', refused)).toEqual({ pending_op: 'upsert', synced: 0 });
+    expect(callLog()).toContain('select:chores');
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('pulls a table of more rows than one page whole, and keeps them', async () => {
+    const count = SYNC_PULL_PAGE + 3;
+    server.seed(
+      'chores',
+      Array.from({ length: count }, (_, i) => serverChore(String(i).padStart(5, '0'), T0)),
+    );
+    await syncAll();
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toHaveLength(count);
+    expect(callLog().filter((c) => c === 'select:chores')).toHaveLength(2);
+
+    // The rows past the first page must not read as deleted elsewhere.
+    await syncAll();
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toHaveLength(count);
+  });
+
+  it('tells the after-sync work which tables came down', async () => {
+    server.fail('select', 'chores');
+    let seen: ReadonlySet<string> | null = null;
+    const stop = afterSync(async (synced) => {
+      seen = new Set(synced);
+    });
+    try {
+      await syncAll();
+    } finally {
+      stop();
+    }
+    expect(seen).not.toBeNull();
+    expect([...(seen ?? [])]).not.toContain('chores');
+    expect([...(seen ?? [])]).toContain('attachments');
   });
 
   it('a failed pull leaves local data untouched', async () => {

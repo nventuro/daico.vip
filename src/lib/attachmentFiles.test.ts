@@ -33,6 +33,9 @@ async function added(id: string, content = 'abc'): Promise<void> {
 
 const uploads = () => server.calls.filter((c) => c.op === 'upload').length;
 
+/** A run in which the attachments table came down, as a healthy one does. */
+const pulled = new Set([ATTACHMENTS_SPEC.table]);
+
 let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(async () => {
@@ -108,7 +111,7 @@ describe('uploadPending', () => {
   it('gives up on a file the bucket refuses for good, and only on that one', async () => {
     await added('big');
     await added('fine');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', 413);
+    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await engine.getAttachmentUploadState('big')).toBe('failed');
     expect(await engine.getAttachmentUploadState('fine')).toBe('failed');
@@ -130,7 +133,7 @@ describe('uploadPending', () => {
 
   it('keeps a file queued while the session is rejected', async () => {
     await added('a');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'JWT expired', 401);
+    server.fail('upload', ATTACHMENTS_BUCKET, 'JWT expired', { status: 401 });
     await expect(uploadPending()).rejects.toThrow();
     expect(await engine.getAttachmentUploadState('a')).toBe('pending');
   });
@@ -163,7 +166,7 @@ describe('syncAttachmentFiles', () => {
       { name: 'old-kept', data: bytes('x'), created_at: old },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, row, 'old-kept');
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual([
       'young-orphan',
       'old-kept',
@@ -177,11 +180,11 @@ describe('syncAttachmentFiles', () => {
     ]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
     await engine.insert(ATTACHMENTS_SPEC, row, 'chore');
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(await engine.getAttachmentFile('doc')).toEqual(bytes('doc'));
     expect(await engine.getAttachmentUploadState('doc')).toBe('uploaded');
     expect(await engine.getAttachmentFile('chore')).toBeNull();
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
   });
 
@@ -189,13 +192,13 @@ describe('syncAttachmentFiles', () => {
     server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'now', data: bytes('now'), created_at: T0 }]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'later');
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'now');
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(await engine.getAttachmentFile('now')).toEqual(bytes('now'));
     expect(await engine.getAttachmentFile('later')).toBeNull();
     server.seedObjects(ATTACHMENTS_BUCKET, [
       { name: 'later', data: bytes('later'), created_at: T0 },
     ]);
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(await engine.getAttachmentFile('later')).toEqual(bytes('later'));
   });
 
@@ -203,11 +206,42 @@ describe('syncAttachmentFiles', () => {
     server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'doc', data: bytes('doc'), created_at: T0 }]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
     server.fail('download', ATTACHMENTS_BUCKET, 'network down');
-    await expect(syncAttachmentFiles()).rejects.toThrow('network down');
+    await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
     expect(await engine.getAttachmentFile('doc')).toBeNull();
     server.restore();
-    await syncAttachmentFiles();
+    await syncAttachmentFiles(pulled);
     expect(await engine.getAttachmentFile('doc')).toEqual(bytes('doc'));
+  });
+
+  it('does not sweep when the attachments table did not come down in the run', async () => {
+    const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
+    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+    await engine.insert(ATTACHMENTS_SPEC, row, 'other');
+    await syncAttachmentFiles(new Set(['chores']));
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+    await syncAttachmentFiles(pulled);
+    expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([]);
+  });
+
+  it('does not sweep when this device holds no attachment at all', async () => {
+    const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
+    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+    await syncAttachmentFiles(pulled);
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+  });
+
+  it('sweeps nothing after a sync in which the attachments table failed', async () => {
+    const stop = afterSync(syncAttachmentFiles);
+    try {
+      const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
+      server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+      await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
+      server.fail('select', 'attachments', 'network down');
+      await syncAll();
+      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+    } finally {
+      stop();
+    }
   });
 
   it('runs at the end of a sync when registered, so a new attachment reaches both places', async () => {

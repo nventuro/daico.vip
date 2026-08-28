@@ -19,6 +19,7 @@ import {
   type Attachment,
 } from '../types';
 import { supabase } from './supabase';
+import { isPermanentStatus } from './refusals';
 import * as engine from './offline/engine';
 import { ATTACHMENTS_SPEC } from './offline/specs';
 import { reportFiles } from './offline/sync';
@@ -28,18 +29,6 @@ const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
 /** The HTTP status a failed storage call reports, when it got as far as the server. */
 function statusOf(error: { message: string }): number | undefined {
   return 'status' in error && typeof error.status === 'number' ? error.status : undefined;
-}
-
-/**
- * Whether a refusal is about the request itself — too large, a type the bucket
- * does not take, an object that is not there — rather than about the moment
- * (no session, throttled, the server down). Retrying the former can never
- * succeed.
- */
-function isPermanent(status: number | undefined): boolean {
-  return (
-    status !== undefined && status >= 400 && status < 500 && ![401, 403, 408, 429].includes(status)
-  );
 }
 
 /** Send every file still waiting for the bucket. Stops at the first refusal
@@ -60,7 +49,7 @@ export async function uploadPending(): Promise<void> {
       await engine.markAttachmentUploaded(id);
       continue;
     }
-    if (isPermanent(status)) {
+    if (isPermanentStatus(status)) {
       await engine.markAttachmentUploadFailed(id, error.message);
       continue;
     }
@@ -74,7 +63,7 @@ export async function uploadPending(): Promise<void> {
 async function downloadObject(id: string): Promise<Uint8Array | null> {
   const { data, error } = await bucket().download(id);
   if (error) {
-    if (isPermanent(statusOf(error))) return null;
+    if (isPermanentStatus(statusOf(error))) return null;
     throw error;
   }
   return data ? new Uint8Array(await data.arrayBuffer()) : null;
@@ -138,6 +127,9 @@ export async function removeAttachmentObject(id: string): Promise<void> {
  */
 async function sweepOrphans(): Promise<void> {
   const kept = new Set((await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).map((a) => a.id));
+  // A household with no attachment at all reads exactly like one whose rows
+  // this device has not got yet, and the difference is every file there is.
+  if (kept.size === 0) return;
   const cutoff = Date.now() - ATTACHMENT_ORPHAN_MIN_AGE_MS;
   const orphans: string[] = [];
   for (let offset = 0; ; offset += ATTACHMENT_LIST_PAGE) {
@@ -160,12 +152,16 @@ async function sweepOrphans(): Promise<void> {
   if (error) throw error;
 }
 
-/** Everything the files need after the tables have synced. Order matters:
- *  uploads first so a just-added file is never taken for an orphan, and the
- *  prune before the fetch so nothing is fetched for a row that is gone. */
-export async function syncAttachmentFiles(): Promise<void> {
+/** Everything the files need after the tables of `synced` have come down.
+ *  Order matters: uploads first so a just-added file is never taken for an
+ *  orphan, and the prune before the fetch so nothing is fetched for a row that
+ *  is gone. */
+export async function syncAttachmentFiles(synced: ReadonlySet<string>): Promise<void> {
   await uploadPending();
   await engine.pruneAttachmentFiles();
   await fetchDocumentFiles();
-  await sweepOrphans();
+  // What the sweep calls an orphan it reads off the local rows, so it may only
+  // run against rows this very run brought down: after a pull that never
+  // happened, every file of the household looks like an orphan.
+  if (synced.has(ATTACHMENTS_SPEC.table)) await sweepOrphans();
 }

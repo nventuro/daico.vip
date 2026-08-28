@@ -47,6 +47,9 @@ function db(): Promise<SQLocal> {
         databasePath: LOCAL_DB_PATH,
         processor: new Worker(new URL('./sahpoolWorker.ts', import.meta.url), { type: 'module' }),
         onInit: (sql) => [
+          // A delete frees the page it was on; without this it keeps whatever
+          // was written there, and a sign-out is supposed to leave nothing.
+          sql('PRAGMA secure_delete = ON'),
           ...ALL_SPECS.map((spec) => sql(createTableSql(spec))),
           sql(IMAGE_CACHE_SQL),
           sql(ATTACHMENT_FILES_SQL),

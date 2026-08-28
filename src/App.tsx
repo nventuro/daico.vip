@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { afterSync } from './lib/offline/sync';
 import { syncAttachmentFiles } from './lib/attachmentFiles';
+import { clearDevice } from './lib/clearDevice';
 import { AppProvider } from './context/AppContext';
 import MainLayout from './shell/MainLayout';
 
@@ -13,10 +14,17 @@ afterSync(syncAttachmentFiles);
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // Whose session it is, for the moment it ends: by then there is none to ask.
+  const userId = useRef<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    function hold(session: Session | null): void {
+      userId.current = session?.user.id ?? null;
       setSession(session);
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      hold(session);
       setAuthLoading(false);
     });
 
@@ -24,8 +32,13 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       // Only react to meaningful auth changes, not silent token refreshes.
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        setSession(session);
+      if (event === 'SIGNED_IN') hold(session);
+      // However the session ended — the button, a refresh that failed, a
+      // sign-out from another device — the device keeps none of it.
+      if (event === 'SIGNED_OUT') {
+        const previous = userId.current;
+        hold(null);
+        void clearDevice(previous);
       }
     });
 

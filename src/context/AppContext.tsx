@@ -1,19 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { clearAll } from '../lib/offline/engine';
-import { resetSyncStatus } from '../lib/offline/sync';
-import { clearMasterKey } from '../hooks/useMasterKey';
+import { cachedVerdict, rememberVerdict } from '../lib/membershipCache';
 import { AppContext } from './appContext';
-
-/** localStorage key prefix for the cached membership verdict, keyed by user id. */
-const MEMBER_CACHE_PREFIX = 'daico.isMember.';
-
-/** The verdict this device last got for the user, if it ever got one. */
-function cachedVerdict(userId: string): boolean | null {
-  const stored = localStorage.getItem(MEMBER_CACHE_PREFIX + userId);
-  return stored === null ? null : stored === '1';
-}
 
 export function AppProvider({
   session,
@@ -70,7 +59,7 @@ export function AppProvider({
       } else {
         const member = (data?.length ?? 0) > 0;
         setIsMember(member);
-        localStorage.setItem(MEMBER_CACHE_PREFIX + session.user.id, member ? '1' : '0');
+        rememberVerdict(session.user.id, member);
       }
       setLoading(false);
     }
@@ -96,15 +85,11 @@ export function AppProvider({
   }, []);
 
   const signOut = useCallback(() => {
-    // Clear the cached membership verdict and wipe local data (shared-device
-    // hygiene) before ending the session. clearAll() is what spins up the local
-    // DB worker; merely importing it does not.
-    if (session) localStorage.removeItem(MEMBER_CACHE_PREFIX + session.user.id);
-    resetSyncStatus();
-    void clearAll().catch(() => {});
-    void clearMasterKey().catch(() => {});
-    supabase.auth.signOut();
-  }, [session]);
+    // Only this device: the other one keeps its session, its data and its key.
+    // What the device holds is forgotten when the session ends, wherever that
+    // is handled — this button is only one of the ways it can end.
+    void supabase.auth.signOut({ scope: 'local' });
+  }, []);
 
   // Nothing drawn keeps the splash up.
   if (loading) return null;
