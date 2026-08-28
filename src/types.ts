@@ -98,9 +98,9 @@ export interface AttachmentOwner {
 }
 
 /**
- * A file — a picture, a PDF — attached to an entry. Only this metadata is a
- * synced row; the file itself lives encrypted in the attachments bucket under
- * the row's id, and only ever changes by being replaced with a new attachment.
+ * A picture attached to an entry. Only this metadata is a synced row; the
+ * picture itself lives encrypted in the attachments bucket under the row's
+ * id, and only ever changes by being replaced with a new attachment.
  * Like every offline-synced row, `id` is a client-generated UUID and
  * `updated_at` is the last-write-wins key.
  */
@@ -191,7 +191,7 @@ export interface Recipe {
 
 /**
  * A document — a passport, an ID, a policy — whose content is its attachments:
- * the pictures or PDFs of it. The row holds only what lists it and announces
+ * the pictures of it. The row holds only what lists it and announces
  * its expiry; anything sensitive (a number, a date of birth) stays inside the
  * encrypted files. Like every offline-synced row, `id` is a client-generated
  * UUID and `updated_at` is the last-write-wins key.
@@ -293,15 +293,28 @@ export const SEARCH_MAX_HITS_PER_APP = 20;
 /** Largest file accepted as an attachment, in bytes. */
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-/** File types accepted as attachments — what both supported browsers can
+/** Picture types accepted as attachments — what both supported browsers can
  *  show — and the extension a file of each gets when it leaves the app. */
 export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
-  'application/pdf': 'pdf',
 };
+
+/** JPEG quality a picture is encoded at once it has been cropped or rotated. */
+export const ATTACHMENT_JPEG_QUALITY = 0.9;
+
+/** Longest side, in pixels, of the copy a picture is cropped on: enough to
+ *  place a crop, small enough for a phone to redraw at once on each turn. */
+export const ATTACHMENT_PREVIEW_MAX_PX = 1600;
+
+/** How far a finger must travel across the lightbox to change picture, in pixels. */
+export const LIGHTBOX_SWIPE_MIN_PX = 50;
+
+/** Navigation state a link into the lightbox carries when it is followed from
+ *  the entry's own page, so that closing can simply go back to it. */
+export const LIGHTBOX_FROM_ENTRY_PAGE = { fromEntryPage: true } as const;
 
 /** The storage bucket holding the encrypted attachment files. */
 export const ATTACHMENTS_BUCKET = 'attachments';

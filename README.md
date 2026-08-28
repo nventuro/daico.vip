@@ -161,8 +161,8 @@ session and are never saved.
 Documents — a passport, an ID, an insurance policy — live in the `documents`
 table (offline-synced like the others): a title, an optional expiry
 (`expires_on`) and its notice window (`notice_days`). The content is the
-document's attachments (see Adjuntos): the pictures or PDFs of it, encrypted on
-the device. Deliberately nothing else is typed in, so a number or a date of
+document's attachments (see Adjuntos): the pictures of it, encrypted on the
+device. Deliberately nothing else is typed in, so a number or a date of
 birth never reaches the server in the clear. A document is created with only
 its title and opened at once to attach its files. The list is alphabetical with
 the expiry under the title ("vence 14/02/2027", "venció" once past). A document
@@ -193,7 +193,7 @@ Links to other guides or chapters are ordinary relative links
 
 ## Adjuntos
 
-A chore or a document can carry attachments — pictures and PDFs, up to
+A chore or a document can carry attachments — pictures, up to
 `ATTACHMENT_MAX_BYTES` each — that are encrypted on the device before they
 leave it, so the server only ever stores ciphertext.
 
@@ -215,15 +215,20 @@ leave it, so the server only ever stores ciphertext.
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
 - **In the app**: an entry's edit form shows its attachments as a grid; Agregar
-  asks the device for a file (on a phone: the camera, the photos or a PDF, each
-  through its own picker), then a screen that names the file. The grid,
-  the viewer and the naming screen are shared (`src/components/Attachment*`);
-  each app's attachment routes are thin wrappers naming the entry in the URL
-  as the owner. A chore with attachments carries the same mark as one with
-  notes. Opening an attachment
-  shows it (an image inline, a PDF as an icon) with Compartir / Descargar / Abrir
-  to get it out through the device's share sheet or, on desktop, a download or a
-  new tab. A file added offline shows a cloud until it reaches the server.
+  asks the device for pictures (on a phone through its photo picker; several at
+  once), then takes them one by one through a dialog where each can be turned,
+  cropped by dragging the edges of the selection, and given a name. A picture
+  left as it came is stored byte for byte; an edited one is drawn afresh as
+  JPEG (a PNG stays PNG). Each is stored the moment it is done, so a batch left
+  halfway keeps what was finished. A tile opens its picture in a lightbox — a
+  swipe or the arrow keys move along the entry's pictures — with Compartir /
+  Descargar to get it out through the device's share sheet or, on desktop, a
+  download, and its deletion behind the usual confirm. The open picture is an
+  optional `:attachmentId` ending the entry's route, so a search hit links
+  straight to it and the phone's back gesture closes it. The grid, tile, dialog
+  and lightbox are shared (`src/components/Attachment*`, `PictureEditor`). A
+  chore with attachments carries the same mark as one with notes. A picture
+  added offline shows a cloud until it reaches the server.
 - **Sync**: files follow every table sync (`afterSync`, registered in
   `src/App.tsx`): uploads go out, files of deleted rows are dropped, every
   document's files this device lacks are fetched and kept, and bucket objects

@@ -7,8 +7,6 @@ import { searchDocuments } from './search';
 
 const DocumentsPage = lazy(() => import('./DocumentsPage'));
 const DocumentEditPage = lazy(() => import('./DocumentEditPage'));
-const NewDocumentAttachmentPage = lazy(() => import('./NewDocumentAttachmentPage'));
-const DocumentAttachmentPage = lazy(() => import('./DocumentAttachmentPage'));
 
 const documentos: AppModule = {
   id: 'documentos',
@@ -18,9 +16,8 @@ const documentos: AppModule = {
   specs: [DOCUMENTS_SPEC],
   routes: [
     { index: true, Component: DocumentsPage },
-    { path: ':id', Component: DocumentEditPage },
-    { path: ':id/nuevo/:attachmentId', Component: NewDocumentAttachmentPage },
-    { path: ':id/:attachmentId', Component: DocumentAttachmentPage },
+    // The optional segment is one of the document's attachments, open in the lightbox.
+    { path: ':id/:attachmentId?', Component: DocumentEditPage },
   ],
   useUpcoming: useDocumentsUpcoming,
   search: searchDocuments,

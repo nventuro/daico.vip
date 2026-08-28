@@ -7,8 +7,6 @@ import { searchChores } from './search';
 
 const ChoresPage = lazy(() => import('./ChoresPage'));
 const ChoreEditPage = lazy(() => import('./ChoreEditPage'));
-const NewChoreAttachmentPage = lazy(() => import('./NewChoreAttachmentPage'));
-const ChoreAttachmentPage = lazy(() => import('./ChoreAttachmentPage'));
 
 const tareas: AppModule = {
   id: 'tareas',
@@ -18,9 +16,8 @@ const tareas: AppModule = {
   specs: [CHORES_SPEC],
   routes: [
     { index: true, Component: ChoresPage },
-    { path: ':id', Component: ChoreEditPage },
-    { path: ':id/nuevo/:attachmentId', Component: NewChoreAttachmentPage },
-    { path: ':id/:attachmentId', Component: ChoreAttachmentPage },
+    // The optional segment is one of the chore's attachments, open in the lightbox.
+    { path: ':id/:attachmentId?', Component: ChoreEditPage },
   ],
   useUpcoming: useChoresUpcoming,
   search: searchChores,

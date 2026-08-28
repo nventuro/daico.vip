@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { ATTACHMENT_FILE_TYPES, type Attachment } from '../types';
 import { decryptFile } from '../lib/householdKey';
 import { fetchAttachmentFile } from '../lib/attachmentFiles';
-import * as engine from '../lib/offline/engine';
 import { useMasterKey } from './useMasterKey';
 
 /** An attachment's file as the page can use it, once it can. */
@@ -13,15 +12,10 @@ export type AttachmentFileView =
   | { status: 'ready'; file: File };
 
 /**
- * The attachment decrypted into a File, named as it should be outside the app.
- * `fetch` false only uses a copy already on this device (a tile that must not
- * download megabytes just to draw itself); true fetches from the bucket when
- * there is none.
+ * The attachment decrypted into a File, named as it should be outside the
+ * app: the copy on this device, fetched from the bucket when there is none.
  */
-export function useAttachmentFile(
-  attachment: Attachment | undefined,
-  fetch: boolean,
-): AttachmentFileView {
+export function useAttachmentFile(attachment: Attachment | undefined): AttachmentFileView {
   const masterKey = useMasterKey();
   const key = masterKey.status === 'unlocked' ? masterKey.key : null;
   const [view, setView] = useState<AttachmentFileView>({ status: 'loading' });
@@ -30,9 +24,7 @@ export function useAttachmentFile(
     if (!attachment || !key) return;
     let active = true;
     (async () => {
-      const data = fetch
-        ? await fetchAttachmentFile(attachment.id)
-        : await engine.getAttachmentFile(attachment.id);
+      const data = await fetchAttachmentFile(attachment.id);
       if (!active) return;
       if (!data) {
         setView({ status: 'unavailable' });
@@ -51,7 +43,7 @@ export function useAttachmentFile(
     return () => {
       active = false;
     };
-  }, [attachment, key, fetch]);
+  }, [attachment, key]);
 
   return view;
 }

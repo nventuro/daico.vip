@@ -28,7 +28,7 @@ export function attachmentType(file: File): string | null {
 /** Why `file` cannot be attached, in the user's words, or null when it can. */
 export function attachmentProblem(file: File): string | null {
   if (!attachmentType(file)) {
-    return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) o PDF.';
+    return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF).';
   }
   if (file.size > ATTACHMENT_MAX_BYTES) {
     return `El archivo pesa ${formatBytes(file.size)}; el máximo es ${formatBytes(ATTACHMENT_MAX_BYTES)}.`;
@@ -38,9 +38,9 @@ export function attachmentProblem(file: File): string | null {
 
 /**
  * Local-first attachments: every entry's when `owner` is not given, one
- * entry's otherwise. Adding (to `owner`) encrypts the file under `masterKey`
- * and keeps it here until the next sync uploads it; removing takes the row,
- * the local file and (best effort) the bucket's object.
+ * entry's otherwise. Adding (to `owner`) encrypts the picture under
+ * `masterKey` and keeps it here until the next sync uploads it; removing
+ * takes the row, the local file and (best effort) the bucket's object.
  */
 export function useAttachments(owner?: AttachmentOwner) {
   const { items: all, loading, error, mutate } = useOfflineTable<Attachment>(ATTACHMENTS_SPEC);
@@ -53,12 +53,9 @@ export function useAttachments(owner?: AttachmentOwner) {
     [all, kind, ownerId],
   );
 
-  // Adds the attachment the moment the file is picked (before it is named), so
-  // the file is safely stored and shown at once and nothing depends on state
-  // surviving the trip through the device's file picker, which on some phones
-  // reloads the app. The name is set afterwards, on its own screen.
+  // Returns the new attachment's id, or undefined when it could not be added.
   const add = useCallback(
-    (file: File, masterKey: CryptoKey) =>
+    (file: File, masterKey: CryptoKey, name: string) =>
       mutate(async () => {
         if (kind === undefined || ownerId === undefined) {
           throw new Error('An attachment needs an entry to belong to');
@@ -78,7 +75,7 @@ export function useAttachments(owner?: AttachmentOwner) {
           {
             owner_kind: kind,
             owner_id: ownerId,
-            name: '',
+            name: lowercaseTrimmed(name),
             mime,
             size: file.size,
             wrapped_file_key: wrappedFileKey,
@@ -87,12 +84,6 @@ export function useAttachments(owner?: AttachmentOwner) {
         );
       }),
     [mutate, kind, ownerId],
-  );
-
-  const rename = useCallback(
-    (id: string, name: string) =>
-      mutate(() => engine.update(ATTACHMENTS_SPEC, id, { name: lowercaseTrimmed(name) })),
-    [mutate],
   );
 
   const remove = useCallback(
@@ -105,5 +96,5 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate],
   );
 
-  return { items, loading, error, add, rename, remove };
+  return { items, loading, error, add, remove };
 }

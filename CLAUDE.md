@@ -137,12 +137,15 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 
 - **Attachment files never reach the server in the clear.** The row
   (`attachments`: owner, name, mime, size) is an ordinary offline-synced table
-  shared by every app whose entries take files (`owner_kind`: a chore, a
-  document), so it lives in `SHELL_SPECS`. The grid, tile, viewer and naming
-  screen are the shared `src/components/Attachment*` (hooks in `src/hooks/`),
-  parametrized by the owner; an app's attachment routes are thin wrappers
-  (`ChoreAttachmentPage`, `DocumentAttachmentPage`) that say which entry in
-  the URL owns them. The bytes go to the private `attachments` storage bucket,
+  shared by every app whose entries take pictures (`owner_kind`: a chore, a
+  document), so it lives in `SHELL_SPECS`. Attachments are pictures only
+  (`ATTACHMENT_FILE_TYPES`). The grid, tile, add dialog (with `PictureEditor`:
+  rotate, crop, name) and lightbox are the shared `src/components/Attachment*`
+  (hooks in `src/hooks/`, the drawing in `src/utils/imageUtils.ts`),
+  parametrized by the owner. There is no attachment page: an entry's route
+  ends in an optional `:attachmentId` that the grid reads to open the
+  lightbox, so a picture has a URL of its own (search links to it) and the
+  phone's back gesture closes it. The bytes go to the private `attachments` storage bucket,
   under the row's id, encrypted on the device. Key hierarchy, all in `src/lib/householdKey.ts` (the
   only crypto code — never add another): the phrase (six words from
   `src/lib/phraseWords.ts`, held on paper) → PBKDF2 → wraps the **master key**
