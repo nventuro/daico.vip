@@ -211,12 +211,16 @@ export default function AttachmentLightbox({
         </div>
 
         <div className="flex shrink-0 flex-col gap-3 bg-surface px-4 py-3 text-on-surface">
-          <div className="flex flex-col">
-            <span className={attachment.name ? 'font-medium' : 'text-muted'}>
-              {attachment.name || 'sin nombre'}
-            </span>
-            {hint && <span className="mt-1 text-sm text-muted">{hint}</span>}
-          </div>
+          {(attachment.name || hint) && (
+            <div className="flex flex-col">
+              {attachment.name && <span className="font-medium">{attachment.name}</span>}
+              {hint && (
+                <span className={`text-sm text-muted ${attachment.name ? 'mt-1' : ''}`}>
+                  {hint}
+                </span>
+              )}
+            </div>
+          )}
           <FormFooter
             removeLabel="Eliminar foto"
             confirmQuestion="¿Eliminar la foto?"
