@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode, type TouchEvent } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode, type TouchEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   IconChevronLeft,
@@ -56,7 +56,7 @@ export default function AttachmentLightbox({
   const url = useObjectUrl(view.status === 'ready' ? view.file : null);
   const uploadState = useAttachmentUploadState(attachment.id);
   const online = useOnline();
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
 
   const close = useCallback(() => {
     // Opened from the entry's page, that page is the previous history entry;
@@ -83,9 +83,9 @@ export default function AttachmentLightbox({
   }, [show, index, hasPrev, hasNext]);
 
   function touchEnd(e: TouchEvent) {
-    if (touchStartX === null) return;
-    const delta = e.changedTouches[0].clientX - touchStartX;
-    setTouchStartX(null);
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
     if (delta > LIGHTBOX_SWIPE_MIN_PX && hasPrev) show(index - 1);
     if (delta < -LIGHTBOX_SWIPE_MIN_PX && hasNext) show(index + 1);
   }
@@ -167,7 +167,9 @@ export default function AttachmentLightbox({
 
         <div
           className="relative min-h-0 flex-1"
-          onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+          }}
           onTouchEnd={touchEnd}
         >
           {url ? (
