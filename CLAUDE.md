@@ -235,6 +235,13 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   from Próximo. A new kind of mark is a new `EntryMark` member plus its icon.
 - **Nothing is destroyed on a single tap**: a delete goes through `FormFooter`'s
   confirm, or is reversible for a moment through `UndoBar` (`useUndo`).
+- **A wait is shown, never written**: no «Cargando...» text. A list still being
+  read holds its place with `SkeletonRows` in the shape of its rows; anything
+  being fetched (a picture, a guide image) carries `LoadingLine`; a gate still
+  resolving before the home screen (session, membership, key) renders `null`,
+  which keeps the splash in `index.html` up — that splash and `LoginScreen`
+  share one frame, keep them identical. A sync in progress is only ever the
+  diamond beside the wordmark (`useSyncStatus`), never a line or a message.
 - **No duplicated logic**: extract shared computation; check for existing helpers first.
 - **Zero lint errors**: run `npm run lint` after changes and fix everything before done.
 - **Prettier-formatted**: run `npm run format` after changes; CI fails on an unformatted

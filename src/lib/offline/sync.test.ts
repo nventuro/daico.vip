@@ -4,7 +4,7 @@ import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
 import { localDb } from './testing/sqlocalInMemory';
 import { server } from './testing/fakeSupabase';
 import * as engine from './engine';
-import { syncAll } from './sync';
+import { afterSync, getSyncStatus, resetSyncStatus, subscribeSyncStatus, syncAll } from './sync';
 
 vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 vi.mock('../supabase', () => import('./testing/fakeSupabase'));
@@ -58,6 +58,7 @@ beforeEach(async () => {
   server.reset();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   await engine.clearAll();
+  resetSyncStatus();
 });
 
 afterEach(() => {
@@ -279,5 +280,54 @@ describe('changes made while a push is in flight', () => {
     expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
     expect(server.rows('chores')).toEqual([]);
     expect(await bookkeeping('chores', id)).toBeNull();
+  });
+});
+
+describe('sync status', () => {
+  it('reports each table in turn and stamps the run once everything went through', async () => {
+    expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: null });
+    const seen: string[] = [];
+    const stop = subscribeSyncStatus(() => {
+      const { syncing, tables } = getSyncStatus();
+      const pulling = Object.entries(tables).find(([, state]) => state === 'pulling')?.[0];
+      seen.push(`${syncing ? 'on' : 'off'}:${pulling ?? '-'}`);
+    });
+    await syncAll();
+    stop();
+
+    expect(seen[0]).toBe('on:-');
+    expect(seen.at(-1)).toBe('off:-');
+    // Each table is the one being pulled, in spec order, and never two at once.
+    const pulled = seen.filter((s) => s !== 'on:-' && s !== 'off:-').map((s) => s.slice(3));
+    expect(pulled).toEqual(ALL_SPECS.map((spec) => spec.table));
+    expect(Object.values(getSyncStatus().tables)).toEqual(ALL_SPECS.map(() => 'done'));
+    expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: T0 });
+  });
+
+  it('leaves the run unstamped when a table or the after-sync work fails', async () => {
+    server.fail('select', 'chores');
+    await syncAll();
+    expect(getSyncStatus().completedAt).toBeNull();
+    expect(getSyncStatus().tables.chores).toBe('pending');
+    expect(getSyncStatus().tables.shopping_items).toBe('done');
+
+    server.restore();
+    const off = afterSync(async () => {
+      throw new Error('bucket down');
+    });
+    await syncAll();
+    off();
+    expect(getSyncStatus().completedAt).toBeNull();
+
+    at(T1);
+    await syncAll();
+    expect(getSyncStatus().completedAt).toBe(T1);
+  });
+
+  it('forgets the stamp when reset', async () => {
+    await syncAll();
+    expect(getSyncStatus().completedAt).toBe(T0);
+    resetSyncStatus();
+    expect(getSyncStatus()).toMatchObject({ completedAt: null, tables: {}, files: null });
   });
 });

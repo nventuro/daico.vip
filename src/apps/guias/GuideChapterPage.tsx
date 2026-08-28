@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useGuides } from './useGuides';
 import GuideMarkdown from './GuideMarkdown';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function GuideChapterPage() {
   const { guideId, chapterId } = useParams();
@@ -19,7 +20,7 @@ export default function GuideChapterPage() {
     window.scrollTo(0, 0);
   }, [chapterId]);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!guide || !chapter) return <p className="text-muted">Capítulo no encontrado.</p>;
 
   const navLink = 'inline-flex max-w-[48%] items-center gap-1 text-sm text-(--app) hover:underline';

@@ -17,6 +17,7 @@ import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
 import Button from './Button';
 import FormFooter from './FormFooter';
 import ModalDialog from './ModalDialog';
+import LoadingLine from './LoadingLine';
 
 function isFromEntryPage(state: unknown): boolean {
   return (
@@ -178,9 +179,11 @@ export default function AttachmentLightbox({
               alt={attachment.name}
               className="absolute inset-0 h-full w-full object-contain"
             />
+          ) : view.status === 'loading' ? (
+            <LoadingLine inverse className="absolute inset-x-0 bottom-0" />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-sm opacity-70">
-              {view.status === 'loading' ? 'Cargando...' : 'No disponible'}
+              No disponible
             </span>
           )}
           {hasPrev && (

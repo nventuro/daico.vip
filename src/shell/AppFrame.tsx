@@ -4,6 +4,7 @@ import type { TablerIcon } from '@tabler/icons-react';
 import type { AppHue } from '../apps/types';
 import AppHeader from './AppHeader';
 import { hueStyle } from './hue';
+import SkeletonRows from '../components/SkeletonRows';
 
 interface AppFrameProps {
   name: string;
@@ -15,7 +16,7 @@ export default function AppFrame({ name, hue, icon }: AppFrameProps) {
   return (
     <div className="flex flex-1 flex-col" style={hueStyle(hue)}>
       <AppHeader name={name} icon={icon} />
-      <Suspense fallback={<p className="text-muted">Cargando...</p>}>
+      <Suspense fallback={<SkeletonRows />}>
         <Outlet />
       </Suspense>
     </div>

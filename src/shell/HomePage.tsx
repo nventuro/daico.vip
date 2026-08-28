@@ -1,6 +1,9 @@
 import { apps } from '../apps/registry';
+import { useSyncStatus } from '../hooks/useSyncStatus';
+import { relativeDayTime, todayIso } from '../utils/dateUtils';
+import Motif from '../components/Motif';
+import OfflineBanner from '../components/OfflineBanner';
 import AppTile from './AppTile';
-import Motif from './Motif';
 import UpcomingStrip from './UpcomingStrip';
 
 /** Mirrors the grid's `grid-cols-2 sm:grid-cols-3`: the floor is completed
@@ -15,9 +18,16 @@ function fillers(columns: number): number {
 export default function HomePage() {
   const narrow = fillers(COLUMNS.narrow);
   const wide = fillers(COLUMNS.wide);
+  const { completedAt } = useSyncStatus();
 
   return (
     <div className="flex flex-col gap-5 pt-5">
+      {/* With no connection, what the screen shows is as old as the last run
+          that brought everything down: said here, once, for every app. */}
+      <OfflineBanner className="">
+        {completedAt &&
+          `Sin conexión — lo último es de ${relativeDayTime(todayIso(), completedAt)}.`}
+      </OfflineBanner>
       <UpcomingStrip />
       <ul className="-mx-4 grid grid-cols-2 gap-0.75 sm:grid-cols-3">
         {apps.map((app) => (

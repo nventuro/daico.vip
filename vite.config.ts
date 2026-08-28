@@ -53,8 +53,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'favicon-32.png', 'favicon-48.png', 'favicon-180.png'],
       manifest: {
-        name: 'Daico',
-        short_name: 'Daico',
+        name: 'daico',
+        short_name: 'daico',
         description: 'Organización del hogar.',
         lang: 'es-AR',
         start_url: '/',

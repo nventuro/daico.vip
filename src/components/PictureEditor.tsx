@@ -17,6 +17,7 @@ import {
 import Button from './Button';
 import FormField from './FormField';
 import TextInput from './TextInput';
+import LoadingLine from './LoadingLine';
 
 const PREVIEW = {
   type: 'image/jpeg',
@@ -161,12 +162,10 @@ export default function PictureEditor({
               onLoad={() => setCrop((current) => current ?? WHOLE_IMAGE)}
             />
           </ReactCrop>
+        ) : (refused ?? problem) ? (
+          <span className="px-4 text-center text-sm text-error">{refused ?? problem}</span>
         ) : (
-          <span
-            className={`px-4 text-center text-sm ${refused || problem ? 'text-error' : 'text-on-surface-inverse/70'}`}
-          >
-            {refused ?? problem ?? 'Cargando...'}
-          </span>
+          <LoadingLine inverse className="w-1/3" />
         )}
       </div>
 

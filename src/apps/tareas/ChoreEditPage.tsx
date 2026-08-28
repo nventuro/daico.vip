@@ -3,6 +3,7 @@ import type { ChoreInput } from './useChores';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
 import ChoreForm from './ChoreForm';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function ChoreEditPage() {
   const { id } = useParams();
@@ -12,7 +13,7 @@ export default function ChoreEditPage() {
 
   const chore = items.find((c) => c.id === id);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!chore) return <p className="text-muted">Tarea no encontrada.</p>;
 
   const handleSave = async (input: ChoreInput) => {

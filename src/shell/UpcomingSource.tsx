@@ -3,7 +3,7 @@ import type { AppId, Upcoming } from '../apps/types';
 
 interface UpcomingSourceProps {
   appId: AppId;
-  useUpcoming: () => Upcoming[];
+  useUpcoming: () => Upcoming[] | undefined;
   onItems: (appId: AppId, items: Upcoming[]) => void;
 }
 
@@ -14,8 +14,10 @@ interface UpcomingSourceProps {
 export default function UpcomingSource({ appId, useUpcoming, onItems }: UpcomingSourceProps) {
   const items = useUpcoming();
 
+  // Not reported until the table is read, so the strip can tell a pending
+  // list from an empty one.
   useEffect(() => {
-    onItems(appId, items);
+    if (items) onItems(appId, items);
   }, [appId, items, onItems]);
 
   return null;

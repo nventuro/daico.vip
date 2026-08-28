@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { GuideChapter } from '../../types';
 import SectionLabel from '../../components/SectionLabel';
 import { useGuides } from './useGuides';
+import SkeletonRows from '../../components/SkeletonRows';
 
 /** Chapters grouped by section, preserving the store's reading order. */
 function groupBySection(chapters: GuideChapter[]): { title: string; chapters: GuideChapter[] }[] {
@@ -19,7 +20,7 @@ export default function GuidePage() {
   const { guides, chapters, loading } = useGuides();
   const guide = guides.find((g) => g.id === guideId);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!guide) return <p className="text-muted">Guía no encontrada.</p>;
 
   const sections = groupBySection(chapters.filter((c) => c.guide_id === guide.id));

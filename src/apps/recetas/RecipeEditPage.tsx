@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { RecipeInput } from './useRecipes';
 import { useRecipes } from './useRecipes';
 import RecipeForm from './RecipeForm';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function RecipeEditPage() {
   const { id } = useParams();
@@ -10,7 +11,7 @@ export default function RecipeEditPage() {
 
   const recipe = items.find((r) => r.id === id);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!recipe) return <p className="text-muted">Receta no encontrada.</p>;
 
   const handleSave = async (input: RecipeInput) => {

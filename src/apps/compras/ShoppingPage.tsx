@@ -23,6 +23,7 @@ import SortableShoppingItem from './SortableShoppingItem';
 import AddBar from '../../components/AddBar';
 import Button from '../../components/Button';
 import UndoBar from '../../components/UndoBar';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function ShoppingPage() {
   const { items, loading, error, add, toggle, removeChecked, restore, move } = useShoppingList();
@@ -86,7 +87,7 @@ export default function ShoppingPage() {
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
         {loading ? (
-          <p className="text-muted">Cargando...</p>
+          <SkeletonRows leading="check" />
         ) : view.length === 0 ? (
           <p className="py-10 text-center text-muted">
             La lista está vacía. Agregá lo que necesites comprar.

@@ -3,6 +3,7 @@ import { IconClock, IconPencil, IconUsers } from '@tabler/icons-react';
 import Markdown from '../../components/Markdown';
 import { useRecipes } from './useRecipes';
 import { minutesLabel, servingsLabel } from './labels';
+import SkeletonRows from '../../components/SkeletonRows';
 
 const CHIP =
   'inline-flex items-center gap-1 border border-border bg-surface-raised px-3 py-1 text-sm text-muted';
@@ -13,7 +14,7 @@ export default function RecipePage() {
 
   const recipe = items.find((r) => r.id === id);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!recipe) return <p className="text-muted">Receta no encontrada.</p>;
 
   return (

@@ -3,6 +3,7 @@ import { useAttachments } from '../../hooks/useAttachments';
 import type { DocumentInput } from './useDocuments';
 import { useDocuments } from './useDocuments';
 import DocumentForm from './DocumentForm';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DocumentEditPage() {
   const { id } = useParams();
@@ -12,7 +13,7 @@ export default function DocumentEditPage() {
 
   const entry = items.find((d) => d.id === id);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!entry) return <p className="text-muted">Documento no encontrado.</p>;
 
   const handleSave = async (input: DocumentInput) => {

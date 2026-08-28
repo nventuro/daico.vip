@@ -12,6 +12,7 @@ import AddBar from '../../components/AddBar';
 import UndoBar from '../../components/UndoBar';
 import DueDateChips from './DueDateChips';
 import { choreMarks } from './marks';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, setDone } = useChores();
@@ -79,7 +80,7 @@ export default function ChoresPage() {
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
         {loading ? (
-          <p className="text-muted">Cargando...</p>
+          <SkeletonRows leading="check" subtitle />
         ) : (
           <>
             {active.length === 0 ? (

@@ -102,6 +102,16 @@ export function relativeDay(today: string, date: string): string {
   return `${namePart(target, { weekday: 'short' })} ${day} ${monthName}`;
 }
 
+/** When something happened, the way a person would say it: "hoy, 9:40",
+ *  "ayer, 21:15", "vie 18 sept, 9:40". `today` is yyyy-mm-dd; `timestamp` an
+ *  ISO instant, told in the device's time zone. */
+export function relativeDayTime(today: string, timestamp: string): string {
+  const at = new Date(timestamp);
+  const day = toIso(at.getFullYear(), at.getMonth() + 1, at.getDate());
+  const time = at.toLocaleTimeString('es-AR', { hour: 'numeric', minute: '2-digit' });
+  return `${relativeDay(today, day)}, ${time}`;
+}
+
 /** A day heading: "Jueves 27", or "Jueves 27 ago" when `withMonth`. */
 export function formatWeekdayDay(dateStr: string, withMonth: boolean): string {
   const [year, month, day] = parseIso(dateStr);

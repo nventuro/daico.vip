@@ -32,13 +32,8 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-surface text-on-surface">
-        <p className="text-lg text-muted">Cargando...</p>
-      </div>
-    );
-  }
+  // Nothing drawn keeps the splash up.
+  if (authLoading) return null;
 
   return (
     <AppProvider session={session}>

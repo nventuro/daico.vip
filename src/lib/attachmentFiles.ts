@@ -21,6 +21,7 @@ import {
 import { supabase } from './supabase';
 import * as engine from './offline/engine';
 import { ATTACHMENTS_SPEC } from './offline/specs';
+import { reportFiles } from './offline/sync';
 
 const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
 
@@ -107,10 +108,15 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
  */
 async function fetchDocumentFiles(): Promise<void> {
   const held = new Set(await engine.listAttachmentFileIds());
-  for (const attachment of await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)) {
-    if (attachment.owner_kind !== 'document' || held.has(attachment.id)) continue;
+  const missing = (await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).filter(
+    (attachment) => attachment.owner_kind === 'document' && !held.has(attachment.id),
+  );
+  reportFiles(0, missing.length);
+  let done = 0;
+  for (const attachment of missing) {
     const bytes = await downloadObject(attachment.id);
     if (bytes) await engine.putAttachmentFile(attachment.id, bytes, true);
+    reportFiles(++done, missing.length);
   }
 }
 

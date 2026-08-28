@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { IconKey, IconLock, type TablerIcon } from '@tabler/icons-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { IconKey, IconLock } from '@tabler/icons-react';
 import { HOUSEHOLD_PHRASE_WORDS, type HouseholdKey } from '../types';
 import { supabase } from '../lib/supabase';
 import { HOUSEHOLD_KEY_SPEC } from '../lib/offline/specs';
@@ -11,35 +11,11 @@ import { setMasterKey } from '../hooks/useMasterKey';
 import { useAppContext } from '../context/appContext';
 import Button from './Button';
 import CheckSquare from './CheckSquare';
+import Gate from './Gate';
 import PhraseWords from './PhraseWords';
 
 /** Postgres: a row that would break a unique index. */
 const UNIQUE_VIOLATION = '23505';
-
-function Gate({
-  icon: Icon,
-  title,
-  text,
-  children,
-}: {
-  icon: TablerIcon;
-  title: string;
-  text: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface px-4 text-on-surface">
-      <div className="flex w-full max-w-sm flex-col items-center text-center">
-        <div className="mb-5 flex h-14 w-14 items-center justify-center border border-border bg-surface-raised text-muted">
-          <Icon size={28} stroke={1.5} />
-        </div>
-        <h2 className="mb-2 font-display text-2xl font-black tracking-tight">{title}</h2>
-        <p className="text-muted">{text}</p>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function SignOutLink() {
   const { signOut } = useAppContext();
@@ -199,9 +175,6 @@ export default function UnlockScreen() {
     );
   }
   if (serverHasKey === false) return <NewPhraseForm />;
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface text-on-surface">
-      <p className="text-lg text-muted">Cargando...</p>
-    </div>
-  );
+  // Still finding out which: nothing drawn keeps the splash up.
+  return null;
 }

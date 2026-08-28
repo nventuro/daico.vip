@@ -3,6 +3,7 @@ import { todayIso } from '../utils/dateUtils';
 import SectionLabel from '../components/SectionLabel';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
+import SkeletonRows from '../components/SkeletonRows';
 
 /** Everything coming up across the apps, grouped by day. */
 export default function ProximoPage() {
@@ -11,7 +12,7 @@ export default function ProximoPage() {
   return (
     <UpcomingRows>
       {(rows, ready) => {
-        if (!ready) return <p className="text-muted">Cargando...</p>;
+        if (!ready) return <SkeletonRows leading="square" trailing />;
         if (rows.length === 0) {
           return <p className="py-10 text-center text-muted">No hay nada por delante.</p>;
         }

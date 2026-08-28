@@ -41,6 +41,35 @@
   --color-on-error: #ede6d6;
   --color-warning: #c7891f;
   --color-success: #5e6e33;
+
+  /* The loading line's segment, sweeping along its track. */
+  --animate-sweep: sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  /* The sync mark turning beside the wordmark. */
+  --animate-turn: turn 1.8s linear infinite;
+  /* A hint that only appears once a wait has gone on for a while. */
+  --animate-late-hint: late-hint 0.3s ease-out 5s both;
+
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+  @keyframes turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes late-hint {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {
@@ -50,6 +79,13 @@
     color: var(--color-on-surface);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* The splash in index.html paints before any script runs and stays until
+     React has drawn something into the root, whatever screen that turns out
+     to be. */
+  #root:not(:empty) + #splash {
+    display: none;
   }
 }
 

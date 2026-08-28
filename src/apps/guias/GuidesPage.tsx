@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
 import { useGuides } from './useGuides';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function GuidesPage() {
   const { guides, loading, error } = useGuides();
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
 
   return (
     <div className="flex flex-col">

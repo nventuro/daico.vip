@@ -1,13 +1,15 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { IconLogout, IconSearch } from '@tabler/icons-react';
 import { useAppContext } from '../context/appContext';
 import { useOnline } from '../hooks/useOnline';
 import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
+import { useSyncStatus } from '../hooks/useSyncStatus';
 import LoginScreen from '../components/LoginScreen';
 import NoAccess from '../components/NoAccess';
 import UnlockScreen from '../components/UnlockScreen';
+import FirstSyncScreen from './FirstSyncScreen';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
 const TabConflict = lazy(() => import('../components/TabConflict'));
@@ -17,6 +19,8 @@ export default function MainLayout() {
   const online = useOnline();
   const dbOwnership = useDbOwnership();
   const masterKey = useMasterKey();
+  const sync = useSyncStatus();
+  const [enteredEarly, setEnteredEarly] = useState(false);
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccess />;
@@ -31,12 +35,26 @@ export default function MainLayout() {
   // is typed: the documents it would show are unreadable without it.
   if (masterKey.status === 'loading') return null;
   if (masterKey.status === 'locked') return <UnlockScreen />;
+  // A device that has never brought everything down shows what is on its way,
+  // unless the member would rather go in meanwhile.
+  if (sync.completedAt === null && !enteredEarly)
+    return <FirstSyncScreen onEnter={() => setEnteredEarly(true)} />;
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
       <header className="sticky top-0 z-10 border-b-2 border-on-surface bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <span className="font-display text-2xl font-black tracking-tight">daico</span>
+          <span className="flex items-center gap-2.5">
+            <span className="font-display text-2xl font-black tracking-tight">daico</span>
+            {sync.syncing && (
+              <span
+                role="status"
+                aria-label="Sincronizando"
+                title="Sincronizando"
+                className="size-2.5 animate-turn bg-on-surface"
+              />
+            )}
+          </span>
           <div className="flex items-center gap-1">
             <Link
               to="/buscar"

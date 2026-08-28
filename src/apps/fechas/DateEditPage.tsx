@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { DateInput } from './useDates';
 import { useDates } from './useDates';
 import DateForm from './DateForm';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DateEditPage() {
   const { id } = useParams();
@@ -10,7 +11,7 @@ export default function DateEditPage() {
 
   const entry = items.find((e) => e.id === id);
 
-  if (loading) return <p className="text-muted">Cargando...</p>;
+  if (loading) return <SkeletonRows />;
   if (!entry) return <p className="text-muted">Fecha no encontrada.</p>;
 
   const handleSave = async (input: DateInput) => {

@@ -8,11 +8,13 @@ export default function LoginScreen() {
   const { signIn } = useAppContext();
   const online = useOnline();
 
+  // The same frame as the splash this screen takes over from, so nothing
+  // moves: the mark at the screen's centre, the rest hanging below it.
   return (
-    <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-sm text-center">
-          <Logo className="mx-auto mb-5 h-30 w-30" />
+    <div className="grid min-h-dvh grid-rows-[1fr_auto_1fr] justify-items-center bg-surface text-on-surface">
+      <Logo className="row-start-2 h-30 w-30" />
+      <div className="row-start-3 flex w-full flex-col items-center px-4 pt-5 text-center">
+        <div className="flex w-full max-w-sm flex-col items-center">
           <h1 className="mb-1.5 font-display text-5xl font-black tracking-tight">daico</h1>
           <p className="mb-10 text-muted">Todo en orden, en un solo lugar.</p>
 
@@ -27,8 +29,8 @@ export default function LoginScreen() {
           </button>
           {!online && <p className="mt-4 text-sm text-muted">Necesitás conexión para ingresar.</p>}
         </div>
+        <Footer className="mt-auto py-8" />
       </div>
-      <Footer className="px-4 pb-8" />
     </div>
   );
 }

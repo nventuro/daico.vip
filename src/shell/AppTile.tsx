@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { AppModule } from '../apps/types';
 import { hueStyle } from './hue';
-import Motif from './Motif';
+import Motif from '../components/Motif';
 
 export default function AppTile({ app }: { app: AppModule }) {
   const Icon = app.icon;

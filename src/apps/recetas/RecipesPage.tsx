@@ -5,6 +5,7 @@ import OfflineBanner from '../../components/OfflineBanner';
 import AddBar from '../../components/AddBar';
 import { useRecipes } from './useRecipes';
 import { minutesLabel, servingsLabel } from './labels';
+import SkeletonRows from '../../components/SkeletonRows';
 
 /** "N min · N porciones", with only the parts that are set. */
 function metaLine(recipe: Recipe): string {
@@ -36,7 +37,7 @@ export default function RecipesPage() {
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
         {loading ? (
-          <p className="text-muted">Cargando...</p>
+          <SkeletonRows subtitle />
         ) : items.length === 0 ? (
           <p className="py-10 text-center text-muted">Todavía no hay recetas.</p>
         ) : (

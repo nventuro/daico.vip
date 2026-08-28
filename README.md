@@ -79,9 +79,29 @@ Three pieces make this work:
   client-generated UUID so an offline-created row has a stable identity before
   it ever reaches the server.
 
-The membership check is also offline-tolerant: it falls back to the last-known
-verdict cached per user, so a member isn't locked out with no signal. This is only
-a UI gate — the server's RLS is still the real authority (see `CLAUDE.md`).
+The membership check is also offline-tolerant: the verdict cached per user
+answers first — so a launch never waits on the server — and the live read then
+confirms or revokes it; with no signal the cached verdict stands, so a member
+isn't locked out. This is only a UI gate — the server's RLS is still the real
+authority (see `CLAUDE.md`).
+
+### Loading
+
+Nothing says "Cargando". The page paints a **splash** before any script runs —
+static markup in `index.html`: the mark at the screen's centre (where an
+installed app's system splash draws its icon), the wordmark and a sweeping
+line — and a rule in `index.css` hides it once React has drawn anything into
+`#root`; a gate still resolving (session, membership, key) renders `null`, so
+the splash simply stays, and the login screen shares its frame so nothing moves
+when it takes over. `sync.ts` keeps a **sync status** (`useSyncStatus`):
+whether a run is on — the mark's diamond turns beside the wordmark — and when a
+run last went through whole on this device, which the home screen quotes while
+offline. Until one has, `FirstSyncScreen` shows the apps' tables and the
+documents' files coming down (a run counts as whole only when every table and
+the after-sync file work succeed). A list still being read holds its place with
+`SkeletonRows` in the shape of its rows; anything being fetched — a picture, a
+guide image, a table on the first sync — carries `LoadingLine`, the one mark
+for a wait.
 
 ### Adding another offline table
 

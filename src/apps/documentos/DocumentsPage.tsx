@@ -5,6 +5,7 @@ import AddBar from '../../components/AddBar';
 import { todayIso } from '../../utils/dateUtils';
 import { useDocuments } from './useDocuments';
 import { expiryLabel, hasExpired } from './expiry';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DocumentsPage() {
   const { items, loading, error, add } = useDocuments();
@@ -29,7 +30,7 @@ export default function DocumentsPage() {
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
         {loading ? (
-          <p className="text-muted">Cargando...</p>
+          <SkeletonRows subtitle />
         ) : items.length === 0 ? (
           <p className="py-10 text-center text-muted">Todavía no hay documentos.</p>
         ) : (

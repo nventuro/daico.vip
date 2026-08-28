@@ -9,6 +9,7 @@ import { useDates } from './useDates';
 import { groupByMonth, splitByToday } from './recurrence';
 import DateFields, { type DateFieldsValue } from './DateFields';
 import DateRow from './DateRow';
+import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DatesPage() {
   const { items, loading, error, add, remove } = useDates();
@@ -50,7 +51,7 @@ export default function DatesPage() {
         {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
 
         {loading ? (
-          <p className="text-muted">Cargando...</p>
+          <SkeletonRows subtitle />
         ) : (
           <>
             {upcoming.length === 0 ? (

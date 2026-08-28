@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { IconArrowLeft, type TablerIcon } from '@tabler/icons-react';
-import Motif from './Motif';
+import Motif from '../components/Motif';
 import { parentPath } from './parentPath';
 
 /** The band at the top of an app's screens: full-bleed in the app's colour,
