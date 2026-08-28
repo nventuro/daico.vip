@@ -112,6 +112,9 @@ export default function PictureEditor({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    // The entry's own form is an ancestor in the React tree, if not in the
+    // document, and must not take this submit for its own.
+    e.stopPropagation();
     if (!image || busy) return;
     setBusy(true);
     try {
@@ -141,14 +144,16 @@ export default function PictureEditor({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="flex h-[50dvh] items-center justify-center overflow-hidden bg-surface-inverse">
+      {/* Padded so the selection's handles, which sit astride the picture's
+          edges, have room when the picture fills the stage. */}
+      <div className="flex h-[50dvh] items-center justify-center overflow-hidden bg-surface-inverse p-3">
         {previewUrl ? (
           <ReactCrop
             crop={crop}
             onChange={(_, percent) => setCrop(percent)}
             keepSelection
             ariaLabels={CROP_LABELS}
-            className="max-h-[50dvh]"
+            className="max-h-[calc(50dvh-1.5rem)]"
           >
             <img
               src={previewUrl}

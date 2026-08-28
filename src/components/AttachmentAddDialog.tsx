@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { IconX } from '@tabler/icons-react';
-import { useModalDialog } from '../hooks/useModalDialog';
+import ModalDialog from './ModalDialog';
 import PictureEditor from './PictureEditor';
 
 interface AttachmentAddDialogProps {
@@ -20,7 +20,6 @@ interface AttachmentAddDialogProps {
  */
 export default function AttachmentAddDialog({ files, onSave, onClose }: AttachmentAddDialogProps) {
   const [index, setIndex] = useState(0);
-  const dialogRef = useModalDialog(onClose);
   const last = index === files.length - 1;
 
   function next() {
@@ -35,8 +34,8 @@ export default function AttachmentAddDialog({ files, onSave, onClose }: Attachme
   }
 
   return (
-    <dialog
-      ref={dialogRef}
+    <ModalDialog
+      onClose={onClose}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto bg-surface p-0 text-on-surface backdrop:bg-on-surface/50 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:w-full sm:max-w-lg sm:border sm:border-border"
     >
       <div className="flex flex-col gap-4 p-4">
@@ -63,6 +62,6 @@ export default function AttachmentAddDialog({ files, onSave, onClose }: Attachme
           onSkip={next}
         />
       </div>
-    </dialog>
+    </ModalDialog>
   );
 }

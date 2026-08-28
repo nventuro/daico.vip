@@ -10,13 +10,13 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { LIGHTBOX_FROM_ENTRY_PAGE, LIGHTBOX_SWIPE_MIN_PX, type Attachment } from '../types';
-import { useModalDialog } from '../hooks/useModalDialog';
 import { useOnline } from '../hooks/useOnline';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
 import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
 import Button from './Button';
 import FormFooter from './FormFooter';
+import ModalDialog from './ModalDialog';
 
 function isFromEntryPage(state: unknown): boolean {
   return (
@@ -64,7 +64,6 @@ export default function AttachmentLightbox({
     if (isFromEntryPage(location.state)) navigate(-1);
     else navigate(ownerPath, { replace: true });
   }, [location.state, navigate, ownerPath]);
-  const dialogRef = useModalDialog(close);
 
   const show = useCallback(
     (i: number) =>
@@ -144,8 +143,8 @@ export default function AttachmentLightbox({
   }
 
   return (
-    <dialog
-      ref={dialogRef}
+    <ModalDialog
+      onClose={close}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-surface-inverse p-0 text-on-surface-inverse backdrop:bg-transparent"
     >
       <div className="flex h-full flex-col">
@@ -226,6 +225,6 @@ export default function AttachmentLightbox({
           />
         </div>
       </div>
-    </dialog>
+    </ModalDialog>
   );
 }

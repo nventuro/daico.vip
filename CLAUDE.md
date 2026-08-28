@@ -218,7 +218,8 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 - **Forms and buttons are built from the shared primitives in `src/components/`**:
   `FormField`, `TextInput`, `TextArea`, `Chip` (one of a row of choices), `Button`
   (variants `primary` / `outline` / `danger` / `dangerOutline`), `FormFooter` (an
-  edit form's delete-with-confirm + submit row) and `UndoBar`. Never hand-write
+  edit form's delete-with-confirm + submit row), `UndoBar` and `ModalDialog` (a
+  modal `<dialog>`, rendered outside whatever form its caller sits in). Never hand-write
   control or button classes in a page; a control with no component of its own
   takes its classes from `src/components/controlClasses.ts`. This is what keeps
   every app looking like one app.
