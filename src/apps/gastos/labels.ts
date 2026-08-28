@@ -28,8 +28,8 @@ export const UNCATEGORIZED_LABEL = 'Sin categoría';
 
 /** Each layout by the card it is for. */
 export const FORMAT_LABELS: Record<StatementFormat, string> = {
-  'galicia-visa': 'Visa',
-  'galicia-mastercard': 'Mastercard',
+  'galicia-visa': 'visa',
+  'galicia-mastercard': 'mastercard',
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
