@@ -127,9 +127,16 @@ export function formatWeekdayDay(dateStr: string, withMonth: boolean): string {
  * `currentYear`, "Marzo 2027" otherwise.
  */
 export function monthLabel(yearMonth: string, currentYear: number): string {
+  const year = Number(yearMonth.split('-')[0]);
+  const name = capitalize(monthName(yearMonth, 'long'));
+  return year === currentYear ? name : `${name} ${year}`;
+}
+
+/** The month of a yyyy-mm string (or a date in it) by its es-AR name, lower-case
+ *  and without the abbreviation dot: "agosto", or "ago" when `style` is short. */
+export function monthName(yearMonth: string, style: 'long' | 'short'): string {
   const [year, month] = yearMonth.split('-').map(Number);
-  const name = new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'long' });
-  return year === currentYear ? capitalize(name) : `${capitalize(name)} ${year}`;
+  return namePart(new Date(year, month - 1, 1), { month: style });
 }
 
 /** The notice windows the apps offer, by their label; any other count of

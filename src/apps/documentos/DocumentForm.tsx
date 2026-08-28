@@ -5,6 +5,7 @@ import { hasChanges } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
+import DatePicker from '../../components/DatePicker';
 import FormFooter from '../../components/FormFooter';
 import AttachmentGrid from '../../components/AttachmentGrid';
 import { CONTROL_CLASS } from '../../components/controlClasses';
@@ -50,13 +51,7 @@ export default function DocumentForm({ entry, onSave, onRemove }: DocumentFormPr
       </FormField>
 
       <FormField label="Vence">
-        <input
-          type="date"
-          value={expiresOn ?? ''}
-          onChange={(e) => setExpiresOn(e.target.value || null)}
-          aria-label="Vence"
-          className={CONTROL_CLASS}
-        />
+        <DatePicker value={expiresOn} onChange={setExpiresOn} label="Vence" />
       </FormField>
 
       {expiresOn && (

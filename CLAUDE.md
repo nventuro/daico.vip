@@ -244,7 +244,10 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 - **Types**: shared types in `src/types.ts`.
 - **No magic numbers**: domain constants must be named in `src/types.ts`, never hardcoded.
 - **Date format**: always dd/mm order, never mm/dd. Use `formatDate` (long locale) or
-  `formatDateShort` (dd/mm/yyyy) from `src/utils/dateUtils.ts`.
+  `formatDateShort` (dd/mm/yyyy) from `src/utils/dateUtils.ts`. A date is picked with
+  `DatePicker` (or `NativeDatePicker` behind a control of your own): a native
+  `<input type="date">` prints in the browser's language. ESLint enforces both
+  (`no-restricted-syntax` in `eslint.config.js`).
 - **Icon-only controls**: must have an accessible label (`aria-label` + `title`).
 - **Forms and buttons are built from the shared primitives in `src/components/`**:
   `FormField`, `TextInput`, `TextArea`, `Chip` (one of a row of choices), `Button`

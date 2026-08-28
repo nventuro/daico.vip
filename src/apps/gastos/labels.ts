@@ -3,6 +3,7 @@ import {
   type SpendingCategory,
   type StatementFormat,
 } from '../../types';
+import { monthName } from '../../utils/dateUtils';
 
 /** Each category as shown to the user. */
 export const CATEGORY_LABELS: Record<SpendingCategory, string> = {
@@ -77,18 +78,14 @@ export function formatPercentDelta(now: number, before: number): string {
 
 /** A yyyy-mm (or a date in it) as its month and year: "Agosto 2026". */
 export function monthTitle(yearMonth: string): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const name = new Date(year, month - 1, 1).toLocaleDateString('es-AR', { month: 'long' });
-  return `${capitalize(name)} ${year}`;
+  const [year] = yearMonth.split('-');
+  return `${capitalize(monthName(yearMonth, 'long'))} ${year}`;
 }
 
 /** A yyyy-mm as a short month and year: "sep 2026". */
 export function monthShort(yearMonth: string): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const name = new Date(year, month - 1, 1)
-    .toLocaleDateString('es-AR', { month: 'short' })
-    .replace(/\.$/, '');
-  return `${name} ${year}`;
+  const [year] = yearMonth.split('-');
+  return `${monthName(yearMonth, 'short')} ${year}`;
 }
 
 /** How a line says who made it: the card's last digits when printed, else

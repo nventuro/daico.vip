@@ -14,6 +14,7 @@ import {
   CONTROL_CLASS,
   FIELD_CLASS,
 } from '../../components/controlClasses';
+import DatePicker from '../../components/DatePicker';
 import { noticeLabel } from '../../utils/dateUtils';
 import type { DateInput } from './useDates';
 import { repeatLabel } from './labels';
@@ -73,11 +74,12 @@ export default function DateFields({
       {field(
         'Fecha',
         <IconCalendarEvent size={18} stroke={1.5} />,
-        <input
-          type="date"
+        <DatePicker
           value={occursOn}
-          onChange={(e) => onChange({ occurs_on: e.target.value })}
-          aria-label="Fecha"
+          onChange={(value) => {
+            if (value) onChange({ occurs_on: value });
+          }}
+          label="Fecha"
           required
           className={control}
         />,
