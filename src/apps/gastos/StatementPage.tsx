@@ -13,6 +13,8 @@ import { useStatementContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
 import {
   byCategory,
+  isOneOff,
+  isOneOffCategory,
   largestFirst,
   lineCents,
   monthOf,
@@ -89,9 +91,9 @@ export default function StatementPage() {
   const toPay = toPayCents(contents);
   const total = totalCents(contents);
   const previousTotal = previousContents ? totalCents(previousContents) : null;
-  const { usual, oneOff } = usualAndOneOff(contents);
+  const { usual, oneOff } = usualAndOneOff(contents, rules);
   const largestShare = Math.max(...shares.map((s) => s.cents), 1);
-  const oneOffs = contents.lines.flatMap((line, i) => (line.one_off ? [i] : []));
+  const oneOffs = contents.lines.flatMap((line, i) => (isOneOff(line, rules) ? [i] : []));
   const overdue = !statement.paid && contents.due_on < today;
   const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
   const selectedLine = selected === null ? null : contents.lines[selected];
@@ -145,15 +147,21 @@ export default function StatementPage() {
   // under the last too, for a list nothing else closes.
   const renderLines = (indices: number[], closed = false) => (
     <ul className={`divide-y divide-border ${closed ? 'border-b border-border' : ''}`}>
-      {largestFirst(contents, indices).map((i) => (
-        <LineRow
-          key={i}
-          line={contents.lines[i]}
-          cents={cents(i)}
-          onSelect={() => setSelected(i)}
-          onToggleOneOff={() => toggleOneOff(i)}
-        />
-      ))}
+      {largestFirst(contents, indices).map((i) => {
+        // A line its category already sets apart takes no mark of its own:
+        // it is filed differently, not unmarked.
+        const fixed = isOneOffCategory(categoryOf(contents.lines[i], rules).category);
+        return (
+          <LineRow
+            key={i}
+            line={contents.lines[i]}
+            cents={cents(i)}
+            oneOff={fixed || contents.lines[i].one_off}
+            onSelect={() => setSelected(i)}
+            onToggleOneOff={fixed ? undefined : () => toggleOneOff(i)}
+          />
+        );
+      })}
     </ul>
   );
 

@@ -7,10 +7,12 @@ interface LineRowProps {
   line: StatementLine;
   /** The line in pesos, its dollars valued at the statement's rate. */
   cents: number;
+  /** Whether the line is set apart from the usual spending. */
+  oneOff?: boolean;
   /** Opens the line to file it. */
   onSelect: () => void;
-  /** Marks the line as a one-off, or unmarks it; without it the row carries
-   *  no flag. */
+  /** Marks the line as a one-off, or unmarks it; without it the flag is only
+   *  shown, for a one-off the user cannot take back. */
   onToggleOneOff?: () => void;
 }
 
@@ -18,8 +20,15 @@ interface LineRowProps {
  *  came to. The row opens it; the flag at its end says whether it is a
  *  one-off and toggles that, on a target of its own so a thumb landing on
  *  the text never marks anything by accident. */
-export default function LineRow({ line, cents, onSelect, onToggleOneOff }: LineRowProps) {
-  const flagLabel = line.one_off ? 'Quitar puntual' : 'Marcar como puntual';
+export default function LineRow({
+  line,
+  cents,
+  oneOff = false,
+  onSelect,
+  onToggleOneOff,
+}: LineRowProps) {
+  const flagLabel = oneOff ? 'Quitar puntual' : 'Marcar como puntual';
+  const flagClass = 'flex shrink-0 items-center pl-4 transition-colors';
   return (
     <li className="flex items-stretch">
       <button
@@ -45,19 +54,30 @@ export default function LineRow({ line, cents, onSelect, onToggleOneOff }: LineR
           )}
         </span>
       </button>
-      {onToggleOneOff && (
+      {onToggleOneOff ? (
         <button
           type="button"
           onClick={onToggleOneOff}
-          aria-pressed={line.one_off}
+          aria-pressed={oneOff}
           aria-label={flagLabel}
           title={flagLabel}
-          className={`flex shrink-0 items-center pl-4 transition-colors ${
-            line.one_off ? 'text-(--app)' : 'text-neutral-hover hover:text-muted'
+          className={`${flagClass} ${
+            oneOff ? 'text-(--app)' : 'text-neutral-hover hover:text-muted'
           }`}
         >
-          <IconFlag size={18} stroke={1.5} fill={line.one_off ? 'currentColor' : 'none'} />
+          <IconFlag size={18} stroke={1.5} fill={oneOff ? 'currentColor' : 'none'} />
         </button>
+      ) : (
+        oneOff && (
+          <span
+            role="img"
+            aria-label="Puntual por su categoría"
+            title="Puntual por su categoría"
+            className={`${flagClass} text-(--app)`}
+          >
+            <IconFlag size={18} stroke={1.5} fill="currentColor" />
+          </span>
+        )
       )}
     </li>
   );

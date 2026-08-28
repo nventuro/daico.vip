@@ -44,7 +44,12 @@ const statement = (over: Partial<StatementContents>): StatementContents => ({
 const RULES: Rule[] = [
   { id: 'r', pattern: 'TIENDA SOL', category: 'supermercado' },
   { id: 'n', pattern: 'LUMEN', category: 'suscripciones' },
+  { id: 't', pattern: 'TURISMO SA', category: 'viajes' },
 ];
+
+const trip = statement({
+  lines: [line({ description: 'TURISMO SA 4471', ars_cents: 90_000 })],
+});
 
 const august = statement({
   lines: [
@@ -80,8 +85,12 @@ describe('byCategory', () => {
 
 describe('usualAndOneOff', () => {
   it('splits the total by the mark', () => {
-    expect(usualAndOneOff(august)).toEqual({ usual: 1_960_000, oneOff: 5_000 });
+    expect(usualAndOneOff(august, RULES)).toEqual({ usual: 1_960_000, oneOff: 5_000 });
     expect(totalCents(august)).toBe(1_965_000);
+  });
+
+  it('counts a line its category sets apart, with no mark on it', () => {
+    expect(usualAndOneOff(trip, RULES)).toEqual({ usual: 0, oneOff: 90_000 });
   });
 });
 
@@ -132,6 +141,11 @@ describe('byMonth', () => {
 
   it('leaves the one-offs out of the usual spending', () => {
     expect(byMonth([julyVisa], RULES, 'usual')[0].cents).toBe(0);
+  });
+
+  it('leaves out what a category sets apart as well', () => {
+    expect(byMonth([trip], RULES, 'usual')[0].cents).toBe(0);
+    expect(byMonth([trip], RULES, 'total')[0]).toMatchObject({ usual: 0, oneOff: 90_000 });
   });
 
   it('follows one category', () => {

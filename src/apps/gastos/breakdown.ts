@@ -3,7 +3,7 @@
 // one-off, and month by month across statements. All in pesos, a dollar line
 // valued at its own statement's rate.
 // =============================================================================
-import type { SpendingCategory, StatementFormat } from '../../types';
+import { ONE_OFF_CATEGORIES, type SpendingCategory, type StatementFormat } from '../../types';
 import { categoryOf, type Rule } from './rules';
 import type { StatementContents, StatementLine } from './statement';
 
@@ -59,13 +59,27 @@ export function byCategory(contents: StatementContents, rules: Rule[]): Category
   return [...shares.values()].sort((a, b) => b.cents - a.cents);
 }
 
+/** Whether every movement a category holds is a one-off. */
+export function isOneOffCategory(category: SpendingCategory | null): boolean {
+  return category !== null && ONE_OFF_CATEGORIES.includes(category);
+}
+
+/** Whether a line is set apart from the usual spending: marked by the user,
+ *  or filed under a category that is a one-off on its own. */
+export function isOneOff(line: StatementLine, rules: Rule[]): boolean {
+  return line.one_off || isOneOffCategory(categoryOf(line, rules).category);
+}
+
 /** What the usual spending and the one-offs come to. */
-export function usualAndOneOff(contents: StatementContents): { usual: number; oneOff: number } {
+export function usualAndOneOff(
+  contents: StatementContents,
+  rules: Rule[],
+): { usual: number; oneOff: number } {
   let usual = 0;
   let oneOff = 0;
   for (const line of contents.lines) {
     const value = lineCents(line, contents.usd_rate);
-    if (line.one_off) oneOff += value;
+    if (isOneOff(line, rules)) oneOff += value;
     else usual += value;
   }
   return { usual, oneOff };
@@ -103,12 +117,13 @@ export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick
     const row = months.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0, formats: [] };
     if (!row.formats.includes(contents.format)) row.formats.push(contents.format);
     for (const line of contents.lines) {
-      if (pick === 'usual' && line.one_off) continue;
+      const oneOff = isOneOff(line, rules);
+      if (pick === 'usual' && oneOff) continue;
       if (pick !== 'total' && pick !== 'usual' && categoryOf(line, rules).category !== pick)
         continue;
       const value = lineCents(line, contents.usd_rate);
       row.cents += value;
-      if (line.one_off) row.oneOff += value;
+      if (oneOff) row.oneOff += value;
       else row.usual += value;
     }
     months.set(month, row);

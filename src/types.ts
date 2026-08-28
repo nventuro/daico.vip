@@ -231,6 +231,10 @@ export const SPENDING_CATEGORIES = [
 ] as const;
 export type SpendingCategory = (typeof SPENDING_CATEGORIES)[number];
 
+/** The categories whose movements are one-offs on their own: a trip is never
+ *  part of a month's usual spending, so it needs no mark of its own. */
+export const ONE_OFF_CATEGORIES: readonly SpendingCategory[] = ['viajes'];
+
 /**
  * One credit-card statement, read on the device from the bank's PDF. The row
  * keeps in the clear only what lists it and announces its due date; the
