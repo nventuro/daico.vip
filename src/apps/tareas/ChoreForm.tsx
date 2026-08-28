@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import type { Chore } from '../../types';
-import { formatDate, todayIso } from '../../utils/dateUtils';
+import { todayIso } from '../../utils/dateUtils';
 import { hasChanges } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import FormField from '../../components/FormField';
@@ -53,9 +53,6 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
 
       <FormField label="Fecha" group>
         <DueDateChips value={dueOn} onChange={setDueOn} today={today} />
-        <p className="text-sm text-muted-strong">
-          {dueOn ? formatDate(dueOn) : 'Sin fecha límite'}
-        </p>
       </FormField>
 
       <FormField label="Notas">
