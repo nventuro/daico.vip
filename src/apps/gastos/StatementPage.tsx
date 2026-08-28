@@ -28,6 +28,7 @@ import {
   UNCATEGORIZED_LABEL,
   carriedLabel,
   formatArs,
+  formatArsCompact,
   formatDelta,
   formatPercentDelta,
   formatUsd,
@@ -67,12 +68,7 @@ export default function StatementPage() {
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<number | null>(null);
 
-  const shares = useMemo(() => {
-    if (!contents) return [];
-    const all = byCategory(contents, rules);
-    // What is not filed yet comes first: it is what needs a hand.
-    return [...all.filter((s) => s.category === null), ...all.filter((s) => s.category !== null)];
-  }, [contents, rules]);
+  const shares = useMemo(() => (contents ? byCategory(contents, rules) : []), [contents, rules]);
   const previousByCategory = useMemo(() => {
     const map = new Map<SpendingCategory | null, number>();
     if (previousContents) {
@@ -106,27 +102,23 @@ export default function StatementPage() {
     });
   }
 
-  async function handleSave(change: RuleChange | null, oneOff: boolean) {
+  async function handleSave(change: RuleChange | 'remove' | null) {
     if (masterKey.status !== 'unlocked' || !statement || !contents || selected === null) return;
-    const line = contents.lines[selected];
-    const { rule } = categoryOf(line, rules);
-    if (change && rule) {
+    const { rule } = categoryOf(contents.lines[selected], rules);
+    if (change === 'remove') {
+      if (rule) await rulesStore.remove(rule.id);
+    } else if (change && rule) {
       await rulesStore.save(rule.id, change, masterKey.key);
     } else if (change) {
       await rulesStore.add(change.pattern, change.category, masterKey.key);
     }
-    if (oneOff !== line.one_off) {
-      const lines = contents.lines.map((l, i) => (i === selected ? { ...l, one_off: oneOff } : l));
-      await replace(statement.id, { ...contents, lines }, masterKey.key);
-    }
     setSelected(null);
   }
 
-  async function handleRemoveRule() {
-    if (!contents || selected === null) return;
-    const { rule } = categoryOf(contents.lines[selected], rules);
-    if (rule) await rulesStore.remove(rule.id);
-    setSelected(null);
+  async function toggleOneOff(i: number) {
+    if (masterKey.status !== 'unlocked' || !statement || !contents) return;
+    const lines = contents.lines.map((l, j) => (j === i ? { ...l, one_off: !l.one_off } : l));
+    await replace(statement.id, { ...contents, lines }, masterKey.key);
   }
 
   async function handleRemove() {
@@ -135,14 +127,17 @@ export default function StatementPage() {
     navigate('/gastos');
   }
 
-  const renderLines = (indices: number[]) => (
-    <ul>
+  // The lines `indices` name, hairlines between them; `closed` draws one
+  // under the last too, for a list nothing else closes.
+  const renderLines = (indices: number[], closed = false) => (
+    <ul className={`divide-y divide-border ${closed ? 'border-b border-border' : ''}`}>
       {largestFirst(contents, indices).map((i) => (
         <LineRow
           key={i}
           line={contents.lines[i]}
           cents={cents(i)}
           onSelect={() => setSelected(i)}
+          onToggleOneOff={() => void toggleOneOff(i)}
         />
       ))}
     </ul>
@@ -232,16 +227,13 @@ export default function StatementPage() {
                   aria-expanded={open}
                   className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-border-subtle"
                 >
-                  {share.category === null && (
-                    <span aria-hidden className="size-3 shrink-0 bg-warning" />
-                  )}
                   <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="truncate text-on-surface">
                         {share.category ? CATEGORY_LABELS[share.category] : UNCATEGORIZED_LABEL}{' '}
                         <span className="text-xs text-muted">{share.lines.length}</span>
                       </span>
-                      <span className="shrink-0 tabular-nums">{formatArs(share.cents)}</span>
+                      <span className="shrink-0 tabular-nums">{formatArsCompact(share.cents)}</span>
                     </span>
                     <span className="flex items-center gap-3">
                       <SpendBar usual={share.cents} max={largestShare} />
@@ -267,7 +259,7 @@ export default function StatementPage() {
             Puntuales{' '}
             <span className="font-normal tracking-normal normal-case">· {formatArs(oneOff)}</span>
           </SectionLabel>
-          {renderLines(oneOffs)}
+          {renderLines(oneOffs, true)}
         </section>
       )}
 
@@ -285,8 +277,7 @@ export default function StatementPage() {
           cents={cents(selected)}
           rule={selectedFiling.rule}
           category={selectedFiling.category}
-          onSave={(change, oneOff) => void handleSave(change, oneOff)}
-          onRemoveRule={() => void handleRemoveRule()}
+          onSave={(change) => void handleSave(change)}
           onClose={() => setSelected(null)}
         />
       )}

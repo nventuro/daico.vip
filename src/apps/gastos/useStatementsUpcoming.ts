@@ -16,7 +16,7 @@ export function useStatementsUpcoming(): Upcoming[] | undefined {
   return useMemo(() => {
     if (loading || !contents || contents.length !== unpaid.length) return undefined;
     return unpaid.map((statement, i) => ({
-      title: `pago ${FORMAT_LABELS[statement.format].toLowerCase()} · ${formatArsCompact(
+      title: `${FORMAT_LABELS[statement.format]} · ${formatArsCompact(
         toPayCents({ ...statement, usd_rate: contents[i].usd_rate }),
       )}`,
       on: statement.due_on,

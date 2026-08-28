@@ -18,7 +18,7 @@ const gastos: AppModule = {
   routes: [
     { index: true, Component: StatementsPage },
     { path: 'tendencias', Component: TrendsPage },
-    { path: 'reglas', Component: RulesPage },
+    { path: 'categorizacion', Component: RulesPage },
     { path: ':id', Component: StatementPage },
   ],
   useUpcoming: useStatementsUpcoming,

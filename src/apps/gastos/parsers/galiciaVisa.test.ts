@@ -130,7 +130,7 @@ describe('the Galicia VISA layout', () => {
 
   it('refuses a statement whose lines do not add up to its total', () => {
     expect(() => parseGaliciaVisa(pages('37.360,00'))).toThrow(StatementError);
-    expect(() => parseGaliciaVisa(pages('37.360,00'))).toThrow(/suman \$ 37\.359,00.*37\.360,00/);
+    expect(() => parseGaliciaVisa(pages('37.360,00'))).toThrow(/suman \$ 37,359\.00.*37,360\.00/);
   });
 
   it("refuses a card whose purchases do not add up to its total, naming the card's digits", () => {

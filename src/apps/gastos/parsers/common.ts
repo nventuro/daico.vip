@@ -158,5 +158,5 @@ export function reconcile(what: string, summed: number, printed: number, currenc
 }
 
 function money(value: number, currency: string): string {
-  return `${currency} ${(value / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  return `${currency} ${(value / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }

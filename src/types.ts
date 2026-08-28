@@ -85,7 +85,7 @@ export interface GuideChapter {
  * stands for attachments: to the row, something written and something attached
  * are the same thing.
  */
-export type EntryMark = 'notes' | 'repeat' | 'oneOff';
+export type EntryMark = 'notes' | 'repeat';
 
 /** The kinds of entry an attachment can belong to. */
 export const ATTACHMENT_OWNER_KINDS = ['chore', 'document'] as const;
@@ -407,7 +407,7 @@ export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 export const ATTACHMENT_LIST_PAGE = 1000;
 
 /** Under this many pesos (in cents) an amount written in thousands keeps a
- *  decimal ("45,7k"); from here on it is whole thousands ("1.235k"). */
+ *  decimal ("45.7k"); from here on it is whole thousands ("123k"). */
 export const COMPACT_AMOUNT_DECIMAL_BELOW_CENTS = 100_000 * 100;
 
 /** Largest PDF taken as a statement, in bytes (input guard). */

@@ -5,8 +5,6 @@ import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import Chip from '../../components/Chip';
 import Button from '../../components/Button';
-import FormFooter from '../../components/FormFooter';
-import CheckSquare from '../../components/CheckSquare';
 import LineRow from './LineRow';
 import { CATEGORY_LABELS } from './labels';
 import { merchantKey, type Rule } from './rules';
@@ -25,19 +23,18 @@ interface RuleDialogProps {
   rule: Rule | null;
   /** How the line is filed now: by its rule, or as a charge. */
   category: SpendingCategory | null;
-  /** Keeps what changed: the rule (null when it did not change) and the mark. */
-  onSave: (change: RuleChange | null, oneOff: boolean) => void;
-  /** Drops the rule filing the line. */
-  onRemoveRule: () => void;
+  /** Keeps what changed: the rule to write, or `'remove'` to drop the one
+   *  filing the line. */
+  onSave: (change: RuleChange | 'remove') => void;
   /** Called when the dialog closes on its own (Escape, a phone's back gesture). */
   onClose: () => void;
 }
 
 /**
- * Files one line of a statement: the merchant pattern the rule will match,
- * its category, and whether this one movement is a one-off. Saving writes
- * the rule for every statement and the mark for this line alone. Shown as a
- * full screen on a phone, a sheet on a wider screen.
+ * Files one line of a statement: the merchant pattern the rule will match
+ * and its category (none chosen, the merchant's rule is dropped). Saving
+ * writes the rule for every statement. Shown as a full screen on a phone, a
+ * sheet on a wider screen.
  */
 export default function RuleDialog({
   line,
@@ -45,27 +42,25 @@ export default function RuleDialog({
   rule,
   category: filed,
   onSave,
-  onRemoveRule,
   onClose,
 }: RuleDialogProps) {
   const [pattern, setPattern] = useState(rule?.pattern ?? merchantKey(line.description));
   const [category, setCategory] = useState<SpendingCategory | null>(filed);
-  const [oneOff, setOneOff] = useState(line.one_off);
 
   const text = pattern.trim();
-  const change: RuleChange | null =
-    !line.charge &&
-    category !== null &&
-    text !== '' &&
-    (!rule || rule.pattern !== text || rule.category !== category)
-      ? { pattern: text, category }
-      : null;
-  const canSave = change !== null || oneOff !== line.one_off;
+  // A charge is filed by the bank, never by a rule.
+  function ruleChange(): RuleChange | 'remove' | null {
+    if (line.charge) return null;
+    if (category === null) return rule ? 'remove' : null;
+    if (text === '') return null;
+    const same = rule && rule.pattern === text && rule.category === category;
+    return same ? null : { pattern: text, category };
+  }
+  const change = ruleChange();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSave) return;
-    onSave(change, oneOff);
+    if (change !== null) onSave(change);
   }
 
   return (
@@ -75,7 +70,7 @@ export default function RuleDialog({
     >
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">{line.charge ? 'Percepción' : 'Categoría'}</span>
-        <ul className="border-t border-border">
+        <ul className="border-y border-border">
           <LineRow line={line} cents={cents} onSelect={() => {}} />
         </ul>
 
@@ -102,7 +97,7 @@ export default function RuleDialog({
                   <Chip
                     key={option}
                     selected={category === option}
-                    onClick={() => setCategory(option)}
+                    onClick={() => setCategory((current) => (current === option ? null : option))}
                   >
                     {CATEGORY_LABELS[option]}
                   </Chip>
@@ -112,41 +107,13 @@ export default function RuleDialog({
           </>
         )}
 
-        <FormField label="Este movimiento" group>
-          <button
-            type="button"
-            onClick={() => setOneOff((v) => !v)}
-            aria-pressed={oneOff}
-            className="flex w-full items-center gap-3 border-b border-border py-3 text-left"
-          >
-            <CheckSquare checked={oneOff} />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-on-surface">Puntual</span>
-              <span className="mt-0.5 text-xs text-muted">
-                No cuenta en la base del mes; se compara aparte.
-              </span>
-            </span>
-          </button>
-        </FormField>
-
-        <div className="mt-auto">
-          {rule ? (
-            <FormFooter
-              removeLabel="Quitar regla"
-              confirmQuestion="¿Quitar la regla?"
-              onRemove={onRemoveRule}
-              submitDisabled={!canSave}
-            />
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="flex-1" disabled={!canSave}>
-                Guardar
-              </Button>
-            </div>
-          )}
+        <div className="mt-auto flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1" disabled={change === null}>
+            Guardar
+          </Button>
         </div>
       </form>
     </ModalDialog>

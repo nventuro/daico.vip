@@ -11,18 +11,17 @@ import SectionLabel from '../../components/SectionLabel';
 import Button from '../../components/Button';
 import ModalDialog from '../../components/ModalDialog';
 import LoadingLine from '../../components/LoadingLine';
-import ChecklistItem from '../../components/ChecklistItem';
 import {
   ADD_BAR_BUTTON_CLASS,
   ADD_BAR_CLASS,
   ADD_BAR_INPUT_CLASS,
 } from '../../components/controlClasses';
 import { useStatements } from './useStatements';
-import { openStatement } from './useStatementContents';
+import { openStatement, useStatementsContents } from './useStatementContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
-import { monthOf } from './breakdown';
-import { FORMAT_LABELS, formatArs, formatUsd, monthTitle, periodLabel } from './labels';
+import { monthOf, toPayCents } from './breakdown';
+import { FORMAT_LABELS, formatArs, monthTitle, periodLabel } from './labels';
 
 /** A statement just read that is already here: the user decides whether it
  *  takes the place of the one imported before. */
@@ -32,7 +31,10 @@ interface Duplicate {
 }
 
 export default function StatementsPage() {
-  const { items, loading, error, add, replace, setPaid } = useStatements();
+  const { items, loading, error, add, replace } = useStatements();
+  // Each statement is one figure in pesos, its dollars at its own rate — which
+  // is in the sealed payload, so every statement listed is opened.
+  const { contents, error: openError } = useStatementsContents(items);
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,9 +95,11 @@ export default function StatementsPage() {
       <div className="flex-1">
         <OfflineBanner />
 
-        {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
+        {(error || openError) && (
+          <p className="mb-4 text-sm text-error">Error: {error ?? openError}</p>
+        )}
 
-        {loading ? (
+        {loading || (!openError && contents?.length !== items.length) ? (
           <SkeletonRows subtitle />
         ) : items.length === 0 ? (
           <p className="py-10 text-center text-muted">
@@ -112,38 +116,40 @@ export default function StatementsPage() {
               <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
             </Link>
             <Link
-              to="/gastos/reglas"
+              to="/gastos/categorizacion"
               className="flex items-center gap-3 border-b border-border py-3 transition-colors hover:bg-border-subtle"
             >
               <IconTags size={20} stroke={1.75} className="shrink-0 text-(--app)" />
-              <span className="flex-1 font-medium">Reglas</span>
+              <span className="flex-1 font-medium">Categorización</span>
               <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
             </Link>
             <div className="mt-5">
               <SectionLabel>Resúmenes</SectionLabel>
               <ul>
-                {items.map((statement) => {
+                {items.map((statement, i) => {
                   const overdue = !statement.paid && statement.due_on < today;
+                  const usdRate = contents?.[i]?.usd_rate ?? null;
                   return (
-                    <ChecklistItem
-                      key={statement.id}
-                      checked={statement.paid}
-                      label={`${monthTitle(monthOf(statement))} · ${FORMAT_LABELS[statement.format]}`}
-                      to={`/gastos/${statement.id}`}
-                      subtitle={
-                        <span
-                          className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}
-                        >
-                          {!statement.paid &&
-                            `${overdue ? 'venció' : 'vence'} ${relativeDay(today, statement.due_on)} · `}
-                          {formatArs(statement.total_ars_cents)}
-                          {statement.total_usd_cents !== 0 &&
-                            ` + ${formatUsd(statement.total_usd_cents)}`}
+                    <li key={statement.id} className="border-b border-border">
+                      <Link
+                        to={`/gastos/${statement.id}`}
+                        className="flex items-center gap-2 py-3 transition-colors hover:bg-border-subtle"
+                      >
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-on-surface">
+                            {monthTitle(monthOf(statement))} · {FORMAT_LABELS[statement.format]}
+                          </span>
+                          <span
+                            className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}
+                          >
+                            {!statement.paid &&
+                              `${overdue ? 'venció' : 'vence'} ${relativeDay(today, statement.due_on)} · `}
+                            {formatArs(toPayCents({ ...statement, usd_rate: usdRate }))}
+                          </span>
                         </span>
-                      }
-                      onToggle={() => void setPaid(statement.id, !statement.paid)}
-                      toggleLabel={statement.paid ? 'Marcar como pendiente' : 'Marcar como pagado'}
-                    />
+                        <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
+                      </Link>
+                    </li>
                   );
                 })}
               </ul>
@@ -168,7 +174,7 @@ export default function StatementsPage() {
             disabled={busy}
             className={`${ADD_BAR_INPUT_CLASS} text-left text-muted disabled:text-disabled`}
           >
-            Agregar un resumen (PDF)...
+            Agregar un resumen...
           </button>
           <button
             type="button"

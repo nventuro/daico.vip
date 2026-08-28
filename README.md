@@ -218,16 +218,17 @@ printed merchant line without processor prefixes, reference numbers and
 currency tails — longest rule winning; what no rule places is listed as «Sin
 categoría». There is no built-in list of merchants: where the household shops
 is private, so every rule is its own, written from a line of a statement or
-pasted in bulk on the Reglas page (one per line, the category last). The
+pasted in bulk on the Categorización page (one per line, the category last). The
 bank's own charges are always `impuestos`. Rules apply on display, so a new
-rule refiles every statement at once. Any line can be marked **puntual** (a one-off), a mark
-kept inside the statement's payload; every view splits spending into base
-and one-offs. The statement page shows the total, the split, the categories
+rule refiles every statement at once. Any line can be marked **puntual** (a one-off)
+with the flag at the end of its row, a mark kept inside the statement's
+payload; every view splits spending into base and one-offs. Amounts are
+written with a point for the decimals and a comma for the thousands. The statement page shows the total, the split, the categories
 with their lines (largest first) and the change against the previous
 statement of the same card; Tendencias sums every
 statement month by month, in pesos with dollars valued at each statement's
 own rate. A statement shows in Próximo until a member marks it **pagado**
-(`paid`, a check on its row like a chore's), however far off its due date.
+(`paid`, a check on its own page), however far off its due date.
 
 ## Markdown dialect
 
