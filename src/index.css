@@ -41,6 +41,9 @@
   --color-on-error: #ede6d6;
   --color-warning: #c7891f;
   --color-success: #5e6e33;
+  /* A change for the better / for the worse, as a hint beside a number */
+  --color-success-subtle: #6f8440;
+  --color-error-subtle: #bf5a4e;
 
   /* The loading line's segment, sweeping along its track. */
   --animate-sweep: sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;

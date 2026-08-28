@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   byCategory,
-  byHolder,
   byMonth,
-  installmentLines,
+  largestFirst,
   lineCents,
+  toPayCents,
   totalCents,
   usualAndOneOff,
 } from './breakdown';
@@ -13,7 +13,6 @@ import { withOneOffsFrom, type StatementContents, type StatementLine } from './s
 
 const line = (over: Partial<StatementLine>): StatementLine => ({
   on: '2026-08-10',
-  holder: 'UNO',
   description: 'X',
   installment: null,
   ars_cents: 0,
@@ -24,9 +23,10 @@ const line = (over: Partial<StatementLine>): StatementLine => ({
 });
 
 const statement = (over: Partial<StatementContents>): StatementContents => ({
-  schema: 1,
+  schema: 2,
   format: 'galicia-visa',
   number: '1',
+  previous_closed_on: '2026-07-23',
   closed_on: '2026-08-20',
   due_on: '2026-09-01',
   previous_ars_cents: 0,
@@ -37,9 +37,7 @@ const statement = (over: Partial<StatementContents>): StatementContents => ({
   total_ars_cents: 0,
   total_usd_cents: 0,
   usd_rate: 1500,
-  holders: [{ holder: 'UNO', last4: '1111', ars_cents: 0, usd_cents: 0 }],
   lines: [],
-  installments_due: [],
   ...over,
 });
 
@@ -58,7 +56,7 @@ const august = statement({
       one_off: true,
       installment: { number: 1, of: 3 },
     }),
-    line({ description: 'DB.RG 5617 30%', ars_cents: 450_000, charge: true, holder: null }),
+    line({ description: 'DB.RG 5617 30%', ars_cents: 450_000, charge: true }),
   ],
 });
 
@@ -87,22 +85,18 @@ describe('usualAndOneOff', () => {
   });
 });
 
-describe('byHolder', () => {
-  it("lists each card in pesos, then the bank's charges", () => {
-    const contents = statement({
-      holders: [{ holder: 'UNO', last4: '1111', ars_cents: 100, usd_cents: 2 }],
-      lines: [line({ ars_cents: 40, charge: true, holder: null })],
-    });
-    expect(byHolder(contents)).toEqual([
-      { holder: 'UNO', last4: '1111', cents: 3_100 },
-      { holder: null, last4: null, cents: 40 },
-    ]);
+describe('toPayCents', () => {
+  it('is the printed total, the dollars at the rate', () => {
+    const contents = statement({ total_ars_cents: 100, total_usd_cents: 2, usd_rate: 1500 });
+    expect(toPayCents(contents)).toBe(3_100);
+    expect(toPayCents({ ...contents, usd_rate: null })).toBe(100);
   });
 });
 
-describe('installmentLines', () => {
-  it('finds the lines that are installments', () => {
-    expect(installmentLines(august)).toEqual([2]);
+describe('largestFirst', () => {
+  it('orders the lines given by amount, the dollars at the rate', () => {
+    expect(largestFirst(august, [0, 1, 2, 3])).toEqual([1, 3, 0, 2]);
+    expect(largestFirst(august, [2, 0])).toEqual([0, 2]);
   });
 });
 

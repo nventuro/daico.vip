@@ -10,11 +10,12 @@ import { byMonth, type TrendPick } from './breakdown';
 import {
   CATEGORY_LABELS,
   FORMAT_LABELS,
-  formatArs,
+  formatArsCompact,
   formatPercentDelta,
   monthTitle,
 } from './labels';
 import SpendBar from './SpendBar';
+import Delta from './Delta';
 
 export default function TrendsPage() {
   const { items, loading, error } = useStatements();
@@ -93,13 +94,16 @@ export default function TrendsPage() {
                     </span>
                   )}
                 </span>
-                <span className="shrink-0 text-sm tabular-nums">{formatArs(row.cents)}</span>
+                <span className="shrink-0 text-sm tabular-nums">{formatArsCompact(row.cents)}</span>
               </span>
               <span className="flex items-center gap-3">
                 <SpendBar usual={row.usual} oneOff={row.oneOff} max={largest} size="md" />
-                <span className="w-14 shrink-0 text-right text-xs text-muted tabular-nums">
+                <Delta
+                  value={older ? row.cents - older.cents : 0}
+                  className="w-14 shrink-0 text-right text-xs"
+                >
                   {older ? formatPercentDelta(row.cents, older.cents) : ''}
-                </span>
+                </Delta>
               </span>
             </li>
           );

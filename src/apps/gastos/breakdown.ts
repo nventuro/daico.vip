@@ -1,7 +1,7 @@
 // =============================================================================
-// The sums a statement is read through: by category, by who spent, the
-// usual against the one-off, and month by month across statements. All in
-// pesos, a dollar line valued at its own statement's rate.
+// The sums a statement is read through: by category, the usual against the
+// one-off, and month by month across statements. All in pesos, a dollar line
+// valued at its own statement's rate.
 // =============================================================================
 import type { SpendingCategory, StatementFormat } from '../../types';
 import { categoryOf, type Rule } from './rules';
@@ -18,9 +18,23 @@ export function lineCents(line: StatementLine, usdRate: number | null): number {
   return inPesos(line.ars_cents, line.usd_cents, usdRate);
 }
 
-/** What a statement comes to in pesos. */
+/** What a statement's movements come to in pesos: the spending it lists,
+ *  apart from any balance carried from the statement before. */
 export function totalCents(contents: StatementContents): number {
   return contents.lines.reduce((acc, line) => acc + lineCents(line, contents.usd_rate), 0);
+}
+
+/** What the statement asks to be paid, in pesos. */
+export function toPayCents(
+  contents: Pick<StatementContents, 'total_ars_cents' | 'total_usd_cents' | 'usd_rate'>,
+): number {
+  return inPesos(contents.total_ars_cents, contents.total_usd_cents, contents.usd_rate);
+}
+
+/** The lines `indices` name, largest amount first. */
+export function largestFirst(contents: StatementContents, indices: number[]): number[] {
+  const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
+  return [...indices].sort((a, b) => cents(b) - cents(a));
 }
 
 /** One category's share of a statement: its total and the lines in it, by
@@ -55,31 +69,6 @@ export function usualAndOneOff(contents: StatementContents): { usual: number; on
     else usual += value;
   }
   return { usual, oneOff };
-}
-
-/** What each card spent, in pesos, in the statement's order; the bank's own
- *  charges come last under a null holder. */
-export function byHolder(
-  contents: StatementContents,
-): { holder: string | null; last4: string | null; cents: number }[] {
-  const rows: { holder: string | null; last4: string | null; cents: number }[] =
-    contents.holders.map((h) => ({
-      holder: h.holder,
-      last4: h.last4,
-      cents:
-        h.ars_cents +
-        (contents.usd_rate === null ? 0 : Math.round(h.usd_cents * contents.usd_rate)),
-    }));
-  const charges = contents.lines
-    .filter((line) => line.charge)
-    .reduce((acc, line) => acc + lineCents(line, contents.usd_rate), 0);
-  if (charges !== 0) rows.push({ holder: null, last4: null, cents: charges });
-  return rows;
-}
-
-/** The indices of the lines that are installments. */
-export function installmentLines(contents: StatementContents): number[] {
-  return contents.lines.flatMap((line, i) => (line.installment ? [i] : []));
 }
 
 /** `part` as a whole percentage of `whole`; 0 when there is no whole. */

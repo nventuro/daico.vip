@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, useRef } from 'react';
 import { IconPlus } from '@tabler/icons-react';
+import { ADD_BAR_BUTTON_CLASS, ADD_BAR_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
 
 interface AddBarProps {
   value: string;
@@ -39,7 +40,7 @@ export default function AddBar({
   }
 
   return (
-    <div className="sticky bottom-0 -mx-4 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur">
+    <div className={ADD_BAR_CLASS}>
       {notice && <div className="mb-3">{notice}</div>}
       <form onSubmit={handleSubmit}>
         <div className="flex items-center gap-2">
@@ -52,7 +53,7 @@ export default function AddBar({
             aria-label={inputLabel}
             enterKeyHint="done"
             autoCapitalize="none"
-            className="flex-1 border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary"
+            className={ADD_BAR_INPUT_CLASS}
           />
           <button
             type="submit"
@@ -64,7 +65,7 @@ export default function AddBar({
             disabled={!value.trim()}
             aria-label="Agregar"
             title="Agregar"
-            className="flex h-12 w-12 shrink-0 items-center justify-center bg-(--app) text-on-primary transition-opacity hover:opacity-90 disabled:bg-disabled disabled:opacity-100"
+            className={ADD_BAR_BUTTON_CLASS}
           >
             <IconPlus size={22} stroke={2} />
           </button>

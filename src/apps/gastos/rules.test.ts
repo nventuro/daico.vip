@@ -4,7 +4,6 @@ import type { StatementLine } from './statement';
 
 const line = (description: string, charge = false): StatementLine => ({
   on: '2026-08-01',
-  holder: 'X',
   description,
   installment: null,
   ars_cents: 100,

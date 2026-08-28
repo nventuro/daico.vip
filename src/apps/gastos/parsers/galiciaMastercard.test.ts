@@ -74,6 +74,7 @@ describe('the Galicia MASTERCARD layout', () => {
   it('reads the consolidated block: totals, previous balance, nothing pending', () => {
     expect(contents.format).toBe('galicia-mastercard');
     expect(contents.number).toBe('027');
+    expect(contents.previous_closed_on).toBe('2026-07-23');
     expect(contents.closed_on).toBe('2026-08-20');
     expect(contents.previous_ars_cents).toBe(126_627_626);
     expect(contents.previous_usd_cents).toBe(4_750);
@@ -82,11 +83,8 @@ describe('the Galicia MASTERCARD layout', () => {
     expect(contents.total_usd_cents).toBe(249);
   });
 
-  it('names the account holder from the header and each additional card from its total, dropping a card with nothing on it', () => {
-    expect(contents.holders).toEqual([
-      { holder: 'APELLIDO,NOMBRE', last4: null, ars_cents: 12_000, usd_cents: 249 },
-      { holder: 'OTRO,TITULAR', last4: null, ars_cents: 20_000, usd_cents: 0 },
-    ]);
+  it('keeps no name: neither the account holder nor an additional card', () => {
+    expect(JSON.stringify(contents)).not.toMatch(/APELLIDO|NOMBRE|OTRO|TITULAR/);
   });
 
   it('reads installments beside the merchant and leaves a period alone', () => {
@@ -97,8 +95,8 @@ describe('the Galicia MASTERCARD layout', () => {
       ['MERPAGO*TV', { number: 3, of: 6 }],
       ['VETERINARIA X', { number: 1, of: 2 }],
     ]);
-    expect(purchases[0]).toMatchObject({ holder: 'APELLIDO,NOMBRE', usd_cents: 249 });
-    expect(purchases[3]).toMatchObject({ holder: 'OTRO,TITULAR', on: '2026-07-04' });
+    expect(purchases[0]).toMatchObject({ usd_cents: 249 });
+    expect(purchases[3]).toMatchObject({ on: '2026-07-04' });
   });
 
   it("reads the bank's charges from the block, dated the closing day", () => {
@@ -108,13 +106,6 @@ describe('the Galicia MASTERCARD layout', () => {
       ['PERCEP.AFIP RG 4815 30%', 111_751, '2026-08-20'],
     ]);
     expect(contents.usd_rate).toBeCloseTo(1496.0, 0);
-  });
-
-  it('reads the installments to come', () => {
-    expect(contents.installments_due).toEqual([
-      { month: '2026-08', ars_cents: 18_735_278, onward: false },
-      { month: '2026-09', ars_cents: 1_197_312, onward: false },
-    ]);
   });
 
   it('refuses a statement whose purchases do not add up to its consumption', () => {

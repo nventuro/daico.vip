@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { IconChevronRight, IconFileUpload, IconTags, IconTrendingUp } from '@tabler/icons-react';
+import { IconChevronRight, IconPlus, IconTags, IconTrendingUp } from '@tabler/icons-react';
 import { STATEMENT_PDF_MAX_BYTES, type Statement } from '../../types';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { formatDateShort, relativeDay, todayIso } from '../../utils/dateUtils';
+import { relativeDay, todayIso } from '../../utils/dateUtils';
 import { formatBytes } from '../../utils/textUtils';
 import OfflineBanner from '../../components/OfflineBanner';
 import SkeletonRows from '../../components/SkeletonRows';
@@ -11,12 +11,18 @@ import SectionLabel from '../../components/SectionLabel';
 import Button from '../../components/Button';
 import ModalDialog from '../../components/ModalDialog';
 import LoadingLine from '../../components/LoadingLine';
+import ChecklistItem from '../../components/ChecklistItem';
+import {
+  ADD_BAR_BUTTON_CLASS,
+  ADD_BAR_CLASS,
+  ADD_BAR_INPUT_CLASS,
+} from '../../components/controlClasses';
 import { useStatements } from './useStatements';
 import { openStatement } from './useStatementContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
 import { monthOf } from './breakdown';
-import { FORMAT_LABELS, formatArs, formatUsd, monthTitle } from './labels';
+import { FORMAT_LABELS, formatArs, formatUsd, monthTitle, periodLabel } from './labels';
 
 /** A statement just read that is already here: the user decides whether it
  *  takes the place of the one imported before. */
@@ -26,7 +32,7 @@ interface Duplicate {
 }
 
 export default function StatementsPage() {
-  const { items, loading, error, add, replace } = useStatements();
+  const { items, loading, error, add, replace, setPaid } = useStatements();
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,6 +86,8 @@ export default function StatementsPage() {
     input.click();
   }
 
+  const busy = reading || masterKey.status !== 'unlocked';
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1">
@@ -114,47 +122,66 @@ export default function StatementsPage() {
             <div className="mt-5">
               <SectionLabel>Resúmenes</SectionLabel>
               <ul>
-                {items.map((statement) => (
-                  <li key={statement.id} className="border-b border-border">
-                    <Link
+                {items.map((statement) => {
+                  const overdue = !statement.paid && statement.due_on < today;
+                  return (
+                    <ChecklistItem
+                      key={statement.id}
+                      checked={statement.paid}
+                      label={`${monthTitle(monthOf(statement))} · ${FORMAT_LABELS[statement.format]}`}
                       to={`/gastos/${statement.id}`}
-                      className="flex items-center gap-2 py-2.5 transition-colors hover:bg-border-subtle"
-                    >
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-on-surface">
-                          {monthTitle(monthOf(statement))}
-                          <span className="text-muted"> · {FORMAT_LABELS[statement.format]}</span>
-                        </span>
-                        <span className="mt-0.5 truncate text-xs text-muted">
-                          {statement.due_on >= today &&
-                            `vence ${relativeDay(today, statement.due_on)} · `}
+                      subtitle={
+                        <span
+                          className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}
+                        >
+                          {!statement.paid &&
+                            `${overdue ? 'venció' : 'vence'} ${relativeDay(today, statement.due_on)} · `}
                           {formatArs(statement.total_ars_cents)}
                           {statement.total_usd_cents !== 0 &&
                             ` + ${formatUsd(statement.total_usd_cents)}`}
                         </span>
-                      </span>
-                      <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
-                    </Link>
-                  </li>
-                ))}
+                      }
+                      onToggle={() => void setPaid(statement.id, !statement.paid)}
+                      toggleLabel={statement.paid ? 'Marcar como pendiente' : 'Marcar como pagado'}
+                    />
+                  );
+                })}
               </ul>
             </div>
           </>
         )}
       </div>
 
-      <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur">
-        {problem && <p className="text-sm text-error">{problem}</p>}
-        {reading && <LoadingLine />}
-        <Button
-          onClick={pick}
-          disabled={reading || masterKey.status !== 'unlocked'}
-          className="flex w-full items-center justify-center gap-2 py-3"
-        >
-          <IconFileUpload size={20} stroke={1.75} />
-          Importar resumen (PDF)
-        </Button>
-        {/* The button is the visible control; this input only carries the file picker. */}
+      {/* The add bar every list ends in, with the file picker where the text
+          would go: a statement is added by picking its PDF, not by typing. */}
+      <div className={ADD_BAR_CLASS}>
+        {problem && <p className="mb-3 text-sm text-error">{problem}</p>}
+        {reading && (
+          <div className="mb-3">
+            <LoadingLine />
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={pick}
+            disabled={busy}
+            className={`${ADD_BAR_INPUT_CLASS} text-left text-muted disabled:text-disabled`}
+          >
+            Agregar un resumen (PDF)...
+          </button>
+          <button
+            type="button"
+            onClick={pick}
+            disabled={busy}
+            aria-label="Agregar resumen"
+            title="Agregar resumen"
+            className={ADD_BAR_BUTTON_CLASS}
+          >
+            <IconPlus size={22} stroke={2} />
+          </button>
+        </div>
+        {/* The buttons are the visible control; this input only carries the file picker. */}
         <input
           ref={inputRef}
           type="file"
@@ -176,8 +203,8 @@ export default function StatementsPage() {
         >
           <div className="flex flex-col gap-2">
             <p className="font-medium text-on-surface">
-              Ya está el resumen {FORMAT_LABELS[duplicate.contents.format]} con cierre{' '}
-              {formatDateShort(duplicate.contents.closed_on)}. ¿Reemplazarlo?
+              Ya está el resumen {FORMAT_LABELS[duplicate.contents.format]}{' '}
+              {periodLabel(duplicate.contents)}. ¿Reemplazarlo?
             </p>
             <p className="text-sm text-muted">Lo que marcaste como puntual se conserva.</p>
             <div className="mt-1 flex gap-2">

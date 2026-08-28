@@ -3,20 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { SpendingCategory } from '../../types';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { formatDateShort, relativeDay, todayIso } from '../../utils/dateUtils';
-import { countLabel } from '../../utils/textUtils';
+import { formatDate, todayIso } from '../../utils/dateUtils';
 import SkeletonRows from '../../components/SkeletonRows';
 import SectionLabel from '../../components/SectionLabel';
 import FormFooter from '../../components/FormFooter';
+import CheckSquare from '../../components/CheckSquare';
 import { useStatements } from './useStatements';
 import { useStatementContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
 import {
   byCategory,
-  byHolder,
-  installmentLines,
+  largestFirst,
   lineCents,
   monthOf,
+  toPayCents,
   totalCents,
   usualAndOneOff,
   type CategoryShare,
@@ -26,27 +26,25 @@ import {
   CATEGORY_LABELS,
   FORMAT_LABELS,
   UNCATEGORIZED_LABEL,
+  carriedLabel,
   formatArs,
   formatDelta,
   formatPercentDelta,
   formatUsd,
   monthShort,
+  periodLabel,
 } from './labels';
-import type { StatementContents } from './statement';
 import SpendBar from './SpendBar';
 import LineRow from './LineRow';
+import Delta from './Delta';
 import RuleDialog, { type RuleChange } from './RuleDialog';
 
 /** A category's key in the set of opened ones; the unfiled lines have their own. */
 const shareKey = (category: SpendingCategory | null) => category ?? 'none';
 
-function last4Of(contents: StatementContents, holder: string | null): string | null {
-  return contents.holders.find((h) => h.holder === holder)?.last4 ?? null;
-}
-
 export default function StatementPage() {
   const { id } = useParams();
-  const { items, loading, error, replace, remove } = useStatements();
+  const { items, loading, error, replace, setPaid, remove } = useStatements();
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const today = todayIso();
@@ -87,19 +85,13 @@ export default function StatementPage() {
   if (!statement) return <p className="text-muted">Resumen no encontrado.</p>;
   if (!contents) return <p className="text-sm text-error">Error: {openError}</p>;
 
+  const toPay = toPayCents(contents);
   const total = totalCents(contents);
   const previousTotal = previousContents ? totalCents(previousContents) : null;
   const { usual, oneOff } = usualAndOneOff(contents);
-  const holders = byHolder(contents);
   const largestShare = Math.max(...shares.map((s) => s.cents), 1);
-  const largestHolder = Math.max(...holders.map((h) => h.cents), 1);
   const oneOffs = contents.lines.flatMap((line, i) => (line.one_off ? [i] : []));
-  const installments = installmentLines(contents);
-  const installmentsTotal = installments.reduce(
-    (acc, i) => acc + lineCents(contents.lines[i], contents.usd_rate),
-    0,
-  );
-  const largestDue = Math.max(...contents.installments_due.map((d) => d.ars_cents), 1);
+  const overdue = !statement.paid && contents.due_on < today;
   const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
   const selectedLine = selected === null ? null : contents.lines[selected];
   const selectedFiling = selectedLine ? categoryOf(selectedLine, rules) : null;
@@ -145,11 +137,10 @@ export default function StatementPage() {
 
   const renderLines = (indices: number[]) => (
     <ul>
-      {indices.map((i) => (
+      {largestFirst(contents, indices).map((i) => (
         <LineRow
           key={i}
           line={contents.lines[i]}
-          last4={last4Of(contents, contents.lines[i].holder)}
           cents={cents(i)}
           onSelect={() => setSelected(i)}
         />
@@ -165,18 +156,20 @@ export default function StatementPage() {
 
       <div className="flex flex-col gap-0.5">
         <span className="text-sm text-muted">
-          {FORMAT_LABELS[contents.format]} · cierre {formatDateShort(contents.closed_on)}
+          {FORMAT_LABELS[contents.format]} · {periodLabel(contents)}
         </span>
         <span className="font-display text-4xl font-black tracking-tight">
-          {formatArs(contents.total_ars_cents, true)}
+          {formatArs(toPay, contents.total_usd_cents === 0)}
         </span>
         {contents.total_usd_cents !== 0 && (
-          <span className="text-xl font-medium">+ {formatUsd(contents.total_usd_cents)}</span>
+          <span className="text-lg tabular-nums">
+            {formatArs(contents.total_ars_cents, true)} + {formatUsd(contents.total_usd_cents)}
+          </span>
         )}
         {contents.total_usd_cents !== 0 && contents.usd_rate !== null && (
           <span className="text-sm text-muted">
-            ≈ {formatArs(total)} en total, al cambio del resumen (
-            {formatArs(Math.round(contents.usd_rate * 100), true)})
+            Total estimado al cambio del resumen (
+            {formatArs(Math.round(contents.usd_rate * 100), true)}).
           </span>
         )}
         {contents.total_usd_cents !== 0 && contents.usd_rate === null && (
@@ -185,21 +178,29 @@ export default function StatementPage() {
           </span>
         )}
         {contents.pending_ars_cents !== 0 && (
-          <span className="text-sm text-muted">
-            Incluye {formatArs(contents.pending_ars_cents)} pendientes del resumen anterior.
-          </span>
+          <span className="text-sm text-muted">{carriedLabel(contents.pending_ars_cents)}</span>
         )}
-        <div className="mt-2 flex items-baseline justify-between gap-3 text-sm">
-          <span>
-            Vence <span className="font-medium">{relativeDay(today, contents.due_on)}</span>
-          </span>
-          {previousContents && previousTotal !== null && (
-            <span className="text-error tabular-nums">
-              {formatPercentDelta(total, previousTotal)} vs. {monthShort(monthOf(previousContents))}
-            </span>
-          )}
-        </div>
+        {previousContents && previousTotal !== null && previousTotal !== 0 && (
+          <Delta value={total - previousTotal} className="mt-1 text-sm">
+            {formatPercentDelta(total, previousTotal)} vs. {monthShort(monthOf(previousContents))}
+          </Delta>
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => void setPaid(statement.id, !statement.paid)}
+        aria-pressed={statement.paid}
+        className="flex w-full items-center gap-3 border-y border-border py-3 text-left"
+      >
+        <CheckSquare checked={statement.paid} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-on-surface">Pagado</span>
+          <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
+            {overdue ? 'Venció' : 'Vence'} el {formatDate(contents.due_on)}
+          </span>
+        </span>
+      </button>
 
       <div className="flex flex-col gap-2">
         <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
@@ -221,7 +222,7 @@ export default function StatementPage() {
           {shares.map((share) => {
             const key = shareKey(share.category);
             const open = opened.has(key);
-            const before = previousByCategory.get(share.category);
+            const change = share.cents - (previousByCategory.get(share.category) ?? 0);
             const Chevron = open ? IconChevronDown : IconChevronRight;
             return (
               <li key={key} className="border-b border-border">
@@ -245,9 +246,9 @@ export default function StatementPage() {
                     <span className="flex items-center gap-3">
                       <SpendBar usual={share.cents} max={largestShare} />
                       {previousContents && (
-                        <span className="w-24 shrink-0 text-right text-xs text-muted tabular-nums">
-                          {formatDelta(share.cents - (before ?? 0))}
-                        </span>
+                        <Delta value={change} className="w-24 shrink-0 text-right text-xs">
+                          {formatDelta(change)}
+                        </Delta>
                       )}
                     </span>
                   </span>
@@ -270,55 +271,6 @@ export default function StatementPage() {
         </section>
       )}
 
-      <section>
-        <SectionLabel>Por titular</SectionLabel>
-        <ul>
-          {holders.map((row) => (
-            <li
-              key={row.holder ?? 'bank'}
-              className="flex items-center gap-3 border-b border-border py-2.5"
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span
-                  className={`truncate ${row.holder === null ? 'text-muted' : 'text-on-surface'}`}
-                >
-                  {row.holder ?? 'Percepciones del banco'}
-                  {row.last4 && <span className="text-muted"> · …{row.last4}</span>}
-                </span>
-                <SpendBar usual={row.cents} max={largestHolder} />
-              </span>
-              <span className={`shrink-0 tabular-nums ${row.holder === null ? 'text-muted' : ''}`}>
-                {formatArs(row.cents)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {(installments.length > 0 || contents.installments_due.length > 0) && (
-        <section>
-          <SectionLabel>Cuotas</SectionLabel>
-          {installments.length > 0 && (
-            <p className="mb-1 text-sm text-muted">
-              {countLabel(installments.length, 'cuota', 'cuotas')} en este resumen ·{' '}
-              {formatArs(installmentsTotal)}
-            </p>
-          )}
-          <ul>
-            {contents.installments_due.map((due) => (
-              <li key={due.month} className="flex items-center gap-3 border-b border-border py-2">
-                <span className="w-28 shrink-0 text-sm">
-                  {due.onward && 'desde '}
-                  {monthShort(due.month)}
-                </span>
-                <SpendBar usual={due.ars_cents} max={largestDue} />
-                <span className="shrink-0 text-sm tabular-nums">{formatArs(due.ars_cents)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       <FormFooter
         removeLabel="Eliminar resumen"
         confirmQuestion="¿Eliminar el resumen?"
@@ -330,7 +282,6 @@ export default function StatementPage() {
         <RuleDialog
           key={selected}
           line={selectedLine}
-          last4={last4Of(contents, selectedLine.holder)}
           cents={cents(selected)}
           rule={selectedFiling.rule}
           category={selectedFiling.category}

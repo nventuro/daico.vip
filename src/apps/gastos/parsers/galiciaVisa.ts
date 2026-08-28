@@ -2,11 +2,12 @@
 // The Galicia VISA layout: the previous balance and the account's own
 // movements against it (a payment, the dollar balance carried into pesos);
 // then, under DETALLE DEL CONSUMO, purchases listed card by card, each card
-// closed by a "TARJETA NNNN Total Consumos de <holder>" total; then the
-// bank's own charges, then TOTAL A PAGAR. Every purchase carries a six-digit
-// receipt number in a column of its own, which is what tells it from a
-// charge. No pending balance is printed: it is what the previous balance and
-// the movements against it come to.
+// closed by a "TARJETA NNNN Total Consumos de <holder>" total, which is only
+// checked against — who made a purchase is not kept; then the bank's own
+// charges, then TOTAL A PAGAR. Every purchase carries a six-digit receipt
+// number in a column of its own, which is what tells it from a charge. No
+// pending balance is printed: it is what the previous balance and the
+// movements against it come to.
 // =============================================================================
 import { STATEMENT_CONTENTS_SCHEMA } from '../../../types';
 import {
@@ -14,7 +15,6 @@ import {
   UnknownLayout,
   type PageLine,
   type StatementContents,
-  type StatementHolder,
   type StatementLine,
 } from '../statement';
 import {
@@ -22,7 +22,6 @@ import {
   cents,
   headerDates,
   installment,
-  installmentsDue,
   isoFromNumericDate,
   minimumPayment,
   reconcile,
@@ -46,7 +45,7 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
   const lines = pages.flat();
   if (!lines.some((line) => SIGNATURE.test(text(line)))) throw new UnknownLayout();
 
-  const holders: StatementHolder[] = [];
+  let cards = 0;
   const purchases: StatementLine[] = [];
   const charges: StatementLine[] = [];
   let block: StatementLine[] = [];
@@ -63,21 +62,16 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     }
     const cardTotal = CARD_TOTAL.exec(t);
     if (cardTotal) {
-      const holder: StatementHolder = {
-        holder: cardTotal[2],
-        last4: cardTotal[1],
-        ars_cents: cents(cardTotal[3]) ?? 0,
-        usd_cents: cents(cardTotal[4]) ?? 0,
-      };
-      reconcile(`Los consumos de ${holder.holder}`, sum(block, 'ars_cents'), holder.ars_cents, '$');
+      const card = `la tarjeta …${cardTotal[1]}`;
+      reconcile(`Los consumos de ${card}`, sum(block, 'ars_cents'), cents(cardTotal[3]) ?? 0, '$');
       reconcile(
-        `Los consumos en dólares de ${holder.holder}`,
+        `Los consumos en dólares de ${card}`,
         sum(block, 'usd_cents'),
-        holder.usd_cents,
+        cents(cardTotal[4]) ?? 0,
         'US$',
       );
-      for (const purchase of block) purchases.push({ ...purchase, holder: holder.holder });
-      holders.push(holder);
+      purchases.push(...block);
+      cards++;
       block = [];
       continue;
     }
@@ -109,7 +103,6 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     );
     const movement: StatementLine = {
       on,
-      holder: null,
       description: body
         .filter((w) => w !== receipt && w !== paid)
         .map((w) => w.text)
@@ -124,7 +117,7 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     else charges.push(movement);
   }
 
-  if (holders.length === 0 || total === null) {
+  if (cards === 0 || total === null) {
     throw new StatementError('No se encontraron los totales del resumen; no se guardó nada.');
   }
   const dates = headerDates(lines);
@@ -147,9 +140,7 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     total_ars_cents: total.ars,
     total_usd_cents: total.usd,
     usd_rate: usdRate(charges, total.usd),
-    holders,
     lines: all,
-    installments_due: installmentsDue(lines),
   };
 }
 

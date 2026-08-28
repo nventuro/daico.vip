@@ -4,9 +4,9 @@
 // own like an attachment's file, then base64 for the text column — and a
 // merchant rule's pattern, the same way without the compression.
 // =============================================================================
-import type { MerchantRule, Statement } from '../../types';
+import { STATEMENT_CONTENTS_SCHEMA, type MerchantRule, type Statement } from '../../types';
 import { decryptFile, encryptFile, fromBase64, toBase64 } from '../../lib/householdKey';
-import type { StatementContents } from './statement';
+import type { StatementContents, StatementLine } from './statement';
 
 async function through(bytes: Uint8Array<ArrayBuffer>, stream: GenericTransformStream) {
   const piped = new Blob([bytes]).stream().pipeThrough(stream);
@@ -24,15 +24,39 @@ export async function sealContents(
   return { payload: toBase64(data), wrapped_key: wrappedFileKey };
 }
 
-/** The contents a statement's payload seals. Throws when `masterKey` is not
- *  the household's or the payload was altered. */
+/** `record` without `keys`. */
+function without(record: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).filter(([name]) => !keys.includes(name)));
+}
+
+/** `contents` as sealed under an earlier schema, brought to the current
+ *  shape: what a later schema dropped is left out, what it added is unknown. */
+export function upgradeContents(contents: Record<string, unknown>): StatementContents {
+  if (contents.schema === STATEMENT_CONTENTS_SCHEMA)
+    return contents as unknown as StatementContents;
+  // Schema 1 named who made each purchase, carried the bank's schedule of
+  // installments to come, and did not say when the period began.
+  const lines = (contents.lines as Record<string, unknown>[]).map((line) =>
+    without(line, 'holder'),
+  );
+  return {
+    ...without(contents, 'holders', 'installments_due'),
+    schema: STATEMENT_CONTENTS_SCHEMA,
+    previous_closed_on: null,
+    lines: lines as unknown as StatementLine[],
+  } as StatementContents;
+}
+
+/** The contents a statement's payload seals, in the current shape whatever
+ *  schema they were sealed under. Throws when `masterKey` is not the
+ *  household's or the payload was altered. */
 export async function openContents(
   masterKey: CryptoKey,
   statement: Pick<Statement, 'payload' | 'wrapped_key'>,
 ): Promise<StatementContents> {
   const packed = await decryptFile(masterKey, statement.wrapped_key, fromBase64(statement.payload));
   const plain = await through(packed, new DecompressionStream('gzip'));
-  return JSON.parse(new TextDecoder().decode(plain)) as StatementContents;
+  return upgradeContents(JSON.parse(new TextDecoder().decode(plain)) as Record<string, unknown>);
 }
 
 /** The encrypted pattern and wrapped key that carry `pattern`. */

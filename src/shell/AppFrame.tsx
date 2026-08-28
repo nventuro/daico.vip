@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 import type { AppHue } from '../apps/types';
+import { HueContext } from '../context/hueContext';
 import AppHeader from './AppHeader';
 import { hueStyle } from './hue';
 import SkeletonRows from '../components/SkeletonRows';
@@ -14,11 +15,13 @@ interface AppFrameProps {
 
 export default function AppFrame({ name, hue, icon }: AppFrameProps) {
   return (
-    <div className="flex flex-1 flex-col" style={hueStyle(hue)}>
-      <AppHeader name={name} icon={icon} />
-      <Suspense fallback={<SkeletonRows />}>
-        <Outlet />
-      </Suspense>
-    </div>
+    <HueContext.Provider value={hue}>
+      <div className="flex flex-1 flex-col" style={hueStyle(hue)}>
+        <AppHeader name={name} icon={icon} />
+        <Suspense fallback={<SkeletonRows />}>
+          <Outlet />
+        </Suspense>
+      </div>
+    </HueContext.Provider>
   );
 }

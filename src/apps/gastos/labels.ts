@@ -3,7 +3,8 @@ import {
   type SpendingCategory,
   type StatementFormat,
 } from '../../types';
-import { monthName } from '../../utils/dateUtils';
+import { addDays, formatDateShort, monthName } from '../../utils/dateUtils';
+import type { StatementContents } from './statement';
 
 /** Each category as shown to the user. */
 export const CATEGORY_LABELS: Record<SpendingCategory, string> = {
@@ -88,10 +89,21 @@ export function monthShort(yearMonth: string): string {
   return `${monthName(yearMonth, 'short')} ${year}`;
 }
 
-/** How a line says who made it: the card's last digits when printed, else
- *  the holder's first name or surname as the bank prints it. */
-export function holderShort(holder: string | null, last4: string | null): string {
-  if (last4) return `…${last4}`;
-  if (!holder) return 'banco';
-  return holder.split(/[\s,]+/)[0].toLowerCase();
+/** The days a statement covers: "del 24/07/2026 al 20/08/2026", or its
+ *  closing day alone when the start is not known. */
+export function periodLabel(
+  contents: Pick<StatementContents, 'previous_closed_on' | 'closed_on'>,
+): string {
+  const to = formatDateShort(contents.closed_on);
+  if (contents.previous_closed_on === null) return `cierre ${to}`;
+  return `del ${formatDateShort(addDays(contents.previous_closed_on, 1))} al ${to}`;
+}
+
+/** What the total carries from the statement before: what was left unpaid,
+ *  or — paid more than owed — what comes off. Empty when nothing was. */
+export function carriedLabel(pendingCents: number): string {
+  if (pendingCents === 0) return '';
+  if (pendingCents < 0)
+    return `Descuenta ${formatArs(-pendingCents)} pagados de más en el resumen anterior.`;
+  return `Incluye ${formatArs(pendingCents)} pendientes del resumen anterior.`;
 }

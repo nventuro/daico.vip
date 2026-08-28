@@ -15,7 +15,7 @@ function toIso(year: number, month: number, day: number): string {
   return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
-/** Formats an ISO date string (yyyy-mm-dd) as a long es-AR locale date, e.g. "Sábado, 14 de Febrero de 2026". */
+/** Formats an ISO date string (yyyy-mm-dd) as a long es-AR locale date, e.g. "Sábado 14 de Febrero de 2026". */
 export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -23,7 +23,7 @@ export function formatDate(dateStr: string): string {
   const weekday = date.toLocaleDateString('es-AR', { weekday: 'long' });
   const monthName = date.toLocaleDateString('es-AR', { month: 'long' });
 
-  return `${capitalize(weekday)}, ${day} de ${capitalize(monthName)} de ${year}`;
+  return `${capitalize(weekday)} ${day} de ${capitalize(monthName)} de ${year}`;
 }
 
 /** Formats an ISO date string (yyyy-mm-dd) as dd/mm/yyyy. */

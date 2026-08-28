@@ -22,8 +22,6 @@ export type PageLine = PositionedWord[];
 export interface StatementLine {
   /** yyyy-mm-dd */
   on: string;
-  /** Who made it, as the bank prints the name; null for the bank's own charges. */
-  holder: string | null;
   /** The merchant line as printed. */
   description: string;
   /** Which installment of how many, for a purchase paid in several. */
@@ -36,30 +34,15 @@ export interface StatementLine {
   one_off: boolean;
 }
 
-/** One card on the statement and what it spent. */
-export interface StatementHolder {
-  holder: string;
-  /** The card's last four digits, on the layouts that print them. */
-  last4: string | null;
-  ars_cents: number;
-  usd_cents: number;
-}
-
-/** One month of installments still to come. */
-export interface InstallmentDue {
-  /** yyyy-mm */
-  month: string;
-  ars_cents: number;
-  /** This amount every month from `month` on, rather than in that month alone. */
-  onward: boolean;
-}
-
 /** Everything read from a statement; what the payload seals. */
 export interface StatementContents {
   schema: number;
   format: StatementFormat;
   /** The bank's own number for it. */
   number: string;
+  /** The day the statement before it closed (yyyy-mm-dd): this one runs from
+   *  the day after. Null when the payload predates it. */
+  previous_closed_on: string | null;
   closed_on: string;
   due_on: string;
   /** What the previous statement came to. */
@@ -73,9 +56,7 @@ export interface StatementContents {
   total_usd_cents: number;
   /** Pesos per dollar the bank valued the dollar spend at, when it can be told. */
   usd_rate: number | null;
-  holders: StatementHolder[];
   lines: StatementLine[];
-  installments_due: InstallmentDue[];
 }
 
 /** A PDF of a known layout that could not be read whole; the message says
@@ -97,7 +78,7 @@ export function withOneOffsFrom(
   previous: StatementContents,
 ): StatementContents {
   const key = (line: StatementLine) =>
-    [line.on, line.holder ?? '', line.description, line.ars_cents, line.usd_cents].join(' ');
+    [line.on, line.description, line.ars_cents, line.usd_cents].join(' ');
   const marked = new Set(previous.lines.filter((line) => line.one_off).map(key));
   return {
     ...contents,

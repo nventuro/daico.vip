@@ -118,6 +118,7 @@ export const STATEMENTS_SPEC: TableSpec = {
     { name: 'due_on', ddl: 'TEXT NOT NULL' },
     { name: 'total_ars_cents', ddl: 'INTEGER NOT NULL' },
     { name: 'total_usd_cents', ddl: 'INTEGER NOT NULL' },
+    { name: 'paid', ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
     { name: 'wrapped_key', ddl: 'TEXT NOT NULL' },
     // Base64 of the encrypted contents: a few KB, small enough to travel with the row.
     { name: 'payload', ddl: 'TEXT NOT NULL' },

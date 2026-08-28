@@ -75,6 +75,7 @@ describe('the Galicia VISA layout', () => {
   it('reads the header: dates, number, previous balance, minimum, totals', () => {
     expect(contents.format).toBe('galicia-visa');
     expect(contents.number).toBe('VI0001');
+    expect(contents.previous_closed_on).toBe('2026-07-23');
     expect(contents.closed_on).toBe('2026-08-20');
     expect(contents.due_on).toBe('2026-09-01');
     expect(contents.previous_ars_cents).toBe(100_000);
@@ -86,14 +87,7 @@ describe('the Galicia VISA layout', () => {
     expect(contents.total_usd_cents).toBe(199);
   });
 
-  it('reads each card with its holder and totals', () => {
-    expect(contents.holders).toEqual([
-      { holder: 'TITULAR UNO', last4: '1111', ars_cents: 3_647_500, usd_cents: 199 },
-      { holder: 'TITULAR DOS', last4: '2222', ars_cents: 0, usd_cents: 0 },
-    ]);
-  });
-
-  it('reads every movement, with its holder, installment and currency', () => {
+  it('reads every movement with its installment and currency, and keeps no name', () => {
     const purchases = contents.lines.filter((line) => !line.charge);
     expect(purchases.map((line) => line.description)).toEqual([
       'VET CLINIC',
@@ -103,15 +97,14 @@ describe('the Galicia VISA layout', () => {
     ]);
     expect(purchases[0]).toMatchObject({
       on: '2026-07-14',
-      holder: 'TITULAR UNO',
       installment: { number: 2, of: 2 },
       ars_cents: 3_647_500,
       usd_cents: 0,
       one_off: false,
     });
     expect(purchases[1]).toMatchObject({ usd_cents: 199, ars_cents: 0, installment: null });
-    expect(purchases[2].holder).toBe('TITULAR DOS');
     expect(purchases[3].ars_cents).toBe(-10_000);
+    expect(JSON.stringify(contents)).not.toMatch(/TITULAR/);
   });
 
   it("tells the bank's charges by their missing receipt number", () => {
@@ -120,19 +113,10 @@ describe('the Galicia VISA layout', () => {
       ['IIBB PERCEP-CABA 2,00%( 100,00)', 200],
       ['DB.RG 5617 30% ( 2940,00 )', 88_200],
     ]);
-    expect(charges.every((line) => line.holder === null)).toBe(true);
   });
 
   it('tells the dollar rate from the 30% withholding', () => {
     expect(contents.usd_rate).toBeCloseTo(1477.39, 1);
-  });
-
-  it('reads the installments to come, the onward ones included', () => {
-    expect(contents.installments_due).toEqual([
-      { month: '2026-09', ars_cents: 10_000, onward: false },
-      { month: '2026-10', ars_cents: 5_000, onward: false },
-      { month: '2027-03', ars_cents: 1_000, onward: true },
-    ]);
   });
 
   it('carries into the total what the payments left of the previous balance', () => {
@@ -147,6 +131,13 @@ describe('the Galicia VISA layout', () => {
   it('refuses a statement whose lines do not add up to its total', () => {
     expect(() => parseGaliciaVisa(pages('37.360,00'))).toThrow(StatementError);
     expect(() => parseGaliciaVisa(pages('37.360,00'))).toThrow(/suman \$ 37\.359,00.*37\.360,00/);
+  });
+
+  it("refuses a card whose purchases do not add up to its total, naming the card's digits", () => {
+    const off = pages();
+    off[0][off[0].length - 1] = cardTotal('1111', 'TITULAR UNO', '36.476,00', '1,99');
+    expect(() => parseGaliciaVisa(off)).toThrow(/tarjeta …1111 suman/);
+    expect(() => parseGaliciaVisa(off)).not.toThrow(/TITULAR/);
   });
 
   it('is what parseStatement picks for these pages', () => {

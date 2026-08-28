@@ -234,8 +234,8 @@ export type SpendingCategory = (typeof SPENDING_CATEGORIES)[number];
 /**
  * One credit-card statement, read on the device from the bank's PDF. The row
  * keeps in the clear only what lists it and announces its due date; the
- * statement itself — every purchase, who made it, the installments to come —
- * is `payload`, compressed and encrypted under a key of its own wrapped under
+ * statement itself — every purchase, the installments to come — is
+ * `payload`, compressed and encrypted under a key of its own wrapped under
  * the household's master key, like an attachment's file. Like every
  * offline-synced row, `id` is a client-generated UUID and `updated_at` is the
  * last-write-wins key.
@@ -249,6 +249,9 @@ export interface Statement {
   due_on: string;
   total_ars_cents: number;
   total_usd_cents: number;
+  /** Marked by a member once the card was paid; until then the statement is
+   *  coming up, however far off its due date. */
+  paid: boolean;
   /** Base64: the payload's own key, wrapped under the household's master key. */
   wrapped_key: string;
   /** Base64: the statement's contents, compressed then encrypted. */
@@ -403,9 +406,6 @@ export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 /** Objects fetched per page when listing the attachments bucket. */
 export const ATTACHMENT_LIST_PAGE = 1000;
 
-/** How many days ahead of its due date a statement shows on the home screen. */
-export const STATEMENT_NOTICE_DAYS = 7;
-
 /** Under this many pesos (in cents) an amount written in thousands keeps a
  *  decimal ("45,7k"); from here on it is whole thousands ("1.235k"). */
 export const COMPACT_AMOUNT_DECIMAL_BELOW_CENTS = 100_000 * 100;
@@ -422,7 +422,7 @@ export const INSTALLMENTS_MAX = 24;
 
 /** Shape of a statement's contents as sealed in its payload; bump it when
  *  the shape changes, so an older payload is told apart. */
-export const STATEMENT_CONTENTS_SCHEMA = 1;
+export const STATEMENT_CONTENTS_SCHEMA = 2;
 
 /** Words in the household phrase. */
 export const HOUSEHOLD_PHRASE_WORDS = 6;

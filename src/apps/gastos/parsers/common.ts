@@ -1,15 +1,10 @@
 // =============================================================================
 // What the bank's layouts share: Argentine amounts, dates in two spellings,
-// the amount columns at the right edge of the page, the header every page
-// carries and the schedule of installments to come.
+// the amount columns at the right edge of the page and the header every page
+// carries.
 // =============================================================================
 import { INSTALLMENTS_MAX } from '../../../types';
-import {
-  StatementError,
-  type InstallmentDue,
-  type PageLine,
-  type PositionedWord,
-} from '../statement';
+import { StatementError, type PageLine, type PositionedWord } from '../statement';
 
 /** An amount whose right edge is from here on sits in the pesos column… */
 export const ARS_COLUMN_MIN_X1 = 480;
@@ -97,13 +92,20 @@ export function installment(token: string): { number: number; of: number } | nul
   return number >= 1 && number <= of && of <= INSTALLMENTS_MAX ? { number, of } : null;
 }
 
-/** The statement's closing and due dates, from the row of six dates every
- *  page's header carries: the previous statement's, this one's, the next's. */
-export function headerDates(lines: PageLine[]): { closed_on: string; due_on: string } | null {
+/** The statement's closing and due dates, and the previous statement's
+ *  closing date, from the row of six dates every page's header carries: the
+ *  previous statement's, this one's, the next's. */
+export function headerDates(
+  lines: PageLine[],
+): { previous_closed_on: string; closed_on: string; due_on: string } | null {
   for (const line of lines) {
     const dates = text(line).split(/\s+/).map(isoFromNamedDate);
     if (dates.length === 6 && dates.every((d) => d !== null)) {
-      return { closed_on: dates[2] as string, due_on: dates[3] as string };
+      return {
+        previous_closed_on: dates[0] as string,
+        closed_on: dates[2] as string,
+        due_on: dates[3] as string,
+      };
     }
   }
   return null;
@@ -130,43 +132,6 @@ export function minimumPayment(lines: PageLine[]): number | null {
     }
   }
   return null;
-}
-
-/** "Setiembre/26" or "Agosto-26" as yyyy-mm, or null. */
-function monthToken(token: string): string | null {
-  const m = /^([A-Za-z]+)[/-](\d\d)$/.exec(token);
-  const month = m && monthNumber(m[1]);
-  return m && month ? `20${m[2]}-${pad2(month)}` : null;
-}
-
-/**
- * The installments still to come: a row of months, the row of amounts under
- * it, and an "A partir de <month> $<amount>" for what goes on beyond them.
- */
-export function installmentsDue(lines: PageLine[]): InstallmentDue[] {
-  const due: InstallmentDue[] = [];
-  let months: string[] | null = null;
-  for (const line of lines) {
-    const t = text(line);
-    if (months) {
-      const values = [...t.matchAll(/\$ ?([\d.]+,\d\d)/g)].map((m) => cents(m[1]) ?? 0);
-      if (values.length === months.length) {
-        months.forEach((month, i) => due.push({ month, ars_cents: values[i], onward: false }));
-      }
-      months = null;
-      continue;
-    }
-    // The row of months may reach us as one run of text or as one word each.
-    const asMonths = t.split(/\s+/).map(monthToken);
-    if (asMonths.length > 0 && asMonths.every((m) => m !== null)) {
-      months = asMonths as string[];
-      continue;
-    }
-    const onward = /^A partir de (\S+) \$ ?([\d.]+,\d\d)$/.exec(t);
-    const month = onward && monthToken(onward[1]);
-    if (onward && month) due.push({ month, ars_cents: cents(onward[2]) ?? 0, onward: true });
-  }
-  return due;
 }
 
 /**

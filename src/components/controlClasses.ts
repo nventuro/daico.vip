@@ -19,3 +19,15 @@ export const CHIP_IDLE_CLASS = 'border-border bg-surface-raised text-muted';
 
 /** Chip colours when it is the selected option: filled in the app's colour. */
 export const CHIP_SELECTED_CLASS = 'border-(--app) bg-(--app) font-medium text-on-primary';
+
+/** The bar pinned to the bottom of a list that adds to it — within thumb reach. */
+export const ADD_BAR_CLASS =
+  'sticky bottom-0 -mx-4 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur';
+
+/** The field of an add bar, taking the row's width. */
+export const ADD_BAR_INPUT_CLASS =
+  'flex-1 border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary';
+
+/** The square button beside it, in the app's colour. */
+export const ADD_BAR_BUTTON_CLASS =
+  'flex h-12 w-12 shrink-0 items-center justify-center bg-(--app) text-on-primary transition-opacity hover:opacity-90 disabled:bg-disabled disabled:opacity-100';

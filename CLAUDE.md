@@ -189,14 +189,15 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 ## Statements (Gastos) — read before touching them
 
 - **A statement's contents never reach the server in the clear.** The
-  `statements` row carries only `format`, `closed_on`, `due_on` and the two
-  totals; every purchase, holder name and installment lives in `payload`,
+  `statements` row carries only `format`, `closed_on`, `due_on`, `paid` and
+  the two totals; every purchase and installment lives in `payload`,
   sealed by `src/apps/gastos/payload.ts` (gzip, then `encryptFile` from
   `householdKey.ts` — never other crypto) and opened on the device with the
   master key. A merchant rule's `pattern` is sealed the same way. Keep it so:
-  never add a column that names a merchant, a holder or an amount of a line,
-  and never log or persist opened contents outside the in-memory caches the
-  hooks keep.
+  never add a column that names a merchant or an amount of a line, and never
+  log or persist opened contents outside the in-memory caches the hooks keep.
+  **Who made a purchase is not kept at all**, not even sealed: a parser checks
+  the per-card totals the bank prints and drops the names.
 - **The payload is pulled with the table**, so it must stay a few KB: keep
   the compression, and keep bulky data (the PDF itself) out — no PDF is ever
   stored. `STATEMENT_CONTENTS_SCHEMA` is bumped when the sealed shape changes.

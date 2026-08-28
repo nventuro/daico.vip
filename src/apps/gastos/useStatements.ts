@@ -6,8 +6,11 @@ import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { sealContents } from './payload';
 import type { StatementContents } from './statement';
 
-/** The row's columns in the clear, from what was read. */
-function columns(contents: StatementContents): Omit<Statement, 'id' | 'created_at' | 'updated_at'> {
+/** The row's columns in the clear, from what was read; whether it is paid
+ *  is the household's to say, not the statement's. */
+function columns(
+  contents: StatementContents,
+): Omit<Statement, 'id' | 'paid' | 'created_at' | 'updated_at'> {
   return {
     format: contents.format,
     closed_on: contents.closed_on,
@@ -32,6 +35,7 @@ export function useStatements() {
       mutate(async () =>
         engine.insert(STATEMENTS_SPEC, {
           ...columns(contents),
+          paid: false,
           ...(await sealContents(masterKey, contents)),
         }),
       ),
@@ -50,10 +54,15 @@ export function useStatements() {
     [mutate],
   );
 
+  const setPaid = useCallback(
+    (id: string, paid: boolean) => mutate(() => engine.update(STATEMENTS_SPEC, id, { paid })),
+    [mutate],
+  );
+
   const remove = useCallback(
     (statement: Statement) => mutate(() => engine.remove(STATEMENTS_SPEC, statement.id)),
     [mutate],
   );
 
-  return { items, loading, error, add, replace, remove };
+  return { items, loading, error, add, replace, setPaid, remove };
 }

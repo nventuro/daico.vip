@@ -20,7 +20,6 @@ export interface RuleChange {
 
 interface RuleDialogProps {
   line: StatementLine;
-  last4: string | null;
   cents: number;
   /** The household's rule filing the line now, if one does. */
   rule: Rule | null;
@@ -42,7 +41,6 @@ interface RuleDialogProps {
  */
 export default function RuleDialog({
   line,
-  last4,
   cents,
   rule,
   category: filed,
@@ -78,7 +76,7 @@ export default function RuleDialog({
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">{line.charge ? 'Percepción' : 'Categoría'}</span>
         <ul className="border-t border-border">
-          <LineRow line={line} last4={last4} cents={cents} onSelect={() => {}} />
+          <LineRow line={line} cents={cents} onSelect={() => {}} />
         </ul>
 
         {!line.charge && (
