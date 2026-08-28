@@ -94,7 +94,10 @@ export default function StatementPage() {
   const { usual, oneOff } = usualAndOneOff(contents, rules);
   const largestShare = Math.max(...shares.map((s) => s.cents), 1);
   const oneOffs = contents.lines.flatMap((line, i) => (isOneOff(line, rules) ? [i] : []));
-  const overdue = !statement.paid && contents.due_on < today;
+  // The due date has passed or it has not, whether or not it was paid; only
+  // an unpaid statement past it is a problem.
+  const expired = contents.due_on < today;
+  const overdue = !statement.paid && expired;
   const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
   const selectedLine = selected === null ? null : contents.lines[selected];
   const selectedFiling = selectedLine ? categoryOf(selectedLine, rules) : null;
@@ -214,7 +217,7 @@ export default function StatementPage() {
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-on-surface">Pagado</span>
           <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-            {overdue ? 'Venció' : 'Vence'} el {formatDate(contents.due_on)}
+            {expired ? 'Venció' : 'Vence'} el {formatDate(contents.due_on)}
           </span>
         </span>
       </button>
