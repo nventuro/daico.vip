@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconPlus, IconTags, IconTrendingUp } from '@tabler/icons-react';
-import type { Statement } from '../../lib/offline/specs';
+import { IconAlertTriangle, IconPlus } from '@tabler/icons-react';
+import type { Statement, StatementFormat } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { dueWord, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { dueWord, formatDateShort, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
 import { tooLargeMessage } from '../../utils/textUtils';
 import DialogFooter from '../../components/DialogFooter';
 import EmptyState from '../../components/EmptyState';
@@ -20,13 +20,22 @@ import {
   ADD_BAR_CLASS,
   ADD_BAR_INPUT_CLASS,
 } from '../../components/controlClasses';
-import { appPath, entryPath } from '../types';
 import { useStatements } from './useStatements';
 import { openStatement, useStatementsContents } from './useStatementContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
 import { toPayCents } from './breakdown';
-import { FORMAT_LABELS, formatArs, periodLabel, statementTitle } from './labels';
+import { cardIsShort, coverageByCard, type Period } from './coverage';
+import { statementPath } from './paths';
+import {
+  FORMAT_ICONS,
+  FORMAT_LABELS,
+  cardStateLabel,
+  formatArs,
+  gapTitle,
+  periodLabel,
+  statementTitle,
+} from './labels';
 
 /** Largest PDF taken as a statement, in bytes (input guard). */
 const STATEMENT_PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -38,10 +47,22 @@ interface Duplicate {
   existing: Statement;
 }
 
+/** What the list is made of: the statements there are, and — where the
+ *  periods of a card do not meet — the one that never came in, in its place. */
+type Listed =
+  | { kind: 'statement'; on: string; statement: Statement; contents: StatementContents }
+  | { kind: 'gap'; on: string; format: StatementFormat; period: Period };
+
+/**
+ * Everything about the statements in one screen: how far along each card is,
+ * every statement by the days it covers, and the ones missing where they
+ * would have been. This is also where a statement is added.
+ */
 export default function StatementsPage() {
   const { items, loading, error, add, replace } = useStatements();
-  // Each statement is one figure in pesos, its dollars at its own rate — which
-  // is in the sealed payload, so every statement listed is opened.
+  // Each statement is named by the days it covers and worth one figure in
+  // pesos, its dollars at its own rate — both of them sealed in the payload,
+  // so every statement listed is opened.
   const { contents, error: openError } = useStatementsContents(items);
   const masterKey = useMasterKey();
   const navigate = useNavigate();
@@ -55,11 +76,11 @@ export default function StatementsPage() {
     if (existing) {
       const previous = await openStatement(existing, masterKey.key);
       await replace(existing.id, withOneOffsFrom(contents, previous), masterKey.key);
-      navigate(entryPath('gastos', existing.id));
+      navigate(statementPath(existing.id));
       return;
     }
     const id = await add(contents, masterKey.key);
-    if (id) navigate(entryPath('gastos', id));
+    if (id) navigate(statementPath(id));
   }
 
   async function importFile(file: File) {
@@ -87,6 +108,25 @@ export default function StatementsPage() {
   }
 
   const busy = reading || masterKey.status !== 'unlocked';
+  const cards = contents ? coverageByCard(contents, today) : [];
+  const listed: Listed[] = contents
+    ? [
+        ...items.map((statement, i) => ({
+          kind: 'statement' as const,
+          on: statement.closed_on,
+          statement,
+          contents: contents[i],
+        })),
+        ...cards.flatMap((card) =>
+          card.gaps.map((period) => ({
+            kind: 'gap' as const,
+            on: period.to,
+            format: card.format,
+            period,
+          })),
+        ),
+      ].sort((a, b) => b.on.localeCompare(a.on))
+    : [];
 
   return (
     <>
@@ -139,44 +179,75 @@ export default function StatementsPage() {
           <EmptyState>Todavía no hay resúmenes. Importá el PDF que manda el banco.</EmptyState>
         ) : (
           <>
-            <ul>
-              <LinkRow
-                to={`${appPath('gastos')}/tendencias`}
-                title="Tendencias"
-                leading={
-                  <IconTrendingUp size={20} stroke={1.75} className="shrink-0 text-(--app)" />
-                }
-                chevron
-              />
-              <LinkRow
-                to={`${appPath('gastos')}/categorizacion`}
-                title="Categorización"
-                leading={<IconTags size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
-                chevron
-              />
-            </ul>
-            <div className="mt-5">
+            <section>
+              <SectionLabel>Tarjetas</SectionLabel>
+              <ul>
+                {cards.map((card) => {
+                  const Icon = FORMAT_ICONS[card.format];
+                  return (
+                    <LinkRow
+                      key={card.format}
+                      title={FORMAT_LABELS[card.format]}
+                      subtitle={cardStateLabel(card)}
+                      leading={<Icon size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
+                      trailing={
+                        cardIsShort(card) ? (
+                          <span
+                            role="img"
+                            aria-label="Falta un resumen"
+                            title="Falta un resumen"
+                            className="flex shrink-0 text-warning"
+                          >
+                            <IconAlertTriangle size={18} stroke={1.75} />
+                          </span>
+                        ) : undefined
+                      }
+                    />
+                  );
+                })}
+              </ul>
+            </section>
+
+            <section className="mt-5">
               <SectionLabel>Resúmenes</SectionLabel>
               <ul>
-                {items.map((statement, i) => {
+                {listed.map((row) => {
+                  if (row.kind === 'gap') {
+                    return (
+                      <LinkRow
+                        key={`gap-${row.format}-${row.on}`}
+                        title={gapTitle(row.format)}
+                        subtitle={`del ${formatDateShort(row.period.from)} al ${formatDateShort(row.period.to)}`}
+                        leading={
+                          <IconAlertTriangle
+                            size={20}
+                            stroke={1.75}
+                            className="shrink-0 text-warning"
+                          />
+                        }
+                      />
+                    );
+                  }
+                  const { statement } = row;
                   const overdue = !statement.paid && isPast(statement.due_on, today);
-                  const usdRate = contents?.[i]?.usd_rate ?? null;
                   const due = `${dueWord(statement.due_on, today)} ${relativeDay(today, statement.due_on)}`;
+                  const Icon = FORMAT_ICONS[statement.format];
                   return (
                     <LinkRow
                       key={statement.id}
-                      to={entryPath('gastos', statement.id)}
-                      title={statementTitle(statement)}
+                      to={statementPath(statement.id)}
+                      title={statementTitle(row.contents)}
                       subtitle={`${statement.paid ? '' : `${due} · `}${formatArs(
-                        toPayCents({ ...statement, usd_rate: usdRate }),
+                        toPayCents(row.contents),
                       )}`}
                       overdue={overdue}
+                      leading={<Icon size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
                       chevron
                     />
                   );
                 })}
               </ul>
-            </div>
+            </section>
           </>
         )}
       </ListPage>

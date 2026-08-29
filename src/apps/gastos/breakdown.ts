@@ -1,9 +1,11 @@
 // =============================================================================
-// The sums a statement is read through: by category, the usual against the
-// one-off, and month by month across statements. All in pesos, a dollar line
-// valued at its own statement's rate.
+// The sums a statement and a month are read through: by category, the usual
+// against the one-off, and month by month across statements. All in pesos, a
+// dollar line valued at the rate of the statement it came in — which is why a
+// movement is carried around already valued: a month is made of several
+// statements, each with a rate of its own.
 // =============================================================================
-import type { SpendingCategory, StatementFormat } from '../../lib/offline/specs';
+import type { SpendingCategory } from '../../lib/offline/specs';
 import { yearMonthOf } from '../../utils/dateUtils';
 import { categoryOf, type Rule } from './rules';
 import type { StatementContents, StatementLine } from './statement';
@@ -19,6 +21,43 @@ export function lineCents(line: StatementLine, usdRate: number | null): number {
   return inPesos(line.ars_cents, line.usd_cents, usdRate);
 }
 
+/** One movement, already in pesos, and where to find it again: marking it
+ *  rewrites the statement that holds it, at that place in its lines. */
+export interface Movement {
+  line: StatementLine;
+  cents: number;
+  statementId: string;
+  index: number;
+}
+
+/** Every movement of one statement. */
+export function movementsOf(statementId: string, contents: StatementContents): Movement[] {
+  return contents.lines.map((line, index) => ({
+    line,
+    cents: lineCents(line, contents.usd_rate),
+    statementId,
+    index,
+  }));
+}
+
+/** The movements of `month` (yyyy-mm) across every statement given, by the
+ *  day each was made — the day the bank prints, which for an installment is
+ *  the day the purchase was made, not the day it is charged. */
+export function movementsOfMonth(
+  statements: { id: string }[],
+  all: StatementContents[],
+  month: string,
+): Movement[] {
+  return statements.flatMap((statement, i) =>
+    all[i] ? movementsOf(statement.id, all[i]).filter((m) => yearMonthOf(m.line.on) === month) : [],
+  );
+}
+
+/** What movements come to. */
+export function sumCents(movements: Movement[]): number {
+  return movements.reduce((acc, movement) => acc + movement.cents, 0);
+}
+
 /** What a statement's movements come to in pesos: the spending it lists,
  *  apart from any balance carried from the statement before. */
 export function totalCents(contents: StatementContents): number {
@@ -32,31 +71,29 @@ export function toPayCents(
   return inPesos(contents.total_ars_cents, contents.total_usd_cents, contents.usd_rate);
 }
 
-/** The lines `indices` name, largest amount first. */
-export function largestFirst(contents: StatementContents, indices: number[]): number[] {
-  const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
-  return [...indices].sort((a, b) => cents(b) - cents(a));
+/** The movements given, largest amount first. */
+export function largestFirst(movements: Movement[]): Movement[] {
+  return [...movements].sort((a, b) => b.cents - a.cents);
 }
 
-/** One category's share of a statement: its total and the lines in it, by
- *  their index in the statement. */
+/** One category's share: its total and the movements in it. */
 export interface CategoryShare {
   category: SpendingCategory | null;
   cents: number;
-  lines: number[];
+  movements: Movement[];
 }
 
-/** A statement by category, largest first; the lines nothing places come as
- *  the null category. */
-export function byCategory(contents: StatementContents, rules: Rule[]): CategoryShare[] {
+/** Movements by category, largest first; the ones nothing places come as the
+ *  null category. */
+export function byCategory(movements: Movement[], rules: Rule[]): CategoryShare[] {
   const shares = new Map<SpendingCategory | null, CategoryShare>();
-  contents.lines.forEach((line, i) => {
-    const { category } = categoryOf(line, rules);
-    const share = shares.get(category) ?? { category, cents: 0, lines: [] };
-    share.cents += lineCents(line, contents.usd_rate);
-    share.lines.push(i);
+  for (const movement of movements) {
+    const { category } = categoryOf(movement.line, rules);
+    const share = shares.get(category) ?? { category, cents: 0, movements: [] };
+    share.cents += movement.cents;
+    share.movements.push(movement);
     shares.set(category, share);
-  });
+  }
   return [...shares.values()].sort((a, b) => b.cents - a.cents);
 }
 
@@ -77,15 +114,14 @@ export function isOneOff(line: StatementLine, rules: Rule[]): boolean {
 
 /** What the usual spending and the one-offs come to. */
 export function usualAndOneOff(
-  contents: StatementContents,
+  movements: Movement[],
   rules: Rule[],
 ): { usual: number; oneOff: number } {
   let usual = 0;
   let oneOff = 0;
-  for (const line of contents.lines) {
-    const value = lineCents(line, contents.usd_rate);
-    if (isOneOff(line, rules)) oneOff += value;
-    else usual += value;
+  for (const movement of movements) {
+    if (isOneOff(movement.line, rules)) oneOff += movement.cents;
+    else usual += movement.cents;
   }
   return { usual, oneOff };
 }
@@ -95,7 +131,7 @@ export function percent(part: number, whole: number): number {
   return whole === 0 ? 0 : Math.round((part / whole) * 100);
 }
 
-/** The yyyy-mm a statement belongs to: the month it closed. */
+/** The yyyy-mm a statement closed in. */
 export function monthOf(contents: Pick<StatementContents, 'closed_on'>): string {
   return yearMonthOf(contents.closed_on);
 }
@@ -103,25 +139,27 @@ export function monthOf(contents: Pick<StatementContents, 'closed_on'>): string 
 /** What to sum month by month: everything, the usual spending alone, or one category. */
 export type TrendPick = 'total' | 'usual' | SpendingCategory;
 
-/** One month across every statement that closed in it. */
+/** One calendar month across every statement that carries a movement made in it. */
 export interface MonthTotal {
   /** yyyy-mm */
   month: string;
   cents: number;
   usual: number;
   oneOff: number;
-  /** The layouts of the statements the month has. */
-  formats: StatementFormat[];
 }
 
-/** Every month with a statement, newest first, summing what `pick` names. */
+/**
+ * Every month with a movement in it, newest first, summing what `pick` names.
+ * A movement counts in the month it was made, not the month its statement
+ * closed: the closing calendar is the bank's, and two cards never share it.
+ */
 export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick): MonthTotal[] {
   const months = new Map<string, MonthTotal>();
   for (const contents of all) {
-    const month = monthOf(contents);
-    const row = months.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0, formats: [] };
-    if (!row.formats.includes(contents.format)) row.formats.push(contents.format);
     for (const line of contents.lines) {
+      const month = yearMonthOf(line.on);
+      const row = months.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0 };
+      months.set(month, row);
       const oneOff = isOneOff(line, rules);
       if (pick === 'usual' && oneOff) continue;
       if (pick !== 'total' && pick !== 'usual' && categoryOf(line, rules).category !== pick)
@@ -131,7 +169,6 @@ export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick
       if (oneOff) row.oneOff += value;
       else row.usual += value;
     }
-    months.set(month, row);
   }
   return [...months.values()].sort((a, b) => b.month.localeCompare(a.month));
 }

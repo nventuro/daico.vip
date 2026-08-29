@@ -1,47 +1,43 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { useEntry } from '../../hooks/useEntry';
-import { capitalize } from '../../utils/textUtils';
-import { dueWord, formatDate, isPast, todayIso } from '../../utils/dateUtils';
-import CheckRow from '../../components/CheckRow';
+import { monthName, todayIso } from '../../utils/dateUtils';
 import ErrorLine from '../../components/ErrorLine';
-import SkeletonRows from '../../components/SkeletonRows';
+import LinkRow from '../../components/LinkRow';
 import SectionLabel from '../../components/SectionLabel';
-import FormFooter from '../../components/FormFooter';
+import SkeletonRows from '../../components/SkeletonRows';
 import { useStatements } from './useStatements';
-import { useStatementContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
 import {
   byCategory,
+  byMonth,
   isOneOff,
   isOneOffCategory,
   largestFirst,
-  monthOf,
-  movementsOf,
-  toPayCents,
-  totalCents,
+  movementsOfMonth,
+  sumCents,
   usualAndOneOff,
   type CategoryShare,
   type Movement,
 } from './breakdown';
+import { coverageByCard, coveredMonths, monthCoverage } from './coverage';
 import { categoryOf } from './rules';
 import { withOneOff, type StatementContents } from './statement';
-import { STATEMENTS_PATH } from './paths';
+import { statementPath } from './paths';
 import {
   CATEGORY_LABELS,
-  FORMAT_LABELS,
   UNCATEGORIZED_LABEL,
-  carriedLabel,
   formatArs,
   formatArsCompact,
   formatDelta,
   formatPercentDelta,
-  formatUsd,
   monthShort,
-  periodLabel,
+  monthTitle,
+  shortfallLabel,
+  statementTitle,
 } from './labels';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
@@ -52,62 +48,80 @@ import RuleDialog, { type RuleChange } from './RuleDialog';
 /** A category's key in the set of opened ones; the unfiled lines have their own. */
 const shareKey = (category: SpendingCategory | null) => category ?? 'none';
 
-export default function StatementPage() {
-  const { items, loading, error, replace, setPaid, remove } = useStatements();
-  const masterKey = useMasterKey();
-  const navigate = useNavigate();
-  const today = todayIso();
-
-  const statement = useEntry(items);
-  // The statement before this one of the same card: what "vs." compares with.
-  const previous = useMemo(
-    () =>
-      statement &&
-      items
-        .filter((s) => s.format === statement.format && s.closed_on < statement.closed_on)
-        .sort((a, b) => b.closed_on.localeCompare(a.closed_on))[0],
-    [items, statement],
-  );
-  const { contents, error: openError } = useStatementContents(statement);
-  const { contents: previousContents } = useStatementContents(previous);
+/**
+ * One calendar month: what the household spent in it, wherever the bank
+ * happened to bill it. The statements it is made of are listed at the end,
+ * because a month and a statement almost never line up.
+ */
+export default function MonthPage() {
+  const { items, loading, error, replace } = useStatements();
+  const { contents, error: openError } = useStatementsContents(items);
   const rulesStore = useMerchantRules();
   const rules = useMemo(() => rulesStore.rules ?? [], [rulesStore.rules]);
+  const masterKey = useMasterKey();
+  const month = useParams().month ?? '';
+  const today = todayIso();
 
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<Movement | null>(null);
-  // Marking a line rewrites the whole sealed payload, and what is on screen
-  // only catches up once the row is written and read again. Each tap waits for
-  // the one before it and marks what that one wrote, so no mark is lost.
-  const writing = useRef<Promise<StatementContents> | null>(null);
+  // Marking a movement rewrites the whole sealed payload of the statement it
+  // is in, and what is on screen only catches up once that row is written and
+  // read again. Each tap waits for the one before it on the same statement and
+  // marks what that one wrote, so no mark is lost.
+  const writing = useRef(new Map<string, Promise<StatementContents>>());
 
   const movements = useMemo(
-    () => (statement && contents ? movementsOf(statement.id, contents) : []),
-    [statement, contents],
+    () => (contents ? movementsOfMonth(items, contents, month) : []),
+    [items, contents, month],
   );
   const shares = useMemo(() => byCategory(movements, rules), [movements, rules]);
+
+  const cards = useMemo(() => (contents ? coverageByCard(contents, today) : []), [contents, today]);
+  const coverage = useMemo(() => monthCoverage(month, cards), [month, cards]);
+  // A month no statement covers a day of is not a month the app has.
+  const listed = useMemo(() => coveredMonths(cards).includes(month), [cards, month]);
+
+  // The month before this one, to compare with — and only when both are whole.
+  const { previousMonth, previousCents, comparable } = useMemo(() => {
+    if (!contents) return { previousMonth: null, previousCents: 0, comparable: false };
+    const months = coveredMonths(cards);
+    const older = months[months.indexOf(month) + 1] ?? null;
+    const totals = new Map(byMonth(contents, rules, 'total').map((row) => [row.month, row.cents]));
+    return {
+      previousMonth: older,
+      previousCents: older ? (totals.get(older) ?? 0) : 0,
+      comparable:
+        older !== null && monthCoverage(month, cards).whole && monthCoverage(older, cards).whole,
+    };
+  }, [contents, rules, month, cards]);
+
   const previousByCategory = useMemo(() => {
     const map = new Map<SpendingCategory | null, number>();
-    if (previous && previousContents) {
-      for (const share of byCategory(movementsOf(previous.id, previousContents), rules))
+    if (contents && previousMonth) {
+      for (const share of byCategory(movementsOfMonth(items, contents, previousMonth), rules))
         map.set(share.category, share.cents);
     }
     return map;
-  }, [previous, previousContents, rules]);
+  }, [items, contents, previousMonth, rules]);
 
-  if (loading || (statement && !contents && !openError)) return <SkeletonRows />;
-  if (!statement) return <p className="text-muted">Resumen no encontrado.</p>;
+  if (loading || (!contents && !openError)) return <SkeletonRows />;
   if (!contents) return <ErrorLine error={openError} />;
+  if (!listed) return <p className="text-muted">Mes no encontrado.</p>;
 
-  const toPay = toPayCents(contents);
-  const total = totalCents(contents);
-  const previousTotal = previousContents ? totalCents(previousContents) : null;
+  const total = sumCents(movements);
   const { usual, oneOff } = usualAndOneOff(movements, rules);
-  const largestShare = Math.max(...shares.map((s) => s.cents), 1);
-  const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
-  // The due date has passed or it has not, whether or not it was paid; only
-  // an unpaid statement past it is a problem.
-  const overdue = !statement.paid && isPast(contents.due_on, today);
+  const largestShare = Math.max(...shares.map((share) => share.cents), 1);
   const selectedFiling = selected ? categoryOf(selected.line, rules) : null;
+
+  // The statements a movement of this month came in, newest first: a month is
+  // rarely one statement, and never the same days as one.
+  const sources = items
+    .map((statement, i) => ({
+      statement,
+      contents: contents[i],
+      movements: movements.filter((movement) => movement.statementId === statement.id),
+    }))
+    .filter((source) => source.movements.length > 0);
 
   function toggle(share: CategoryShare) {
     setOpened((prev) => {
@@ -120,7 +134,7 @@ export default function StatementPage() {
   }
 
   async function handleSave(change: RuleChange | 'remove' | null) {
-    if (masterKey.status !== 'unlocked' || selected === null) return;
+    if (masterKey.status !== 'unlocked' || !selected) return;
     const { rule } = categoryOf(selected.line, rules);
     if (change === 'remove') {
       if (rule) await rulesStore.remove(rule.id);
@@ -132,29 +146,24 @@ export default function StatementPage() {
     setSelected(null);
   }
 
-  function toggleOneOff(i: number) {
-    if (masterKey.status !== 'unlocked' || !statement || !contents) return;
+  function toggleOneOff(movement: Movement) {
+    if (masterKey.status !== 'unlocked' || !contents) return;
     const { key } = masterKey;
-    const id = statement.id;
-    const written = (writing.current ?? Promise.resolve(contents)).then(async (current) => {
-      const marked = withOneOff(current, i);
-      await replace(id, marked, key);
+    const at = items.findIndex((statement) => statement.id === movement.statementId);
+    if (at < 0) return;
+    const { statementId } = movement;
+    const pending = writing.current.get(statementId) ?? Promise.resolve(contents[at]);
+    const written = pending.then(async (current) => {
+      const marked = withOneOff(current, movement.index);
+      await replace(statementId, marked, key);
       return marked;
     });
-    writing.current = written;
+    writing.current.set(statementId, written);
     void written.finally(() => {
-      if (writing.current === written) writing.current = null;
+      if (writing.current.get(statementId) === written) writing.current.delete(statementId);
     });
   }
 
-  async function handleRemove() {
-    if (!statement) return;
-    await remove(statement.id);
-    navigate(STATEMENTS_PATH);
-  }
-
-  // The movements given, hairlines between them; `closed` draws one under the
-  // last too, for a list nothing else closes.
   const renderMovements = (list: Movement[], closed = false) => (
     <ul className={`divide-y divide-border ${closed ? 'border-b border-border' : ''}`}>
       {largestFirst(list).map((movement) => {
@@ -163,67 +172,36 @@ export default function StatementPage() {
         const fixed = isOneOffCategory(categoryOf(movement.line, rules).category);
         return (
           <LineRow
-            key={movement.index}
+            key={`${movement.statementId}-${movement.index}`}
             line={movement.line}
             cents={movement.cents}
             oneOff={fixed || movement.line.one_off}
             onSelect={() => setSelected(movement)}
-            onToggleOneOff={fixed ? undefined : () => toggleOneOff(movement.index)}
+            onToggleOneOff={fixed ? undefined : () => toggleOneOff(movement)}
           />
         );
       })}
     </ul>
   );
 
+  const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
+
   return (
     <div className="flex flex-col gap-6">
       <ErrorLine error={error ?? rulesStore.error} />
 
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm text-muted">
-          {FORMAT_LABELS[contents.format]} · {periodLabel(contents)}
-        </span>
-        <span className="font-display text-4xl font-black tracking-tight">
-          {formatArs(toPay, contents.total_usd_cents === 0)}
-        </span>
-        {contents.total_usd_cents !== 0 && (
-          <span className="text-lg tabular-nums">
-            {formatArs(contents.total_ars_cents, true)} + {formatUsd(contents.total_usd_cents)}
-          </span>
-        )}
-        {contents.total_usd_cents !== 0 && contents.usd_rate !== null && (
-          <span className="text-sm text-muted">
-            Total estimado al cambio del resumen (
-            {formatArs(Math.round(contents.usd_rate * 100), true)}).
-          </span>
-        )}
-        {contents.total_usd_cents !== 0 && contents.usd_rate === null && (
-          <span className="text-sm text-muted">
-            El resumen no dice el cambio; los dólares van aparte.
-          </span>
-        )}
-        {contents.pending_ars_cents !== 0 && (
-          <span className="text-sm text-muted">{carriedLabel(contents.pending_ars_cents)}</span>
-        )}
-        {previousContents && previousTotal !== null && previousTotal !== 0 && (
-          <Delta value={total - previousTotal} className="mt-1 text-sm">
-            {formatPercentDelta(total, previousTotal)} vs. {monthShort(monthOf(previousContents))}
+        <span className="text-sm text-muted">{monthTitle(month)}</span>
+        <span className="font-display text-4xl font-black tracking-tight">{formatArs(total)}</span>
+        {comparable && previousMonth && previousCents !== 0 && (
+          <Delta value={total - previousCents} className="mt-1 text-sm">
+            {formatPercentDelta(total, previousCents)} vs. {monthShort(previousMonth)}
           </Delta>
         )}
+        {!coverage.whole && (
+          <span className="mt-1 text-sm text-muted">{shortfallLabel(coverage.short, month)}</span>
+        )}
       </div>
-
-      <CheckRow
-        checked={statement.paid}
-        onToggle={() => void setPaid(statement.id, !statement.paid)}
-        className="w-full border-y border-border py-3"
-      >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-on-surface">Pagado</span>
-          <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-            {capitalize(dueWord(contents.due_on, today))} el {formatDate(contents.due_on)}
-          </span>
-        </span>
-      </CheckRow>
 
       <div className="flex flex-col gap-2">
         <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
@@ -260,7 +238,7 @@ export default function StatementPage() {
                     </span>
                     <span className="flex items-center gap-3">
                       <SpendBar usual={share.cents} max={largestShare} />
-                      {previousContents && (
+                      {previousMonth && (
                         <Delta value={change} className="w-24 shrink-0 text-right text-xs">
                           {formatDelta(change)}
                         </Delta>
@@ -283,16 +261,32 @@ export default function StatementPage() {
         </section>
       )}
 
-      <FormFooter
-        removeLabel="Eliminar resumen"
-        confirmQuestion="¿Eliminar el resumen?"
-        onRemove={() => void handleRemove()}
-        action={<span />}
-      />
+      {sources.length > 0 && (
+        <section>
+          <SectionLabel>De qué resúmenes sale</SectionLabel>
+          <ul>
+            {sources.map((source) => {
+              const cuotas = source.movements.every((movement) => movement.line.installment);
+              const what = cuotas ? 'cuotas de compras' : 'movimientos';
+              return (
+                <LinkRow
+                  key={source.statement.id}
+                  to={statementPath(source.statement.id)}
+                  title={statementTitle(source.contents)}
+                  subtitle={`${source.movements.length} ${what} de ${monthName(month, 'long')} · ${formatArs(
+                    sumCents(source.movements),
+                  )}`}
+                  chevron
+                />
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {selected && selectedFiling && (
         <RuleDialog
-          key={selected.index}
+          key={`${selected.statementId}-${selected.index}`}
           line={selected.line}
           cents={selected.cents}
           rule={selectedFiling.rule}

@@ -26,7 +26,7 @@ export async function searchGuides(query: string): Promise<SearchHit[]> {
   const chapterHits = chapters.flatMap((chapter): SearchHit[] => {
     const guideTitle = guideTitles.get(chapter.guide_id);
     if (guideTitle === undefined) return [];
-    const to = `${entryPath('guias', chapter.guide_id)}/${chapter.id}`;
+    const to = entryPath('guias', chapter.guide_id, chapter.id);
     if (matches(chapter.title, query)) return [{ title: chapter.title, subtitle: guideTitle, to }];
     if (matches(chapter.body, query)) {
       return [

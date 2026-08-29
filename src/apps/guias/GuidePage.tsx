@@ -35,7 +35,7 @@ export default function GuidePage() {
                   {section.items.map((chapter) => (
                     <LinkRow
                       key={chapter.id}
-                      to={`${entryPath('guias', guide.id)}/${chapter.id}`}
+                      to={entryPath('guias', guide.id, chapter.id)}
                       title={chapter.title}
                     />
                   ))}

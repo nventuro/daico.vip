@@ -22,7 +22,7 @@ export default function RecipePage() {
             <IconButton
               label="Editar receta"
               icon={IconPencil}
-              to={`${entryPath('recetas', recipe.id)}/editar`}
+              to={entryPath('recetas', recipe.id, 'editar')}
             />
           </div>
 

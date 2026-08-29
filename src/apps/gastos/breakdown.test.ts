@@ -4,6 +4,7 @@ import {
   byMonth,
   largestFirst,
   lineCents,
+  movementsOf,
   toPayCents,
   totalCents,
   usualAndOneOff,
@@ -72,25 +73,41 @@ describe('lineCents', () => {
   });
 });
 
+/** Every movement of a statement, as a screen reads them. */
+const movements = (contents: StatementContents) => movementsOf('s', contents);
+
 describe('byCategory', () => {
   it('sums each category largest first, the unfiled lines under null', () => {
-    expect(byCategory(august, RULES)).toEqual([
-      { category: 'suscripciones', cents: 1_500_000, lines: [1] },
-      { category: 'impuestos', cents: 450_000, lines: [3] },
-      { category: 'supermercado', cents: 10_000, lines: [0] },
-      { category: null, cents: 5_000, lines: [2] },
+    expect(
+      byCategory(movements(august), RULES).map((share) => [
+        share.category,
+        share.cents,
+        share.movements.map((movement) => movement.index),
+      ]),
+    ).toEqual([
+      ['suscripciones', 1_500_000, [1]],
+      ['impuestos', 450_000, [3]],
+      ['supermercado', 10_000, [0]],
+      [null, 5_000, [2]],
     ]);
+  });
+
+  it('reads a month made of several statements at their own rates', () => {
+    const cheap = statement({ usd_rate: 1000, lines: [line({ usd_cents: 100 })] });
+    const dear = statement({ usd_rate: 2000, lines: [line({ usd_cents: 100 })] });
+    const both = [...movementsOf('a', cheap), ...movementsOf('b', dear)];
+    expect(byCategory(both, RULES)[0].cents).toBe(300_000);
   });
 });
 
 describe('usualAndOneOff', () => {
   it('splits the total by the mark', () => {
-    expect(usualAndOneOff(august, RULES)).toEqual({ usual: 1_960_000, oneOff: 5_000 });
+    expect(usualAndOneOff(movements(august), RULES)).toEqual({ usual: 1_960_000, oneOff: 5_000 });
     expect(totalCents(august)).toBe(1_965_000);
   });
 
   it('counts a line its category sets apart, with no mark on it', () => {
-    expect(usualAndOneOff(trip, RULES)).toEqual({ usual: 0, oneOff: 90_000 });
+    expect(usualAndOneOff(movements(trip), RULES)).toEqual({ usual: 0, oneOff: 90_000 });
   });
 });
 
@@ -103,39 +120,33 @@ describe('toPayCents', () => {
 });
 
 describe('largestFirst', () => {
-  it('orders the lines given by amount, the dollars at the rate', () => {
-    expect(largestFirst(august, [0, 1, 2, 3])).toEqual([1, 3, 0, 2]);
-    expect(largestFirst(august, [2, 0])).toEqual([0, 2]);
+  it('orders the movements given by amount, the dollars at the rate', () => {
+    expect(largestFirst(movements(august)).map((m) => m.index)).toEqual([1, 3, 0, 2]);
+    expect(
+      largestFirst(movements(august).filter((m) => m.index === 2 || m.index === 0)).map(
+        (m) => m.index,
+      ),
+    ).toEqual([0, 2]);
   });
 });
 
 describe('byMonth', () => {
+  // Closes in August, so by the bank's calendar it is an August statement —
+  // but what it lists was bought in July.
   const july = statement({
-    closed_on: '2026-07-23',
+    closed_on: '2026-08-02',
     format: 'galicia-mastercard',
-    lines: [line({ description: 'TIENDA SOL', ars_cents: 7_000 })],
+    lines: [line({ on: '2026-07-28', description: 'TIENDA SOL', ars_cents: 7_000 })],
   });
   const julyVisa = statement({
     closed_on: '2026-07-20',
-    lines: [line({ description: 'TIENDA SOL', ars_cents: 1_000, one_off: true })],
+    lines: [line({ on: '2026-07-04', description: 'TIENDA SOL', ars_cents: 1_000, one_off: true })],
   });
 
-  it('sums every statement closed in a month, newest month first', () => {
+  it('counts a movement in the month it was made, not the month its statement closed', () => {
     expect(byMonth([july, august, julyVisa], RULES, 'total')).toEqual([
-      {
-        month: '2026-08',
-        cents: 1_965_000,
-        usual: 1_960_000,
-        oneOff: 5_000,
-        formats: ['galicia-visa'],
-      },
-      {
-        month: '2026-07',
-        cents: 8_000,
-        usual: 7_000,
-        oneOff: 1_000,
-        formats: ['galicia-mastercard', 'galicia-visa'],
-      },
+      { month: '2026-08', cents: 1_965_000, usual: 1_960_000, oneOff: 5_000 },
+      { month: '2026-07', cents: 8_000, usual: 7_000, oneOff: 1_000 },
     ]);
   });
 

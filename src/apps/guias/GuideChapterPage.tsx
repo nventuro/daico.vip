@@ -35,10 +35,7 @@ export default function GuideChapterPage() {
           </div>
           <nav className="mt-6 flex justify-between gap-4 border-t border-border pt-4">
             {previous ? (
-              <Link
-                to={`${entryPath('guias', chapter.guide_id)}/${previous.id}`}
-                className={navLink}
-              >
+              <Link to={entryPath('guias', chapter.guide_id, previous.id)} className={navLink}>
                 <IconChevronLeft size={16} stroke={1.5} className="shrink-0" />
                 <span className="truncate">{previous.title}</span>
               </Link>
@@ -47,7 +44,7 @@ export default function GuideChapterPage() {
             )}
             {next && (
               <Link
-                to={`${entryPath('guias', chapter.guide_id)}/${next.id}`}
+                to={entryPath('guias', chapter.guide_id, next.id)}
                 className={`${navLink} text-right`}
               >
                 <span className="truncate">{next.title}</span>

@@ -1,5 +1,7 @@
-import type { SpendingCategory, Statement, StatementFormat } from '../../lib/offline/specs';
-import { addDays, formatDateShort, monthName, yearMonthOf } from '../../utils/dateUtils';
+import { IconBrandMastercard, IconBrandVisa, type TablerIcon } from '@tabler/icons-react';
+import type { SpendingCategory, StatementFormat } from '../../lib/offline/specs';
+import { addDays, formatDateShort, monthName } from '../../utils/dateUtils';
+import type { CardCoverage, Shortfall } from './coverage';
 import type { StatementContents } from './statement';
 
 /** Under this many pesos (in cents) an amount written in thousands keeps a
@@ -30,6 +32,13 @@ export const UNCATEGORIZED_LABEL = 'Sin categoría';
 export const FORMAT_LABELS: Record<StatementFormat, string> = {
   'galicia-visa': 'visa',
   'galicia-mastercard': 'mastercard',
+};
+
+/** The card's own mark, for a row that lists one. Line drawings from the
+ *  icon set the rest of the app is drawn with, not the networks' artwork. */
+export const FORMAT_ICONS: Record<StatementFormat, TablerIcon> = {
+  'galicia-visa': IconBrandVisa,
+  'galicia-mastercard': IconBrandMastercard,
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -81,10 +90,71 @@ export function formatPercentDelta(now: number, before: number): string {
   return `${value < 0 ? '−' : '+'} ${Math.abs(value)} %`;
 }
 
-/** How a statement is named wherever it is listed: the month it covers and
- *  the card it is for. */
-export function statementTitle(statement: Pick<Statement, 'format' | 'closed_on'>): string {
-  return `${monthTitle(yearMonthOf(statement.closed_on))} · ${FORMAT_LABELS[statement.format]}`;
+/** A day without its leading zero. */
+const day = (date: string) => String(Number(date.slice(8)));
+
+/**
+ * The days a statement covers, tight enough for a row: "3 al 30 jul 2026",
+ * "29 may al 2 jul 2026", "24 dic 2025 al 22 ene 2026".
+ */
+export function periodShort(from: string, to: string): string {
+  const [fromYear, fromMonth] = from.split('-');
+  const [toYear, toMonth] = to.split('-');
+  const start =
+    fromYear !== toYear
+      ? `${day(from)} ${monthName(from, 'short')} ${fromYear}`
+      : fromMonth === toMonth
+        ? day(from)
+        : `${day(from)} ${monthName(from, 'short')}`;
+  return `${start} al ${day(to)} ${monthName(to, 'short')} ${toYear}`;
+}
+
+/** How a statement is named wherever it is listed: the card it is for and the
+ *  days it covers — never the month it closed in, which two statements of the
+ *  same card can share. */
+export function statementTitle(
+  contents: Pick<StatementContents, 'format' | 'previous_closed_on' | 'closed_on'>,
+): string {
+  const period =
+    contents.previous_closed_on === null
+      ? `cierre ${formatDateShort(contents.closed_on)}`
+      : periodShort(addDays(contents.previous_closed_on, 1), contents.closed_on);
+  return `${FORMAT_LABELS[contents.format]} · ${period}`;
+}
+
+/** What a card's row says under its name: when it last closed, and whatever
+ *  it is missing. */
+export function cardStateLabel(card: CardCoverage): string {
+  const parts = [`último cierre ${formatDateShort(card.lastClosedOn)}`];
+  if (card.late) parts.push(`hace ${card.daysSinceClose} días`);
+  if (card.gaps.length === 1) parts.push('falta 1 resumen');
+  if (card.gaps.length > 1) parts.push(`faltan ${card.gaps.length} resúmenes`);
+  return parts.join(' · ');
+}
+
+/** How a missing statement is named where it sits in the list. */
+export function gapTitle(format: StatementFormat): string {
+  return `Falta un resumen de ${FORMAT_LABELS[format]}`;
+}
+
+function shortfallSentence(short: Shortfall, month: string): string {
+  const card = FORMAT_LABELS[short.format];
+  const when = monthName(month, 'long');
+  switch (short.kind) {
+    case 'none':
+      return `Falta el resumen de ${card} de ${when}.`;
+    case 'gap':
+      return `Falta un resumen de ${card} de ${when}.`;
+    case 'until':
+      return `La ${card} de ${when} llega hasta el ${day(short.day)}.`;
+    case 'since':
+      return `La ${card} de ${when} arranca el ${day(short.day)}.`;
+  }
+}
+
+/** Why a month is not whole, in a sentence per card that leaves it short. */
+export function shortfallLabel(short: Shortfall[], month: string): string {
+  return short.map((one) => shortfallSentence(one, month)).join(' ');
 }
 
 /** A yyyy-mm (or a date in it) as its month and year: "Agosto 2026". */

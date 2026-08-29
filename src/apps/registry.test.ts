@@ -24,6 +24,9 @@ describe('apps registry', () => {
     for (const app of apps) {
       expect(appPath(app.id)).toBe(`/${app.id}`);
       expect(entryPath(app.id, 'an-id')).toBe(`/${app.id}/an-id`);
+      // An entry that hangs off one of the app's screens, or a page of an
+      // entry, is built the same way rather than pasted together.
+      expect(entryPath(app.id, 'under', 'an-id')).toBe(`/${app.id}/under/an-id`);
     }
   });
 

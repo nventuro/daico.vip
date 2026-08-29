@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
 
 interface LinkRowProps {
-  /** Where the row opens. */
-  to: string;
+  /** Where the row opens; without it the row only shows what it says. */
+  to?: string;
   title: string;
   /** The smaller line under the title: a date, what it came to. */
   subtitle?: ReactNode;
@@ -19,8 +19,9 @@ interface LinkRowProps {
   chevron?: boolean;
 }
 
-/** One entry in a list: a hairline row that opens it. The rows a list is made
- *  of, wherever nothing on the row is a control of its own. */
+/** One entry in a list: a hairline row that opens it, or — with nowhere to
+ *  go — that only says what it says. The rows a list is made of, wherever
+ *  nothing on the row is a control of its own. */
 export default function LinkRow({
   to,
   title,
@@ -30,24 +31,31 @@ export default function LinkRow({
   trailing,
   chevron = false,
 }: LinkRowProps) {
+  const body = (
+    <>
+      {leading}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-on-surface">{title}</span>
+        {subtitle !== undefined && (
+          <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
+            {subtitle}
+          </span>
+        )}
+      </span>
+      {trailing}
+      {chevron && <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />}
+    </>
+  );
+  const shape = 'flex min-w-0 flex-1 items-center gap-2 py-3';
   return (
     <li className="flex items-stretch border-b border-border">
-      <Link
-        to={to}
-        className="flex min-w-0 flex-1 items-center gap-2 py-3 transition-colors hover:bg-border-subtle"
-      >
-        {leading}
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-on-surface">{title}</span>
-          {subtitle !== undefined && (
-            <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-              {subtitle}
-            </span>
-          )}
-        </span>
-        {trailing}
-        {chevron && <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />}
-      </Link>
+      {to === undefined ? (
+        <span className={shape}>{body}</span>
+      ) : (
+        <Link to={to} className={`${shape} transition-colors hover:bg-border-subtle`}>
+          {body}
+        </Link>
+      )}
     </li>
   );
 }

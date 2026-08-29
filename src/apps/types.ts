@@ -18,9 +18,14 @@ export function appPath(appId: AppId): string {
   return `/${appId}`;
 }
 
-/** Where one of an app's entries is: a page of its own under the app's. */
-export function entryPath(appId: AppId, entryId: string): string {
-  return `/${appId}/${entryId}`;
+/**
+ * Where one of an app's entries is: a page of its own under the app's. An
+ * entry that hangs off one of the app's screens rather than off the app
+ * itself names that screen first — `entryPath('gastos', 'resumenes', id)` —
+ * and so does a page of an entry: `entryPath('recetas', id, 'editar')`.
+ */
+export function entryPath(appId: AppId, ...segments: string[]): string {
+  return `/${[appId, ...segments].join('/')}`;
 }
 
 /** One result of an app's `search`. */
