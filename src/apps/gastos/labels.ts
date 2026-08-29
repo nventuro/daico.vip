@@ -113,9 +113,10 @@ export function statementTitle(
 }
 
 /** What a card that has gone too long without closing again says under its
- *  row: when the last statement closed, and how long ago that was. */
+ *  row: when the newest statement it did send closed, and how long ago that
+ *  was. */
 export function lateLabel(card: CardCoverage): string {
-  return `el último cerró el ${formatDateCompact(card.lastClosedOn)}, hace ${card.daysSinceClose} días`;
+  return `el más reciente cerró el ${formatDateCompact(card.lastClosedOn)}, hace ${card.daysSinceClose} días`;
 }
 
 function shortfallSentence(short: Shortfall, month: string): string {

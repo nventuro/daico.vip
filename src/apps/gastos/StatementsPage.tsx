@@ -198,7 +198,7 @@ export default function StatementsPage() {
                 {late.map((card) => (
                   <LinkRow
                     key={card.format}
-                    title="No llega un resumen nuevo"
+                    title="Falta el último resumen"
                     subtitle={lateLabel(card)}
                     leading={<CardMark format={card.format} />}
                     trailing={MISSING_MARK}

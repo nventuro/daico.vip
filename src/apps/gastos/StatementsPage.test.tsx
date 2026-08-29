@@ -96,7 +96,7 @@ describe('StatementsPage', () => {
   // never came in would have been; nothing new at all has no such place.
   it('says which card has gone quiet', () => {
     state.contents = all;
-    expect(render()).toContain('No llega un resumen nuevo');
+    expect(render()).toContain('Falta el último resumen');
   });
 
   // The rows come from the store before their payloads are open, and the list

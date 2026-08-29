@@ -27,18 +27,43 @@ export interface Period {
   to: string;
 }
 
-/** Where one card stands: the days its statements cover, the days missing
- *  between them, and how long since anything new came in. */
-export interface CardCoverage {
+/** How long a card has gone without closing again. */
+export interface CardClose {
   format: StatementFormat;
-  /** Oldest first, already joined where one statement meets the next. */
-  covered: Period[];
-  /** The days between two statements that no statement covers. */
-  gaps: Period[];
   lastClosedOn: string;
   daysSinceClose: number;
   /** Nothing new for longer than `CARD_LATE_DAYS`. */
   late: boolean;
+}
+
+/** Where one card stands: the days its statements cover, the days missing
+ *  between them, and how long since anything new came in. */
+export interface CardCoverage extends CardClose {
+  /** Oldest first, already joined where one statement meets the next. */
+  covered: Period[];
+  /** The days between two statements that no statement covers. */
+  gaps: Period[];
+}
+
+/** When the card of each statement given last closed, and whether that is long
+ *  enough ago to say a statement is missing. A closing day is one of the few
+ *  things a statement carries in the open, so this reads no payload. Cards come
+ *  alphabetically, as wherever they are listed. */
+export function cardCloses(
+  statements: { format: StatementFormat; closed_on: string }[],
+  today: string,
+): CardClose[] {
+  const lastByFormat = new Map<StatementFormat, string>();
+  for (const { format, closed_on } of statements) {
+    const last = lastByFormat.get(format);
+    if (last === undefined || closed_on > last) lastByFormat.set(format, closed_on);
+  }
+  return [...lastByFormat.entries()]
+    .map(([format, lastClosedOn]) => {
+      const daysSinceClose = daysUntil(lastClosedOn, today);
+      return { format, lastClosedOn, daysSinceClose, late: daysSinceClose > CARD_LATE_DAYS };
+    })
+    .sort((a, b) => a.format.localeCompare(b.format));
 }
 
 /** Whether the card is missing something, either way. */
@@ -67,34 +92,25 @@ export function coverageByCard(all: StatementContents[], today: string): CardCov
     byFormat.set(contents.format, list);
   }
 
-  return [...byFormat.entries()]
-    .map(([format, list]) => {
-      const sorted = [...list].sort((a, b) => a.closed_on.localeCompare(b.closed_on));
-      const covered: Period[] = [];
-      const gaps: Period[] = [];
-      sorted.forEach((contents, i) => {
-        const period = periodOf(contents, sorted[i - 1]);
-        const last = covered[covered.length - 1];
-        if (!last) covered.push({ ...period });
-        else if (period.from <= addDays(last.to, 1)) {
-          if (period.to > last.to) last.to = period.to;
-        } else {
-          gaps.push({ from: addDays(last.to, 1), to: addDays(period.from, -1) });
-          covered.push({ ...period });
-        }
-      });
-      const lastClosedOn = sorted[sorted.length - 1].closed_on;
-      const daysSinceClose = daysUntil(lastClosedOn, today);
-      return {
-        format,
-        covered,
-        gaps,
-        lastClosedOn,
-        daysSinceClose,
-        late: daysSinceClose > CARD_LATE_DAYS,
-      };
-    })
-    .sort((a, b) => a.format.localeCompare(b.format));
+  return cardCloses(all, today).map((close) => {
+    const sorted = [...(byFormat.get(close.format) ?? [])].sort((a, b) =>
+      a.closed_on.localeCompare(b.closed_on),
+    );
+    const covered: Period[] = [];
+    const gaps: Period[] = [];
+    sorted.forEach((contents, i) => {
+      const period = periodOf(contents, sorted[i - 1]);
+      const last = covered[covered.length - 1];
+      if (!last) covered.push({ ...period });
+      else if (period.from <= addDays(last.to, 1)) {
+        if (period.to > last.to) last.to = period.to;
+      } else {
+        gaps.push({ from: addDays(last.to, 1), to: addDays(period.from, -1) });
+        covered.push({ ...period });
+      }
+    });
+    return { ...close, covered, gaps };
+  });
 }
 
 /** How a card falls short of a month: it covers none of it, only up to a day,

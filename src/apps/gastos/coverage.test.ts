@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { coverageByCard, coveredMonths, monthCoverage } from './coverage';
+import { cardCloses, coverageByCard, coveredMonths, monthCoverage } from './coverage';
 import type { StatementContents } from './statement';
 
 /** A statement is only its card and the days it covers here. */
@@ -37,6 +37,21 @@ const MASTERCARD = [
   statement('galicia-mastercard', '2026-04-30', '2026-05-28'),
   statement('galicia-mastercard', '2026-05-28', '2026-07-02'),
 ];
+
+describe('cardCloses', () => {
+  it('reads every card by its last closing day', () => {
+    expect(cardCloses([...VISA, ...MASTERCARD], '2026-07-10')).toEqual([
+      { format: 'galicia-mastercard', lastClosedOn: '2026-07-02', daysSinceClose: 8, late: false },
+      { format: 'galicia-visa', lastClosedOn: '2026-06-25', daysSinceClose: 15, late: false },
+    ]);
+  });
+
+  it('calls a card late only once the day its statement was due to come by is past', () => {
+    // The visa closed on 25/06, so the next one was due to be in hand by 27/07.
+    expect(cardCloses(VISA, '2026-07-27')[0].late).toBe(false);
+    expect(cardCloses(VISA, '2026-07-28')[0].late).toBe(true);
+  });
+});
 
 describe('coverageByCard', () => {
   it('joins the periods of a card that chain, and finds no hole', () => {
