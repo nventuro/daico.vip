@@ -118,13 +118,14 @@ for a wait.
 
 ### Adding a column to an existing offline table
 
-1. Migration: `alter table ... add column`. The column must be **nullable or have
-   a default** — the engine mirrors the change into each client's local SQLite via
-   `ADD COLUMN`, which SQLite only allows under that rule. No new RLS/grant: a
+1. Migration: `alter table ... add column`. A `not null` column needs a **default**,
+   or Postgres refuses it on a table that already holds rows. No new RLS/grant: a
    column inherits the table's.
 2. Add the column to the table's `TableSpec.columns`. The engine creates it for new
-   clients and `ALTER`s it into existing local databases on next load; sync carries
-   it automatically.
+   clients and brings each existing local database up to the spec on next load —
+   with `ADD COLUMN` where SQLite takes the column, and otherwise by making the
+   table again, which the next sync fills from the server. Sync carries the column
+   automatically.
 3. If you **backfill** existing rows, bump their `updated_at` in the same migration
    so the value reaches already-synced clients (their last-write-wins pull only
    takes a strictly newer row). Run it once every device has synced, so no unsynced

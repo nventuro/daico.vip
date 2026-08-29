@@ -1,32 +1,70 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { CHORES_SPEC, type Chore } from './specs';
+import { describe, it, expect, vi } from 'vitest';
+import { CHORES_SPEC, DATES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
 import { localDb, seedSql } from './testing/sqlocalInMemory';
 import * as engine from './engine';
 
 vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 
-// A local database created by an older client, before `chores` gained
-// `notes`, `done` and `due_on`, with a row synced back then.
-const OLD_SHAPE = `CREATE TABLE chores (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  pending_op TEXT,
-  synced INTEGER NOT NULL DEFAULT 0
-)`;
-const OLD_ROW = `INSERT INTO chores (id, title, created_at, updated_at, pending_op, synced)
-  VALUES ('old', 'Regar', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`;
+// Three tables as older clients left them, each with a row synced back then,
+// seeded before the store opens its database.
+seedSql.push(
+  // `chores` before it gained `notes`, `done` and `due_on` — all three of them
+  // columns SQLite can add to a table that already exists.
+  `CREATE TABLE chores (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    pending_op TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
+  )`,
+  `INSERT INTO chores (id, title, created_at, updated_at, pending_op, synced)
+    VALUES ('old', 'Regar', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`,
+  // `dates` before it gained `occurs_on`, which is NOT NULL with no default:
+  // SQLite refuses to add it, so the table has to be made again.
+  `CREATE TABLE dates (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    pending_op TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
+  )`,
+  `INSERT INTO dates (id, title, created_at, updated_at, pending_op, synced)
+    VALUES ('old', 'Dentista', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`,
+  // `shopping_items` with a column the spec no longer has: left in place it
+  // would refuse every insert that does not fill it.
+  `CREATE TABLE shopping_items (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    position TEXT,
+    quantity TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    pending_op TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
+  )`,
+  `INSERT INTO shopping_items
+    (id, name, checked, position, quantity, created_at, updated_at, pending_op, synced)
+    VALUES ('old', 'Pan', 0, 'a0', '1 kg', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`,
+);
 
-describe('column migration', () => {
-  beforeAll(() => {
-    seedSql.push(OLD_SHAPE, OLD_ROW);
-  });
+/** The table's columns, in the order they are declared. */
+async function columnsOf(table: string): Promise<string[]> {
+  const info = await localDb().sql<{ name: string }>(`PRAGMA table_info(${table})`);
+  return info.map((column) => column.name);
+}
 
+/** Everything the table holds, whatever its shape. */
+async function rowsOf(table: string): Promise<Record<string, unknown>[]> {
+  return localDb().sql(`SELECT * FROM ${table}`);
+}
+
+describe('table migration', () => {
   it('adds the columns a spec gained since the table was created', async () => {
     const rows = await engine.listVisible<Chore>(CHORES_SPEC);
-    const info = await localDb().sql<{ name: string }>('PRAGMA table_info(chores)');
-    expect(info.map((c) => c.name)).toEqual([
+    expect(await columnsOf('chores')).toEqual([
       'id',
       'title',
       'created_at',
@@ -63,5 +101,40 @@ describe('column migration', () => {
       done: true,
       due_on: '2026-09-01',
     });
+  });
+
+  it('makes the table again when a column it gained cannot be added', async () => {
+    await engine.listVisible(DATES_SPEC);
+    expect(await columnsOf('dates')).toEqual([
+      'id',
+      'title',
+      'occurs_on',
+      'repeat',
+      'repeat_months',
+      'notice_days',
+      'notes',
+      'created_at',
+      'updated_at',
+      'pending_op',
+      'synced',
+    ]);
+    // Emptied: the row had no value for `occurs_on`, and the next sync brings
+    // the table down whole.
+    expect(await rowsOf('dates')).toEqual([]);
+  });
+
+  it('makes the table again when it has a column the spec dropped', async () => {
+    await engine.listVisible(SHOPPING_SPEC);
+    expect(await columnsOf('shopping_items')).toEqual([
+      'id',
+      'name',
+      'checked',
+      'position',
+      'created_at',
+      'updated_at',
+      'pending_op',
+      'synced',
+    ]);
+    expect(await rowsOf('shopping_items')).toEqual([]);
   });
 });

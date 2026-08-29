@@ -40,11 +40,9 @@ type DbRow = Record<string, unknown>;
 let ready: Promise<SQLocal> | null = null;
 
 /**
- * The local client, guaranteed to have every column its specs declare. `onInit`
- * creates missing tables; this additionally ALTERs in any column added to a spec
- * after a client first created the table, so an existing local database picks up
- * new columns instead of erroring on them. Additive only — a column added this
- * way must be nullable or carry a DEFAULT (SQLite's rule for ADD COLUMN).
+ * The local client, guaranteed to hold every table in the shape its spec
+ * declares: `onInit` creates the ones that are missing, and `migrateTables`
+ * brings the ones an older client left behind up to date.
  *
  * The database is opened through a custom worker that uses the OPFS SAH-pool VFS
  * (sahpoolWorker.ts) so it persists without COOP/COEP headers. Opening is gated
@@ -65,36 +63,67 @@ function db(): Promise<SQLocal> {
           ...LOCAL_SPECS.map((spec) => sql(spec.ddl)),
         ],
       });
-      return migrateColumns(c).then(() => c);
+      return migrateTables(c).then(() => c);
     });
   }
   return ready;
 }
 
-async function migrateColumns(c: SQLocal): Promise<void> {
+/**
+ * Every table brought to the shape its spec declares. A table a client created
+ * under an older spec can be a column short or a column over: a column the
+ * spec has gained is added in place where SQLite takes it, which keeps the
+ * rows and whatever is queued on them, and anything else is settled by
+ * emptying the table.
+ */
+async function migrateTables(c: SQLocal): Promise<void> {
   for (const spec of ALL_SPECS) {
-    const existing = await c.sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
-    const present = new Set(existing.map((col) => col.name));
-    for (const [name, col] of columnsOf(spec)) {
-      if (!present.has(name)) {
-        await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${name} ${col.ddl}`);
-      }
+    const columns = localColumns(spec);
+    const info = await c.sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
+    const present = new Set(info.map((col) => col.name));
+    const expected = new Set(columns.map(([name]) => name));
+    const missing = columns.filter(([name]) => !present.has(name));
+    const over = [...present].filter((name) => !expected.has(name));
+    if (over.length > 0 || missing.some(([, ddl]) => !addable(ddl))) {
+      // Nothing here can be carried over: a row stored without a column the
+      // shape now requires has no value to give it, and one queued in the old
+      // shape is not a row the server would take either. The table is a copy
+      // of the server's, so the next sync brings it back whole.
+      await c.sql(`DROP TABLE IF EXISTS ${spec.table}`);
+      await c.sql(createTableSql(spec));
+      continue;
+    }
+    for (const [name, ddl] of missing) {
+      await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${name} ${ddl}`);
     }
   }
 }
 
+/** Whether SQLite takes this column on a table that already exists: it refuses
+ *  a primary key, a unique one, and one that is NOT NULL without a default. */
+function addable(ddl: string): boolean {
+  if (/\b(PRIMARY KEY|UNIQUE)\b/i.test(ddl)) return false;
+  return !/\bNOT NULL\b/i.test(ddl) || /\bDEFAULT\b/i.test(ddl);
+}
+
+/** Every column of a local table with its declaration, in DDL order: the id,
+ *  the spec's own columns, the timestamps, then the engine's bookkeeping. */
+function localColumns(spec: TableSpec): [string, string][] {
+  return [
+    ['id', 'TEXT PRIMARY KEY'],
+    ...columnsOf(spec).map(([name, col]): [string, string] => [name, col.ddl]),
+    ['created_at', 'TEXT NOT NULL'],
+    ['updated_at', 'TEXT NOT NULL'],
+    ['pending_op', 'TEXT'],
+    ['synced', 'INTEGER NOT NULL DEFAULT 0'],
+  ];
+}
+
 function createTableSql(spec: TableSpec): string {
-  const appColumns = columnsOf(spec)
-    .map(([name, col]) => `${name} ${col.ddl}`)
+  const columns = localColumns(spec)
+    .map(([name, ddl]) => `${name} ${ddl}`)
     .join(', ');
-  return `CREATE TABLE IF NOT EXISTS ${spec.table} (
-    id TEXT PRIMARY KEY,
-    ${appColumns},
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    pending_op TEXT,
-    synced INTEGER NOT NULL DEFAULT 0
-  )`;
+  return `CREATE TABLE IF NOT EXISTS ${spec.table} (${columns})`;
 }
 
 function nowIso(): string {
