@@ -280,6 +280,16 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `DatePicker` (or `NativeDatePicker` behind a control of your own): a native
   `<input type="date">` prints in the browser's language. ESLint enforces both
   (`no-restricted-syntax` in `eslint.config.js`).
+- **Repetition**: anything that comes back says so the same way — `repeat_every`
+  and `repeat_unit` (`day`/`week`/`month`/`year`), both null or both set, on
+  `chores` and `dates` alike. The arithmetic and the words for it are
+  `src/utils/recurrence.ts`, under both apps because one app may not import from
+  another; `nextOccurrenceOnOrAfter` derives every occurrence from the anchor
+  (anchor plus k steps) rather than from the one before, so a day clamped by a
+  short month never drifts. What a chore counts its next date from
+  (`repeat_from`) and the day it was last marked (`last_done_on`) are its own: a
+  date is never done, and a chore that repeats never is either — it is up to
+  date, which is why `chores` has no `done` column.
 - **Icon-only controls**: must have an accessible label (`aria-label` + `title`).
 - **Screens are built from the shared pieces in `src/components/`**, never
   hand-assembled: `ListPage` (the offline notice, the error, the skeleton and
