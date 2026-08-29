@@ -13,7 +13,6 @@ import { appPath } from '../types';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import Delta from './Delta';
-import PartialNote from './PartialNote';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
@@ -25,7 +24,7 @@ import {
   formatArsCompact,
   formatPercentDelta,
   monthTitle,
-  shortfallLabel,
+  percentDelta,
 } from './labels';
 
 /**
@@ -118,37 +117,36 @@ export default function MonthsPage() {
           <ul>
             {months.map((row, i) => {
               const older = months[i + 1];
-              // Half a month against a whole one is not a comparison.
-              const comparable = row.coverage.whole && older !== undefined && older.coverage.whole;
+              // Half a month against a whole one is not a comparison, and
+              // nothing is ever guessed for the days no statement covers.
+              const change =
+                row.coverage.whole && older?.coverage.whole
+                  ? percentDelta(row.cents, older.cents)
+                  : null;
               return (
-                <li key={row.month} className="flex items-stretch border-b border-border">
+                <li key={row.month} className="border-b border-border">
                   <Link
                     to={monthPath(row.month)}
-                    className="flex min-w-0 flex-1 flex-col gap-1.5 py-2.5 transition-colors hover:bg-border-subtle"
+                    className="flex items-center gap-1 py-2.5 transition-colors hover:bg-border-subtle"
                   >
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm">{monthTitle(row.month)}</span>
-                      <span className="shrink-0 text-sm tabular-nums">
-                        {formatArsCompact(row.cents)}
+                    <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="text-sm">{monthTitle(row.month)}</span>
+                        <span className="shrink-0 text-sm tabular-nums">
+                          {formatArsCompact(row.cents)}
+                        </span>
                       </span>
+                      <SpendBar usual={row.usual} oneOff={row.oneOff} max={largest} />
                     </span>
-                    <SpendBar usual={row.usual} oneOff={row.oneOff} max={largest} />
+                    {change === null ? (
+                      <span className="w-14 shrink-0 text-right text-xs text-muted">—</span>
+                    ) : (
+                      <Delta value={change} className="w-14 shrink-0 text-right text-xs">
+                        {formatPercentDelta(change)}
+                      </Delta>
+                    )}
+                    <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
                   </Link>
-                  {row.coverage.whole ? (
-                    <Delta
-                      value={comparable ? row.cents - older.cents : 0}
-                      className="flex w-14 shrink-0 items-center justify-end text-xs"
-                    >
-                      {comparable ? formatPercentDelta(row.cents, older.cents) : ''}
-                    </Delta>
-                  ) : (
-                    <PartialNote reason={shortfallLabel(row.coverage.short, row.month)} />
-                  )}
-                  <IconChevronRight
-                    size={18}
-                    stroke={1.5}
-                    className="my-auto ml-1 shrink-0 text-muted"
-                  />
                 </li>
               );
             })}

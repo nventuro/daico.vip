@@ -75,18 +75,23 @@ export function formatUsd(cents: number): string {
   return `${cents < 0 ? '−' : ''}US$ ${number(cents, true)}`;
 }
 
-/** A difference in pesos with its sign: "+ $ 61,000", "− $ 18,000", "=" for none. */
+/** A difference in pesos with its sign: "+ $ 61,000", "− $ 18,000", "$ 0". */
 export function formatDelta(cents: number): string {
-  if (cents === 0) return '=';
+  if (cents === 0) return '$ 0';
   return `${cents < 0 ? '−' : '+'} $ ${number(cents, false)}`;
 }
 
-/** A change from `before` to `now` as a whole percentage with its sign:
- *  "+ 49 %"; empty when there is nothing to compare with. */
-export function formatPercentDelta(now: number, before: number): string {
-  if (before === 0) return '';
-  const value = Math.round(((now - before) / before) * 100);
-  if (value === 0) return '=';
+/** A change from `before` to `now` as a whole percentage, or null when there
+ *  is nothing to compare against. */
+export function percentDelta(now: number, before: number): number | null {
+  return before === 0 ? null : Math.round(((now - before) / before) * 100);
+}
+
+/** A whole percentage change with its sign: "+ 49 %", "− 3 %". Spending that
+ *  came to what it came to before is the number it is, "0 %": a period is
+ *  never told it is the same as another, only how far off it is. */
+export function formatPercentDelta(value: number): string {
+  if (value === 0) return '0 %';
   return `${value < 0 ? '−' : '+'} ${Math.abs(value)} %`;
 }
 

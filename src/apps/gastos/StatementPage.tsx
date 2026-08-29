@@ -8,7 +8,6 @@ import { capitalize } from '../../utils/textUtils';
 import { dueWord, formatDate, isPast, todayIso } from '../../utils/dateUtils';
 import CheckRow from '../../components/CheckRow';
 import ErrorLine from '../../components/ErrorLine';
-import SkeletonRows from '../../components/SkeletonRows';
 import SectionLabel from '../../components/SectionLabel';
 import FormFooter from '../../components/FormFooter';
 import { useStatements } from './useStatements';
@@ -41,8 +40,10 @@ import {
   formatPercentDelta,
   formatUsd,
   monthShort,
+  percentDelta,
   periodLabel,
 } from './labels';
+import BreakdownSkeleton from './BreakdownSkeleton';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import LineRow from './LineRow';
@@ -94,13 +95,18 @@ export default function StatementPage() {
     return map;
   }, [previous, previousContents, rules]);
 
-  if (loading || (statement && !contents && !openError)) return <SkeletonRows />;
+  if (loading) return <BreakdownSkeleton check />;
   if (!statement) return <p className="text-muted">Resumen no encontrado.</p>;
-  if (!contents) return <ErrorLine error={openError} />;
+  if (!contents && openError) return <ErrorLine error={openError} />;
+  // The rules are waited for like the statement is: they decide what each line
+  // is filed under and whether it counts as a one-off, so the whole screen
+  // would be laid out again a moment after it was drawn.
+  if (!contents || (!rulesStore.rules && !rulesStore.error)) return <BreakdownSkeleton check />;
 
   const toPay = toPayCents(contents);
   const total = totalCents(contents);
   const previousTotal = previousContents ? totalCents(previousContents) : null;
+  const sinceLast = previousTotal === null ? null : percentDelta(total, previousTotal);
   const { usual, oneOff } = usualAndOneOff(movements, rules);
   const largestShare = Math.max(...shares.map((s) => s.cents), 1);
   const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
@@ -205,9 +211,9 @@ export default function StatementPage() {
         {contents.pending_ars_cents !== 0 && (
           <span className="text-sm text-muted">{carriedLabel(contents.pending_ars_cents)}</span>
         )}
-        {previousContents && previousTotal !== null && previousTotal !== 0 && (
-          <Delta value={total - previousTotal} className="mt-1 text-sm">
-            {formatPercentDelta(total, previousTotal)} vs. {monthShort(monthOf(previousContents))}
+        {previousContents && sinceLast !== null && (
+          <Delta value={sinceLast} className="mt-1 text-sm">
+            {formatPercentDelta(sinceLast)} vs. {monthShort(monthOf(previousContents))}
           </Delta>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MERCHANT_RULES_SPEC, type SpendingCategory } from '../../lib/offline/specs';
-import { normalize } from '../../utils/textUtils';
+import { errorMessage, normalize } from '../../utils/textUtils';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { useMasterKey } from '../../hooks/useMasterKey';
@@ -20,6 +20,9 @@ export function useMerchantRules() {
   const { items, loading, error, mutate, remove } = useOfflineTable(MERCHANT_RULES_SPEC);
   const masterKey = useMasterKey();
   const [rules, setRules] = useState<Rule[] | undefined>();
+  // A pattern that will not open is said so: without it the screens waiting on
+  // the rules would hold their place for a set that is never coming.
+  const [openError, setOpenError] = useState<string | null>(null);
 
   useEffect(() => {
     if (masterKey.status !== 'unlocked') return;
@@ -30,9 +33,17 @@ export function useMerchantRules() {
         category: row.category,
         pattern: await openOnce(row, () => openPattern(masterKey.key, row)),
       })),
-    ).then((unsealed) => {
-      if (active) setRules(unsealed);
-    });
+    ).then(
+      (unsealed) => {
+        if (active) {
+          setRules(unsealed);
+          setOpenError(null);
+        }
+      },
+      (e: unknown) => {
+        if (active) setOpenError(errorMessage(e));
+      },
+    );
     return () => {
       active = false;
     };
@@ -78,5 +89,5 @@ export function useMerchantRules() {
     [mutate, rules],
   );
 
-  return { rules, loading, error, add, addMany, save, remove };
+  return { rules, loading, error: error ?? openError, add, addMany, save, remove };
 }

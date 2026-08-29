@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatArs, formatArsCompact, formatUsd } from './labels';
+import { formatArs, formatArsCompact, formatPercentDelta, formatUsd, percentDelta } from './labels';
 
 describe('formatArsCompact', () => {
   it.each([
@@ -28,5 +28,21 @@ describe('formatArs / formatUsd', () => {
     expect(formatArs(441_387_492, true)).toBe('$ 4,413,874.92');
     expect(formatArs(-1_800_000)).toBe('−$ 18,000');
     expect(formatUsd(61_744)).toBe('US$ 617.44');
+  });
+});
+
+describe('percentDelta / formatPercentDelta', () => {
+  it('writes a change with its sign', () => {
+    expect(formatPercentDelta(percentDelta(149_000, 100_000)!)).toBe('+ 49 %');
+    expect(formatPercentDelta(percentDelta(97_000, 100_000)!)).toBe('− 3 %');
+  });
+
+  it('writes a month that came to what the one before it did as 0 %', () => {
+    expect(formatPercentDelta(percentDelta(100_000, 100_000)!)).toBe('0 %');
+    expect(formatPercentDelta(percentDelta(100_400, 100_000)!)).toBe('0 %');
+  });
+
+  it('has no change to write against nothing spent', () => {
+    expect(percentDelta(100_000, 0)).toBeNull();
   });
 });

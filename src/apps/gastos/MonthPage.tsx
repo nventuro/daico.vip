@@ -7,7 +7,6 @@ import { monthName, todayIso } from '../../utils/dateUtils';
 import ErrorLine from '../../components/ErrorLine';
 import LinkRow from '../../components/LinkRow';
 import SectionLabel from '../../components/SectionLabel';
-import SkeletonRows from '../../components/SkeletonRows';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
@@ -36,9 +35,11 @@ import {
   formatPercentDelta,
   monthShort,
   monthTitle,
+  percentDelta,
   shortfallLabel,
   statementTitle,
 } from './labels';
+import BreakdownSkeleton from './BreakdownSkeleton';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import LineRow from './LineRow';
@@ -104,11 +105,16 @@ export default function MonthPage() {
     return map;
   }, [items, contents, previousMonth, rules]);
 
-  if (loading || (!contents && !openError)) return <SkeletonRows />;
-  if (!contents) return <ErrorLine error={openError} />;
+  if (!contents && openError) return <ErrorLine error={openError} />;
+  // The rules are waited for like the statements are: they decide what each
+  // movement is filed under and whether it counts as a one-off, so the whole
+  // screen would be laid out again a moment after it was drawn.
+  if (loading || !contents || (!rulesStore.rules && !rulesStore.error))
+    return <BreakdownSkeleton />;
   if (!listed) return <p className="text-muted">Mes no encontrado.</p>;
 
   const total = sumCents(movements);
+  const monthChange = comparable ? percentDelta(total, previousCents) : null;
   const { usual, oneOff } = usualAndOneOff(movements, rules);
   const largestShare = Math.max(...shares.map((share) => share.cents), 1);
   const selectedFiling = selected ? categoryOf(selected.line, rules) : null;
@@ -193,9 +199,9 @@ export default function MonthPage() {
       <div className="flex flex-col gap-0.5">
         <span className="text-sm text-muted">{monthTitle(month)}</span>
         <span className="font-display text-4xl font-black tracking-tight">{formatArs(total)}</span>
-        {comparable && previousMonth && previousCents !== 0 && (
-          <Delta value={total - previousCents} className="mt-1 text-sm">
-            {formatPercentDelta(total, previousCents)} vs. {monthShort(previousMonth)}
+        {monthChange !== null && previousMonth && (
+          <Delta value={monthChange} className="mt-1 text-sm">
+            {formatPercentDelta(monthChange)} vs. {monthShort(previousMonth)}
           </Delta>
         )}
         {!coverage.whole && (
