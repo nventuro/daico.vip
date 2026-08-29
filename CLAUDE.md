@@ -1,8 +1,8 @@
 # Daico
 
-Private household app for tracking chores, appointments, and personal documents,
-backed by Supabase. Access is restricted to a fixed allowlist of authorized users.
-All data is sensitive and strictly access-gated.
+Private household app — what the household has to do, buy, remember, keep and
+pay — backed by Supabase. Access is restricted to a fixed allowlist of
+authorized users. All data is sensitive and strictly access-gated.
 
 ## Target platform
 
@@ -128,22 +128,16 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   (token syntax, section names) belong in `scripts/import-guides/`, never in the
   app. **Never commit a guides dump** — it is private content, keep it outside
   the repo.
-- **The local database persists through the OPFS SAH-pool VFS, opened by a custom
-  SQLocal worker (`src/lib/offline/sahpoolWorker.ts`), not SQLocal's default.**
-  SQLocal's default worker uses the classic OPFS VFS, which reaches the file system
-  through a `SharedArrayBuffer`/Atomics proxy and therefore needs `COOP`/`COEP`
-  response headers — and **GitHub Pages can't set those**, so the default silently
-  falls back to an in-memory database that never persists (only a `console.warn`).
-  The SAH-pool VFS uses worker-only sync access handles instead: no
-  `SharedArrayBuffer`, no headers, same OPFS storage. Keep opening the database
-  through that worker (passed as SQLocal's `processor` in `engine.ts`); **don't
-  revert to SQLocal's default and don't add anything needing `SharedArrayBuffer`
-  or cross-origin isolation.** The SAH-pool VFS allows one connection per origin,
-  so `src/lib/offline/singleTab.ts` elects one owning tab with a Web Lock and a
-  second tab gets the "already open in another tab" notice. Likewise keep
+- **The local database is opened by the custom SQLocal worker in
+  `src/lib/offline/sahpoolWorker.ts`, never SQLocal's default** — the worker's
+  own header says why, and the host cannot set the headers the default needs.
+  So: keep passing that worker as SQLocal's `processor`, **never add anything
+  that needs `SharedArrayBuffer` or cross-origin isolation**, and keep
   `worker: { format: 'es' }` and
   `optimizeDeps.exclude: ['sqlocal', '@sqlite.org/sqlite-wasm']` in
-  `vite.config.ts`, or the worker/wasm won't bundle.
+  `vite.config.ts`, or the worker and the wasm won't bundle. That VFS takes one
+  connection per origin, which is what `src/lib/offline/singleTab.ts` is for;
+  leave the lock in place.
 - **The membership check is offline-tolerant** (`AppContext` falls back to a
   per-user cached verdict when the live read fails). This is only a UI gate — the
   server's RLS is the real authority, so a stale `true` still reads nothing and has
@@ -196,7 +190,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   difference is every document the household has. That fetch is the one exception to files
   being fetched on demand: never extend it to another owner kind, never pull
   files wholesale, and never put them in `ALL_SPECS`. Blobs are immutable:
-  replacing a file is a new attachment; only `name` ever changes.
+  replacing a file is a new attachment.
 - **The bucket is private and gated like a table**: `storage.objects` has a
   `private.is_member()` policy scoped to the bucket, it only takes
   `application/octet-stream`, and its size limit is `ATTACHMENT_MAX_BYTES` plus
@@ -209,11 +203,11 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 ## Statements (Gastos) — read before touching them
 
 - **A statement's contents never reach the server in the clear.** The
-  `statements` row carries only `format`, `closed_on`, `due_on`, `paid` and
-  the two totals; every purchase and installment lives in `payload`,
-  sealed by `src/apps/gastos/payload.ts` (gzip, then `encryptFile` from
-  `householdKey.ts` — never other crypto) and opened on the device with the
-  master key. A merchant rule's `pattern` is sealed the same way. Keep it so:
+  `statements` row carries in the clear only `format`, `closed_on`, `due_on`,
+  `paid` and the two totals; every purchase and installment lives in `payload`
+  under its own `wrapped_key`, sealed by `src/apps/gastos/payload.ts` (gzip,
+  then `encryptFile` from `householdKey.ts` — never other crypto) and opened on
+  the device with the master key. A merchant rule's `pattern` is sealed the same way. Keep it so:
   never add a column that names a merchant or an amount of a line, and never
   log or persist opened contents outside `openOnce`'s in-memory cache, which
   opens a row once per version of it. **Gastos contributes nothing to search**
@@ -232,8 +226,8 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   reconcile with the printed totals; an import that fails saves nothing.
   Column positions are named constants at the top of each parser.
 - **Never commit a real statement**, nor a fixture derived from one: the
-  parser tests build synthetic pages with `parsers/testing/fixture.ts` and invented
-  holders. The privacy rule below applies to test data too.
+  parser tests build synthetic pages with the builders in `parsers/testing/` and
+  invented holders. The privacy rule below applies to test data too.
 - **Categories are the fixed `SPENDING_CATEGORIES`**; a new one is a new
   member plus its label in `labels.ts`. Filing is done on display by
   `rules.ts` (the household's own rules only, longest wins; bank charges are
@@ -366,10 +360,13 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 ## Commands
 
 - `npm run dev` — start dev server
+- `npm test` — the whole suite once (`npm run test:watch` keeps it running)
 - `npm run build` — production build
 - `npm run preview` — preview production build
 - `npm run lint` — run ESLint
 - `npm run format` — format everything with Prettier (`format:check` only reports)
+
+CI runs `format:check`, `lint`, `test` and `build` on every push to `main`.
 
 ### Database
 
