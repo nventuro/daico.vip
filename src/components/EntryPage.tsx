@@ -7,6 +7,9 @@ interface EntryPageProps<Entry> {
   entry: Entry | undefined;
   loading: boolean;
   error?: string | null;
+  /** What holds the entry's place while the store is read, unless the plain
+   *  rows will do. */
+  skeleton?: ReactNode;
   /** What is said when there is no such entry, e.g. "Tarea no encontrada.". */
   missing: string;
   children: (entry: Entry) => ReactNode;
@@ -19,10 +22,11 @@ export default function EntryPage<Entry>({
   entry,
   loading,
   error,
+  skeleton,
   missing,
   children,
 }: EntryPageProps<Entry>) {
-  if (loading) return <SkeletonRows />;
+  if (loading) return skeleton ?? <SkeletonRows />;
   if (!entry) return <p className="text-muted">{missing}</p>;
   return (
     <>

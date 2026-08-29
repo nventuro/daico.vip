@@ -68,7 +68,7 @@ export default function RuleDialog({
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">{line.charge ? 'Percepción' : 'Categoría'}</span>
         <ul className="border-y border-border">
-          <LineRow line={line} cents={cents} onSelect={() => {}} />
+          <LineRow line={line} cents={cents} />
         </ul>
 
         {!line.charge && (

@@ -9,7 +9,6 @@ import LinkRow from '../../components/LinkRow';
 import ListPage from '../../components/ListPage';
 import Select from '../../components/Select';
 import SkeletonRows from '../../components/SkeletonRows';
-import { appPath } from '../types';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import Delta from './Delta';
@@ -18,7 +17,7 @@ import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
 import { byMonth, type TrendPick } from './breakdown';
 import { cardIsShort, coverageByCard, coveredMonths, monthCoverage } from './coverage';
-import { monthPath, STATEMENTS_PATH } from './paths';
+import { monthPath, RULES_PATH, STATEMENTS_PATH } from './paths';
 import {
   CATEGORY_LABELS,
   formatArsCompact,
@@ -85,7 +84,7 @@ export default function MonthsPage() {
           chevron
         />
         <LinkRow
-          to={`${appPath('gastos')}/categorizacion`}
+          to={RULES_PATH}
           title="Categorización"
           leading={<IconTags size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
           chevron

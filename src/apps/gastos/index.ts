@@ -2,7 +2,7 @@ import { lazy } from 'react';
 import { IconCreditCard } from '@tabler/icons-react';
 import { MERCHANT_RULES_SPEC, STATEMENTS_SPEC } from '../../lib/offline/specs';
 import type { AppModule } from '../types';
-import { STATEMENTS_SEGMENT } from './paths';
+import { RULES_SEGMENT, STATEMENTS_SEGMENT } from './paths';
 import { useStatementsUpcoming } from './useStatementsUpcoming';
 
 const MonthsPage = lazy(() => import('./MonthsPage'));
@@ -23,7 +23,7 @@ const gastos: AppModule = {
     { index: true, Component: MonthsPage },
     { path: STATEMENTS_SEGMENT, Component: StatementsPage },
     { path: `${STATEMENTS_SEGMENT}/:id`, Component: StatementPage },
-    { path: 'categorizacion', Component: RulesPage },
+    { path: RULES_SEGMENT, Component: RulesPage },
     { path: ':month', Component: MonthPage },
   ],
   useUpcoming: useStatementsUpcoming,

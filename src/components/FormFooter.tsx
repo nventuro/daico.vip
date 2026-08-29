@@ -12,8 +12,9 @@ interface FormFooterProps {
   /** Forms pass true until the draft differs from the saved record (see `hasChanges`). */
   submitDisabled?: boolean;
   /** What to show instead of the submit button, for a screen whose main
-   *  action is not saving a form (opening or sharing what it shows). */
-  action?: ReactNode;
+   *  action is not saving a form (opening or sharing what it shows); `null`
+   *  for one whose only action is the destructive one. */
+  action?: ReactNode | null;
 }
 
 /**
@@ -52,10 +53,12 @@ export default function FormFooter({
       <Button variant="dangerOutline" onClick={() => setConfirming(true)}>
         {removeLabel}
       </Button>
-      {action ?? (
+      {action === undefined ? (
         <Button type="submit" disabled={submitDisabled}>
           {submitLabel}
         </Button>
+      ) : (
+        action
       )}
     </div>
   );

@@ -1,37 +1,30 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { monthName, todayIso } from '../../utils/dateUtils';
+import EntryPage from '../../components/EntryPage';
 import ErrorLine from '../../components/ErrorLine';
 import LinkRow from '../../components/LinkRow';
 import SectionLabel from '../../components/SectionLabel';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
+import { useRuleDialog } from './useRuleDialog';
 import {
   byCategory,
   byMonth,
   isOneOff,
-  isOneOffCategory,
-  largestFirst,
   movementsOfMonth,
   spendParts,
   sumCents,
-  type CategoryShare,
   type Movement,
 } from './breakdown';
 import { coverageByCard, coveredMonths, monthCoverage } from './coverage';
-import { categoryOf } from './rules';
 import { withOneOff, type StatementContents } from './statement';
 import { statementPath } from './paths';
 import {
-  CATEGORY_LABELS,
-  UNCATEGORIZED_LABEL,
   formatArs,
-  formatArsCompact,
-  formatDelta,
   formatPercentDelta,
   monthShort,
   monthTitle,
@@ -39,16 +32,11 @@ import {
   shortfallLabel,
   statementTitle,
 } from './labels';
+import Breakdown from './Breakdown';
 import BreakdownSkeleton from './BreakdownSkeleton';
 import CardMark from './CardMark';
-import SpendBar from './SpendBar';
-import SpendLegend from './SpendLegend';
-import LineRow from './LineRow';
 import Delta from './Delta';
-import RuleDialog, { type RuleChange } from './RuleDialog';
-
-/** A category's key in the set of opened ones; the unfiled lines have their own. */
-const shareKey = (category: SpendingCategory | null) => category ?? 'none';
+import MovementList from './MovementList';
 
 /**
  * One calendar month: what the household spent in it, wherever the bank
@@ -61,11 +49,10 @@ export default function MonthPage() {
   const rulesStore = useMerchantRules();
   const rules = useMemo(() => rulesStore.rules ?? [], [rulesStore.rules]);
   const masterKey = useMasterKey();
+  const { select, dialog } = useRuleDialog(rulesStore);
   const month = useParams().month ?? '';
   const today = todayIso();
 
-  const [opened, setOpened] = useState<Set<string>>(() => new Set());
-  const [selected, setSelected] = useState<Movement | null>(null);
   // Marking a movement rewrites the whole sealed payload of the statement it
   // is in, and what is on screen only catches up once that row is written and
   // read again. Each tap waits for the one before it on the same statement and
@@ -76,7 +63,6 @@ export default function MonthPage() {
     () => (contents ? movementsOfMonth(items, contents, month) : []),
     [items, contents, month],
   );
-  const shares = useMemo(() => byCategory(movements, rules), [movements, rules]);
 
   const cards = useMemo(() => (contents ? coverageByCard(contents, today) : []), [contents, today]);
   const coverage = useMemo(() => monthCoverage(month, cards), [month, cards]);
@@ -106,53 +92,6 @@ export default function MonthPage() {
     return map;
   }, [items, contents, previousMonth, rules]);
 
-  if (!contents && openError) return <ErrorLine error={openError} />;
-  // The rules are waited for like the statements are: they decide what each
-  // movement is filed under and whether it counts as a one-off, so the whole
-  // screen would be laid out again a moment after it was drawn.
-  if (loading || !contents || (!rulesStore.rules && !rulesStore.error))
-    return <BreakdownSkeleton />;
-  if (!listed) return <p className="text-muted">Mes no encontrado.</p>;
-
-  const total = sumCents(movements);
-  const monthChange = comparable ? percentDelta(total, previousCents) : null;
-  const { usual, oneOff } = spendParts(movements, rules);
-  const largestShare = Math.max(...shares.map((share) => share.cents), 1);
-  const selectedFiling = selected ? categoryOf(selected.line, rules) : null;
-
-  // The statements a movement of this month came in, newest first: a month is
-  // rarely one statement, and never the same days as one.
-  const sources = items
-    .map((statement, i) => ({
-      statement,
-      contents: contents[i],
-      movements: movements.filter((movement) => movement.statementId === statement.id),
-    }))
-    .filter((source) => source.movements.length > 0);
-
-  function toggle(share: CategoryShare) {
-    setOpened((prev) => {
-      const next = new Set(prev);
-      const key = shareKey(share.category);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  async function handleSave(change: RuleChange | 'remove' | null) {
-    if (masterKey.status !== 'unlocked' || !selected) return;
-    const { rule } = categoryOf(selected.line, rules);
-    if (change === 'remove') {
-      if (rule) await rulesStore.remove(rule.id);
-    } else if (change && rule) {
-      await rulesStore.save(rule.id, change, masterKey.key);
-    } else if (change) {
-      await rulesStore.add(change.pattern, change.category, masterKey.key);
-    }
-    setSelected(null);
-  }
-
   function toggleOneOff(movement: Movement) {
     if (masterKey.status !== 'unlocked' || !contents) return;
     const { key } = masterKey;
@@ -171,135 +110,107 @@ export default function MonthPage() {
     });
   }
 
-  const renderMovements = (list: Movement[], closed = false) => (
-    <ul className={`divide-y divide-border ${closed ? 'border-b border-border' : ''}`}>
-      {largestFirst(list).map((movement) => {
-        // A line its category already sets apart takes no mark of its own:
-        // it is filed differently, not unmarked.
-        const fixed = isOneOffCategory(categoryOf(movement.line, rules).category);
-        return (
-          <LineRow
-            key={`${movement.statementId}-${movement.index}`}
-            line={movement.line}
-            cents={movement.cents}
-            whole
-            oneOff={fixed || movement.line.one_off}
-            onSelect={() => setSelected(movement)}
-            onToggleOneOff={fixed ? undefined : () => toggleOneOff(movement)}
-          />
-        );
-      })}
-    </ul>
-  );
+  const markOf = (movement: Movement) => ({
+    marked: movement.line.one_off,
+    onToggle: () => toggleOneOff(movement),
+  });
 
-  const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
+  // A statement that will not open is said and nothing else: the months it
+  // would have counted are never coming.
+  if (!contents && openError) return <ErrorLine error={openError} />;
 
   return (
-    <div className="flex flex-col gap-6">
-      <ErrorLine error={error ?? rulesStore.error} />
+    <EntryPage
+      entry={contents && listed ? { month, contents } : undefined}
+      // The rules are waited for like the statements are: they decide what
+      // each movement is filed under and whether it counts as a one-off, so
+      // the whole screen would be laid out again a moment after it was drawn.
+      loading={loading || !contents || (!rulesStore.rules && !rulesStore.error)}
+      error={error ?? rulesStore.error}
+      skeleton={<BreakdownSkeleton />}
+      missing="Mes no encontrado."
+    >
+      {({ contents }) => {
+        const total = sumCents(movements);
+        const monthChange = comparable ? percentDelta(total, previousCents) : null;
+        const { oneOff } = spendParts(movements, rules);
+        const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
+        // The statements a movement of this month came in, newest first: a
+        // month is rarely one statement, and never the same days as one.
+        const sources = items
+          .map((statement, i) => ({
+            statement,
+            contents: contents[i],
+            movements: movements.filter((movement) => movement.statementId === statement.id),
+          }))
+          .filter((source) => source.movements.length > 0);
 
-      <div className="flex flex-col gap-0.5">
-        <span className="text-sm text-muted">{monthTitle(month)}</span>
-        <span className="font-display text-4xl font-black tracking-tight">{formatArs(total)}</span>
-        {monthChange !== null && previousMonth && (
-          <Delta value={monthChange} className="mt-1 text-sm">
-            {formatPercentDelta(monthChange)} vs. {monthShort(previousMonth)}
-          </Delta>
-        )}
-        {!coverage.whole && (
-          <span className="mt-1 text-sm text-muted">{shortfallLabel(coverage.short, month)}</span>
-        )}
-      </div>
+        return (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm text-muted">{monthTitle(month)}</span>
+              <span className="font-display text-4xl font-black tracking-tight">
+                {formatArs(total)}
+              </span>
+              {monthChange !== null && previousMonth && (
+                <Delta value={monthChange} className="mt-1 text-sm">
+                  {formatPercentDelta(monthChange)} vs. {monthShort(previousMonth)}
+                </Delta>
+              )}
+              {!coverage.whole && (
+                <span className="mt-1 text-sm text-muted">
+                  {shortfallLabel(coverage.short, month)}
+                </span>
+              )}
+            </div>
 
-      <div className="flex flex-col gap-2">
-        <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
-        <SpendLegend
-          usual={formatArsCompact(usual)}
-          oneOff={formatArsCompact(oneOff)}
-          className="flex justify-between gap-3"
-        />
-      </div>
+            <Breakdown
+              movements={movements}
+              rules={rules}
+              previousByCategory={previousMonth ? previousByCategory : undefined}
+              whole
+              markOf={markOf}
+              onSelect={select}
+            />
 
-      <section>
-        <SectionLabel>Por categoría</SectionLabel>
-        <ul>
-          {shares.map((share) => {
-            const key = shareKey(share.category);
-            const open = opened.has(key);
-            const change = share.cents - (previousByCategory.get(share.category) ?? 0);
-            const Chevron = open ? IconChevronDown : IconChevronRight;
-            return (
-              <li key={key} className="border-b border-border">
-                <button
-                  type="button"
-                  onClick={() => toggle(share)}
-                  aria-expanded={open}
-                  className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-border-subtle"
-                >
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-on-surface">
-                        {share.category ? CATEGORY_LABELS[share.category] : UNCATEGORIZED_LABEL}{' '}
-                        <span className="text-xs text-muted">{share.movements.length}</span>
-                      </span>
-                      <span className="shrink-0 tabular-nums">{formatArsCompact(share.cents)}</span>
-                    </span>
-                    <span className="flex items-center gap-3">
-                      <SpendBar usual={share.cents} max={largestShare} />
-                      {previousMonth && (
-                        <Delta value={change} className="w-24 shrink-0 text-right text-xs">
-                          {formatDelta(change)}
-                        </Delta>
-                      )}
-                    </span>
-                  </span>
-                  <Chevron size={18} stroke={1.5} className="shrink-0 text-muted" />
-                </button>
-                {open && <div className="pb-1 pl-3">{renderMovements(share.movements)}</div>}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+            {oneOffs.length > 0 && (
+              <section>
+                <SectionLabel detail={formatArs(oneOff)}>Puntuales</SectionLabel>
+                <MovementList
+                  movements={oneOffs}
+                  rules={rules}
+                  whole
+                  closed
+                  markOf={markOf}
+                  onSelect={select}
+                />
+              </section>
+            )}
 
-      {oneOffs.length > 0 && (
-        <section>
-          <SectionLabel detail={formatArs(oneOff)}>Puntuales</SectionLabel>
-          {renderMovements(oneOffs, true)}
-        </section>
-      )}
+            {sources.length > 0 && (
+              <section>
+                <SectionLabel>De qué resúmenes sale</SectionLabel>
+                <ul>
+                  {sources.map((source) => (
+                    <LinkRow
+                      key={source.statement.id}
+                      to={statementPath(source.statement.id)}
+                      title={statementTitle(source.contents)}
+                      leading={<CardMark format={source.statement.format} />}
+                      subtitle={`${source.movements.length} movimientos de ${monthName(month, 'long')} · ${formatArs(
+                        sumCents(source.movements),
+                      )}`}
+                      chevron
+                    />
+                  ))}
+                </ul>
+              </section>
+            )}
 
-      {sources.length > 0 && (
-        <section>
-          <SectionLabel>De qué resúmenes sale</SectionLabel>
-          <ul>
-            {sources.map((source) => (
-              <LinkRow
-                key={source.statement.id}
-                to={statementPath(source.statement.id)}
-                title={statementTitle(source.contents)}
-                leading={<CardMark format={source.statement.format} />}
-                subtitle={`${source.movements.length} movimientos de ${monthName(month, 'long')} · ${formatArs(
-                  sumCents(source.movements),
-                )}`}
-                chevron
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {selected && selectedFiling && (
-        <RuleDialog
-          key={`${selected.statementId}-${selected.index}`}
-          line={selected.line}
-          cents={selected.cents}
-          rule={selectedFiling.rule}
-          category={selectedFiling.category}
-          onSave={(change) => void handleSave(change)}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
+            {dialog}
+          </div>
+        );
+      }}
+    </EntryPage>
   );
 }
