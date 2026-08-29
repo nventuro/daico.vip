@@ -8,8 +8,8 @@ vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 // Three tables as older clients left them, each with a row synced back then,
 // seeded before the store opens its database.
 seedSql.push(
-  // `chores` before it gained `notes`, `done` and `due_on` — all three of them
-  // columns SQLite can add to a table that already exists.
+  // `chores` before it gained `notes`, `due_on` and the four that came with
+  // repetition — all of them columns SQLite can add to a table that exists.
   `CREATE TABLE chores (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -72,16 +72,22 @@ describe('table migration', () => {
       'pending_op',
       'synced',
       'notes',
-      'done',
       'due_on',
+      'last_done_on',
+      'repeat_every',
+      'repeat_unit',
+      'repeat_from',
     ]);
     expect(rows).toEqual([
       {
         id: 'old',
         title: 'Regar',
         notes: null,
-        done: false,
         due_on: null,
+        last_done_on: null,
+        repeat_every: null,
+        repeat_unit: null,
+        repeat_from: null,
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z',
       },
@@ -92,14 +98,19 @@ describe('table migration', () => {
     const id = await engine.insert(CHORES_SPEC, {
       title: 'Podar',
       notes: 'fondo',
-      done: true,
       due_on: '2026-09-01',
+      last_done_on: null,
+      repeat_every: 3,
+      repeat_unit: 'month',
+      repeat_from: 'done',
     });
     const rows = await engine.listVisible<Chore>(CHORES_SPEC);
     expect(rows.find((c) => c.id === id)).toMatchObject({
       notes: 'fondo',
-      done: true,
       due_on: '2026-09-01',
+      repeat_every: 3,
+      repeat_unit: 'month',
+      repeat_from: 'done',
     });
   });
 
@@ -109,8 +120,8 @@ describe('table migration', () => {
       'id',
       'title',
       'occurs_on',
-      'repeat',
-      'repeat_months',
+      'repeat_every',
+      'repeat_unit',
       'notice_days',
       'notes',
       'created_at',

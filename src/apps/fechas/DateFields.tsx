@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import { IconBell, IconCalendarEvent, IconRepeat } from '@tabler/icons-react';
-import { REPEAT_KINDS, type RepeatKind } from '../../lib/offline/specs';
+import {
+  REPEAT_UNITS,
+  repeatIntervalLabel,
+  repeatLabel,
+  repeatUnitsLabel,
+  type RepeatUnit,
+} from '../../utils/recurrence';
 import {
   CHIP_BASE_CLASS,
   CHIP_IDLE_CLASS,
@@ -12,28 +18,30 @@ import NoticeDaysSelect from '../../components/NoticeDaysSelect';
 import Select from '../../components/Select';
 import TextInput from '../../components/TextInput';
 import type { DateInput } from './useDates';
-import { repeatLabel } from './labels';
 
 /** Notice windows (days ahead) offered when adding or editing a date. */
 const DATE_NOTICE_DAYS_OPTIONS = [0, 1, 3, 7, 14, 30] as const;
 
-/** Interval a date gets when switched to repeating every N months. */
-const DATE_REPEAT_MONTHS_DEFAULT = 3;
+/** Interval a date gets when it is switched to repeating. */
+const DATE_REPEAT_EVERY_DEFAULT = 1;
 
-/** Bounds for a date's every-N-months interval (input guard). */
-const DATE_REPEAT_MONTHS_MIN = 1;
-const DATE_REPEAT_MONTHS_MAX = 24;
+/** Bounds for a date's interval (input guard). */
+const DATE_REPEAT_EVERY_MIN = 1;
+const DATE_REPEAT_EVERY_MAX = 24;
+
+/** What the repeat select says for a date that only happens once. */
+const ONCE = 'none';
 
 /** The scheduling half of a date: when, how it repeats, and the notice window. */
 export type DateFieldsValue = Pick<
   DateInput,
-  'occurs_on' | 'repeat' | 'repeat_months' | 'notice_days'
+  'occurs_on' | 'repeat_every' | 'repeat_unit' | 'notice_days'
 >;
 
 interface DateFieldsProps {
   occursOn: string;
-  repeat: RepeatKind;
-  repeatMonths: number | null;
+  repeatEvery: number | null;
+  repeatUnit: RepeatUnit | null;
   noticeDays: number;
   onChange: (patch: Partial<DateFieldsValue>) => void;
   /** `chips`: compact pills for the add bar; `form`: labelled stacked fields. */
@@ -43,18 +51,19 @@ interface DateFieldsProps {
 const CHIP = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`;
 const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
 
-/** The date, repeat and notice controls of a dated entry. Controlled: every
- *  change is reported as a patch of the value. */
+/** The date, repeat and notice controls shared by the add bar and the edit
+ *  form. Controlled: every change is reported as a patch of the value. */
 export default function DateFields({
   occursOn,
-  repeat,
-  repeatMonths,
+  repeatEvery,
+  repeatUnit,
   noticeDays,
   onChange,
   layout,
 }: DateFieldsProps) {
   const chips = layout === 'chips';
   const control = chips ? CHIP_CONTROL : CONTROL_CLASS;
+  const every = repeatEvery ?? DATE_REPEAT_EVERY_DEFAULT;
 
   function field(label: string, icon: ReactNode, input: ReactNode) {
     return (
@@ -65,13 +74,13 @@ export default function DateFields({
     );
   }
 
-  function changeRepeat(value: string) {
-    const kind = REPEAT_KINDS.find((k) => k === value);
-    if (!kind) return;
-    onChange({
-      repeat: kind,
-      repeat_months: kind === 'months' ? (repeatMonths ?? DATE_REPEAT_MONTHS_DEFAULT) : null,
-    });
+  function changeUnit(value: string) {
+    if (value === ONCE) {
+      onChange({ repeat_every: null, repeat_unit: null });
+      return;
+    }
+    const unit = REPEAT_UNITS.find((u) => u === value);
+    if (unit) onChange({ repeat_every: every, repeat_unit: unit });
   }
 
   return (
@@ -93,38 +102,39 @@ export default function DateFields({
         'Repetición',
         <IconRepeat size={18} stroke={1.5} />,
         <Select
-          value={repeat}
-          onChange={(e) => changeRepeat(e.target.value)}
+          value={repeatUnit ?? ONCE}
+          onChange={(e) => changeUnit(e.target.value)}
           aria-label="Repetición"
           className={control}
         >
-          {REPEAT_KINDS.map((kind) => (
-            <option key={kind} value={kind}>
-              {repeatLabel(kind, repeatMonths ?? DATE_REPEAT_MONTHS_DEFAULT)}
+          <option value={ONCE}>Una vez</option>
+          {REPEAT_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {repeatLabel(every, unit)}
             </option>
           ))}
         </Select>,
       )}
-      {repeat === 'months' &&
+      {repeatUnit !== null &&
         field(
-          'Cada cuántos meses',
+          repeatIntervalLabel(repeatUnit),
           <span>Cada</span>,
           <span className="flex items-center gap-1.5">
             <TextInput
               type="number"
               inputMode="numeric"
-              min={DATE_REPEAT_MONTHS_MIN}
-              max={DATE_REPEAT_MONTHS_MAX}
+              min={DATE_REPEAT_EVERY_MIN}
+              max={DATE_REPEAT_EVERY_MAX}
               required
-              value={repeatMonths ?? ''}
+              value={repeatEvery ?? ''}
               onChange={(e) => {
                 const n = e.target.valueAsNumber;
-                onChange({ repeat_months: Number.isFinite(n) ? n : null });
+                onChange({ repeat_every: Number.isFinite(n) ? n : null });
               }}
-              aria-label="Cada cuántos meses"
+              aria-label={repeatIntervalLabel(repeatUnit)}
               className={`${control} ${chips ? 'w-12' : 'w-24'}`}
             />
-            {chips && <span>meses</span>}
+            {chips && <span>{repeatUnitsLabel(repeatUnit)}</span>}
           </span>,
         )}
       {field(

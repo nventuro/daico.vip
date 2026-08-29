@@ -19,8 +19,8 @@ export default function DatesPage() {
 
   const [newFields, setNewFields] = useState<DateFieldsValue>({
     occurs_on: today,
-    repeat: 'none',
-    repeat_months: null,
+    repeat_every: null,
+    repeat_unit: null,
     notice_days: DATE_NOTICE_DAYS_DEFAULT,
   });
 
@@ -47,8 +47,8 @@ export default function DatesPage() {
         <AddBar onAdd={addDate} placeholder="Agregar una fecha..." inputLabel="Nueva fecha">
           <DateFields
             occursOn={newFields.occurs_on}
-            repeat={newFields.repeat}
-            repeatMonths={newFields.repeat_months}
+            repeatEvery={newFields.repeat_every}
+            repeatUnit={newFields.repeat_unit}
             noticeDays={newFields.notice_days}
             onChange={(patch) => setNewFields((fields) => ({ ...fields, ...patch }))}
             layout="chips"

@@ -64,11 +64,11 @@ describe('syncAll', () => {
     await syncAll();
 
     at(T1);
-    await engine.update(CHORES_SPEC, 'a', { done: true });
+    await engine.update(CHORES_SPEC, 'a', { last_done_on: '2026-08-27' });
     await engine.remove(CHORES_SPEC, 'b');
     await syncAll();
 
-    expect(server.rows('chores')).toEqual([serverChore('a', T1, { done: true })]);
+    expect(server.rows('chores')).toEqual([serverChore('a', T1, { last_done_on: '2026-08-27' })]);
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
     expect(await bookkeeping('chores', 'b')).toBeNull();
   });
@@ -82,7 +82,7 @@ describe('syncAll', () => {
     server.calls.length = 0;
 
     at(T1);
-    await engine.update(CHORES_SPEC, 'a', { done: true });
+    await engine.update(CHORES_SPEC, 'a', { last_done_on: '2026-08-27' });
     await engine.insert(CHORES_SPEC, newChore);
     await engine.remove(SHOPPING_SPEC, 's');
     await syncAll();

@@ -9,6 +9,7 @@
 // column missing from either the row type or the spec fails to compile.
 // =============================================================================
 import type { AttachmentOwnerKind, SyncedRow } from '../../types';
+import type { RepeatUnit } from '../../utils/recurrence';
 
 /** How a column is declared in SQLite, and how its values cross to the app. */
 export interface ColumnSpec {
@@ -107,13 +108,32 @@ export const ATTACHMENTS_SPEC: TableSpec<Attachment> = {
 
 // ─── Tareas ──────────────────────────────────────────────────────────────────
 
-/** A chore / task to be done. */
+/** What the next date of a repeating chore is counted from. */
+export const REPEAT_FROMS = ['due', 'done'] as const;
+export type RepeatFrom = (typeof REPEAT_FROMS)[number];
+
+/**
+ * A chore / task to be done. A chore that repeats is the same row coming back:
+ * marking it writes the day it was marked and moves `due_on` on, so there is
+ * never a second row for the next time and nothing is ever created on a
+ * device's behalf. The three `repeat_*` columns are set and cleared together —
+ * `repeat_every` being null is the whole of "this does not repeat".
+ */
 export interface Chore extends SyncedRow {
   title: string;
   notes: string | null;
-  done: boolean;
-  /** Optional due date as an ISO date string (yyyy-mm-dd). */
+  /** When it is due (yyyy-mm-dd); for a chore that repeats, the day the next
+   *  one falls on. Null for a chore with no date, which never repeats. */
   due_on: string | null;
+  /** The day it was last marked (yyyy-mm-dd), null if it never was. A chore
+   *  that does not repeat and carries one is done: that pair is what `done`
+   *  used to be, plus when. */
+  last_done_on: string | null;
+  /** How many `repeat_unit`s go by between one and the next; null when the
+   *  chore does not repeat. */
+  repeat_every: number | null;
+  repeat_unit: RepeatUnit | null;
+  repeat_from: RepeatFrom | null;
 }
 
 export const CHORES_SPEC: TableSpec<Chore> = {
@@ -121,11 +141,17 @@ export const CHORES_SPEC: TableSpec<Chore> = {
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
     notes: { ddl: 'TEXT' },
-    done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
-    // Due date as a yyyy-mm-dd string (date-only, no timezone).
+    // Dates as yyyy-mm-dd strings (date-only, no timezone).
     due_on: { ddl: 'TEXT' },
+    last_done_on: { ddl: 'TEXT' },
+    repeat_every: { ddl: 'INTEGER' },
+    repeat_unit: { ddl: 'TEXT' },
+    repeat_from: { ddl: 'TEXT' },
   },
-  orderBy: 'done ASC, due_on ASC NULLS LAST, created_at ASC',
+  // Done last, then by date. A chore that repeats is never done, however long
+  // ago it was marked, so it keeps its place among the dates.
+  orderBy:
+    '(last_done_on IS NOT NULL AND repeat_every IS NULL) ASC, due_on ASC NULLS LAST, created_at ASC',
 };
 
 // ─── Compras ─────────────────────────────────────────────────────────────────
@@ -201,10 +227,6 @@ export const GUIDE_CHAPTERS_SPEC: TableSpec<GuideChapter> = {
 
 // ─── Fechas ──────────────────────────────────────────────────────────────────
 
-/** How a date repeats: never, every year, or every `repeat_months` months. */
-export const REPEAT_KINDS = ['none', 'yearly', 'months'] as const;
-export type RepeatKind = (typeof REPEAT_KINDS)[number];
-
 /**
  * A calendar entry — a birthday, an appointment, a renewal. Not a task: nothing
  * is ever done, and the app never rewrites a row on its own. `occurs_on` is the
@@ -215,9 +237,10 @@ export interface DateEntry extends SyncedRow {
   title: string;
   /** The anchor: the ISO date (yyyy-mm-dd) entered by the user, never moved by the app. */
   occurs_on: string;
-  repeat: RepeatKind;
-  /** Interval in months when `repeat` is 'months'; null otherwise. */
-  repeat_months: number | null;
+  /** How many `repeat_unit`s go by between one occurrence and the next; null
+   *  when the date happens once. The pair is the same one chores carry. */
+  repeat_every: number | null;
+  repeat_unit: RepeatUnit | null;
   /** How many days ahead the entry shows on the home screen (0 = only on the day). */
   notice_days: number;
   notes: string | null;
@@ -232,8 +255,8 @@ export const DATES_SPEC: TableSpec<DateEntry> = {
     title: { ddl: 'TEXT NOT NULL' },
     // yyyy-mm-dd: the day the entry falls on.
     occurs_on: { ddl: 'TEXT NOT NULL' },
-    repeat: { ddl: "TEXT NOT NULL DEFAULT 'none'" },
-    repeat_months: { ddl: 'INTEGER' },
+    repeat_every: { ddl: 'INTEGER' },
+    repeat_unit: { ddl: 'TEXT' },
     notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
     notes: { ddl: 'TEXT' },
   },

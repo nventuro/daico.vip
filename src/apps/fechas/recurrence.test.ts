@@ -1,20 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { DateEntry } from '../../lib/offline/specs';
-import {
-  displayDate,
-  groupByMonth,
-  isNear,
-  nextOccurrenceOnOrAfter,
-  splitByToday,
-} from './recurrence';
+import { displayDate, groupByMonth, isNear, splitByToday } from './recurrence';
 
 const TODAY = '2026-03-14';
 
 function entry(overrides: Partial<DateEntry> & Pick<DateEntry, 'id' | 'occurs_on'>): DateEntry {
   return {
     title: overrides.id,
-    repeat: 'none',
-    repeat_months: null,
+    repeat_every: null,
+    repeat_unit: null,
     notice_days: 7,
     notes: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -23,45 +17,20 @@ function entry(overrides: Partial<DateEntry> & Pick<DateEntry, 'id' | 'occurs_on
   };
 }
 
-describe('nextOccurrenceOnOrAfter', () => {
-  it('returns today when a yearly anchor falls on it', () => {
-    expect(nextOccurrenceOnOrAfter('1990-03-14', 'yearly', null, '2026-03-14')).toBe('2026-03-14');
-  });
-
-  it('rolls a yearly anchor to next year once the day has passed', () => {
-    expect(nextOccurrenceOnOrAfter('1990-03-14', 'yearly', null, '2026-03-15')).toBe('2027-03-14');
-  });
-
-  it('keeps a future anchor as is', () => {
-    expect(nextOccurrenceOnOrAfter('2026-03-14', 'yearly', null, '2026-01-01')).toBe('2026-03-14');
-  });
-
-  it('steps every N months from the anchor', () => {
-    expect(nextOccurrenceOnOrAfter('2025-10-01', 'months', 3, '2026-03-14')).toBe('2026-04-01');
-  });
-
-  it('clamps a leap-day anchor without drifting', () => {
-    expect(nextOccurrenceOnOrAfter('2024-02-29', 'yearly', null, '2024-03-01')).toBe('2025-02-28');
-  });
-
-  it('returns the anchor for a one-off, even in the past', () => {
-    expect(nextOccurrenceOnOrAfter('2026-03-10', 'none', null, '2026-03-14')).toBe('2026-03-10');
-  });
-
-  it('is null for a months repeat with no interval', () => {
-    expect(nextOccurrenceOnOrAfter('2026-03-14', 'months', null, '2026-03-14')).toBeNull();
-    expect(nextOccurrenceOnOrAfter('2026-03-14', 'months', 0, '2026-03-14')).toBeNull();
-  });
-});
+const yearly = (id: string, occursOn: string) =>
+  entry({ id, occurs_on: occursOn, repeat_every: 1, repeat_unit: 'year' });
 
 describe('displayDate', () => {
   it('is the next occurrence for a repeating entry', () => {
-    const e = entry({ id: 'a', occurs_on: '1990-03-14', repeat: 'yearly' });
-    expect(displayDate(e, '2026-03-15')).toBe('2027-03-14');
+    expect(displayDate(yearly('a', '1990-03-14'), '2026-03-15')).toBe('2027-03-14');
+  });
+
+  it('is the anchor for a one-off, past or not', () => {
+    expect(displayDate(entry({ id: 'a', occurs_on: '2026-03-10' }), TODAY)).toBe('2026-03-10');
   });
 
   it('falls back to the anchor when no occurrence can be computed', () => {
-    const e = entry({ id: 'a', occurs_on: '2026-03-10', repeat: 'months', repeat_months: null });
+    const e = entry({ id: 'a', occurs_on: '2026-03-10', repeat_every: 3, repeat_unit: null });
     expect(displayDate(e, TODAY)).toBe('2026-03-10');
   });
 });
@@ -83,7 +52,7 @@ describe('splitByToday', () => {
   });
 
   it('puts a yearly entry with a past anchor in upcoming, under next year', () => {
-    const birthday = entry({ id: 'b', occurs_on: '1990-03-10', repeat: 'yearly' });
+    const birthday = yearly('b', '1990-03-10');
     const { upcoming, past } = splitByToday([birthday], TODAY);
     expect(upcoming).toEqual([birthday]);
     expect(past).toEqual([]);
@@ -126,8 +95,7 @@ describe('groupByMonth', () => {
   });
 
   it('groups a repeating entry under its next occurrence', () => {
-    const birthday = entry({ id: 'b', occurs_on: '1990-03-10', repeat: 'yearly' });
-    const [group] = groupByMonth([birthday], TODAY);
+    const [group] = groupByMonth([yearly('b', '1990-03-10')], TODAY);
     expect(group.key).toBe('2027-03');
     expect(group.label).toBe('Marzo 2027');
   });

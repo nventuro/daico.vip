@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { excerpt, matches, searchTable } from './search';
 import * as engine from './offline/engine';
+import { newChore } from './offline/testing/rows';
 import { ATTACHMENTS_SPEC, CHORES_SPEC } from './offline/specs';
 
 vi.mock('sqlocal', () => import('./offline/testing/sqlocalInMemory'));
@@ -52,7 +53,7 @@ describe('searchTable', () => {
   });
 
   const add = (title: string, notes: string | null = null) =>
-    engine.insert(CHORES_SPEC, { title, notes, done: false, due_on: null });
+    engine.insert(CHORES_SPEC, { ...newChore, title, notes });
 
   const hits = (query: string) =>
     searchTable(CHORES_SPEC, query, {

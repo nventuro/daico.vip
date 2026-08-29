@@ -21,8 +21,8 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
   const [notes, setNotes] = useState(entry.notes ?? '');
   const [fields, setFields] = useState<DateFieldsValue>({
     occurs_on: entry.occurs_on,
-    repeat: entry.repeat,
-    repeat_months: entry.repeat_months,
+    repeat_every: entry.repeat_every,
+    repeat_unit: entry.repeat_unit,
     notice_days: entry.notice_days,
   });
 
@@ -45,8 +45,8 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <DateFields
           occursOn={fields.occurs_on}
-          repeat={fields.repeat}
-          repeatMonths={fields.repeat_months}
+          repeatEvery={fields.repeat_every}
+          repeatUnit={fields.repeat_unit}
           noticeDays={fields.notice_days}
           onChange={(patch) => setFields((current) => ({ ...current, ...patch }))}
           layout="form"

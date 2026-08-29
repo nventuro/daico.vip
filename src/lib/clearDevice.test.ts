@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CHORES_SPEC } from './offline/specs';
 import * as engine from './offline/engine';
+import { newChore } from './offline/testing/rows';
 import { getSyncStatus, syncAll } from './offline/sync';
 import { cachedVerdict, rememberVerdict } from './membershipCache';
 import { clearDevice } from './clearDevice';
@@ -31,7 +32,7 @@ beforeEach(async () => {
 
 describe('clearDevice', () => {
   it('leaves the device holding nothing of the household', async () => {
-    await engine.insert(CHORES_SPEC, { title: 'Regar', notes: null, done: false, due_on: null });
+    await engine.insert(CHORES_SPEC, newChore);
     await putAttachmentFile('a', new TextEncoder().encode('abc'), true);
     rememberVerdict('u1', true);
     await syncAll();

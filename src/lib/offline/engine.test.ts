@@ -132,7 +132,7 @@ describe('listVisible', () => {
     const noDate = await engine.insert(CHORES_SPEC, newChore);
     const done = await engine.insert(CHORES_SPEC, {
       ...newChore,
-      done: true,
+      last_done_on: '2026-01-01',
       due_on: '2026-01-01',
     });
     const sooner = await engine.insert(CHORES_SPEC, { ...newChore, due_on: '2026-09-01' });
@@ -192,10 +192,10 @@ describe('update', () => {
     await pulled(serverChore('a', T0));
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
     at(T1);
-    await engine.update(CHORES_SPEC, 'a', { done: true });
+    await engine.update(CHORES_SPEC, 'a', { last_done_on: '2026-08-27' });
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: 'upsert', synced: 1 });
     expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toEqual([
-      serverChore('a', T1, { done: true }),
+      serverChore('a', T1, { last_done_on: '2026-08-27' }),
     ]);
   });
 
@@ -324,7 +324,7 @@ describe('local-only tables', () => {
 
 describe('sync queues', () => {
   it('getPendingUpserts returns queued inserts and edits in server shape', async () => {
-    const id = await engine.insert(CHORES_SPEC, { ...newChore, done: true });
+    const id = await engine.insert(CHORES_SPEC, { ...newChore, last_done_on: '2026-08-27' });
     await pulled(serverChore('clean', T0));
     await pulled(serverChore('edited', T0));
     at(T1);
@@ -334,7 +334,13 @@ describe('sync queues', () => {
 
     const pending = await engine.getPendingUpserts<Chore>(CHORES_SPEC);
     expect(pending).toHaveLength(2);
-    expect(pending).toContainEqual({ id, ...newChore, done: true, created_at: T0, updated_at: T0 });
+    expect(pending).toContainEqual({
+      id,
+      ...newChore,
+      last_done_on: '2026-08-27',
+      created_at: T0,
+      updated_at: T0,
+    });
     expect(pending).toContainEqual(serverChore('edited', T1, { notes: 'n' }));
     for (const row of pending) expect(Object.keys(row)).not.toContain('pending_op');
   });
@@ -386,17 +392,17 @@ describe('sync queues', () => {
 
 describe('reconcile', () => {
   it('inserts unknown server rows as clean synced rows', async () => {
-    await engine.reconcile(CHORES_SPEC, [serverChore('a', T0, { done: true, notes: 'n' })]);
+    await engine.reconcile(CHORES_SPEC, [
+      serverChore('a', T0, { last_done_on: '2026-08-27', notes: 'n' }),
+    ]);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
-      serverChore('a', T0, { done: true, notes: 'n' }),
+      serverChore('a', T0, { last_done_on: '2026-08-27', notes: 'n' }),
     ]);
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
   });
 
   it('stores server columns that are missing as null', async () => {
-    await engine.reconcile(CHORES_SPEC, [
-      { id: 'a', title: 't', done: false, created_at: T0, updated_at: T0 },
-    ]);
+    await engine.reconcile(CHORES_SPEC, [{ id: 'a', title: 't', created_at: T0, updated_at: T0 }]);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
       serverChore('a', T0, { title: 't' }),
     ]);
@@ -404,9 +410,19 @@ describe('reconcile', () => {
 
   it('applies a newer server version over a clean local row', async () => {
     await pulled(serverChore('a', T0));
-    await pulled(serverChore('a', T1, { title: 'edited elsewhere', done: true, created_at: T1 }));
+    await pulled(
+      serverChore('a', T1, {
+        title: 'edited elsewhere',
+        last_done_on: '2026-08-27',
+        created_at: T1,
+      }),
+    );
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
-      serverChore('a', T1, { title: 'edited elsewhere', done: true, created_at: T1 }),
+      serverChore('a', T1, {
+        title: 'edited elsewhere',
+        last_done_on: '2026-08-27',
+        created_at: T1,
+      }),
     ]);
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
   });

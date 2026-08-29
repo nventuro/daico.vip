@@ -19,8 +19,11 @@ export function serverChore(
     id,
     title: `Chore ${id}`,
     notes: null,
-    done: false,
     due_on: null,
+    last_done_on: null,
+    repeat_every: null,
+    repeat_unit: null,
+    repeat_from: null,
     created_at: T0,
     updated_at: updatedAt,
     ...patch,
@@ -28,7 +31,15 @@ export function serverChore(
 }
 
 /** A chore as the app hands one to the store to create. */
-export const newChore = { title: 'Regar', notes: null, done: false, due_on: null };
+export const newChore = {
+  title: 'Regar',
+  notes: null,
+  due_on: null,
+  last_done_on: null,
+  repeat_every: null,
+  repeat_unit: null,
+  repeat_from: null,
+};
 
 type Bookkeeping = { pending_op: string | null; synced: number };
 
