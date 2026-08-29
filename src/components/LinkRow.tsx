@@ -13,7 +13,7 @@ interface LinkRowProps {
   overdue?: boolean;
   /** What stands before the title: an icon, for a row that is not an entry. */
   leading?: ReactNode;
-  /** What stands after it: the entry's marks. */
+  /** What stands after it: the entry's marks, what it came to. */
   trailing?: ReactNode;
   /** Whether the row ends in a chevron saying it opens something else. */
   chevron?: boolean;

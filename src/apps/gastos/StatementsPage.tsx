@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-react';
 import type { Statement, StatementFormat } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { dueWord, formatDateShort, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { dueWord, formatDateCompact, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
 import { tooLargeMessage } from '../../utils/textUtils';
 import DialogFooter from '../../components/DialogFooter';
 import EmptyState from '../../components/EmptyState';
@@ -25,20 +25,25 @@ import { openStatement, useStatementsContents } from './useStatementContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
 import { toPayCents } from './breakdown';
-import { cardIsShort, coverageByCard, type Period } from './coverage';
+import { coverageByCard, type Period } from './coverage';
 import { statementPath } from './paths';
-import {
-  FORMAT_ICONS,
-  FORMAT_LABELS,
-  cardStateLabel,
-  formatArs,
-  gapTitle,
-  periodLabel,
-  statementTitle,
-} from './labels';
+import { FORMAT_LABELS, formatArs, lateLabel, periodLabel, statementTitle } from './labels';
+import CardMark from './CardMark';
 
 /** Largest PDF taken as a statement, in bytes (input guard). */
 const STATEMENT_PDF_MAX_BYTES = 5 * 1024 * 1024;
+
+/** What a row takes at its end when the statement it is about never came in. */
+const MISSING_MARK = (
+  <span
+    role="img"
+    aria-label="Falta un resumen"
+    title="Falta un resumen"
+    className="flex shrink-0 text-warning"
+  >
+    <IconAlertTriangle size={18} stroke={1.75} />
+  </span>
+);
 
 /** A statement just read that is already here: the user decides whether it
  *  takes the place of the one imported before. */
@@ -54,9 +59,9 @@ type Listed =
   | { kind: 'gap'; on: string; format: StatementFormat; period: Period };
 
 /**
- * Everything about the statements in one screen: how far along each card is,
- * every statement by the days it covers, and the ones missing where they
- * would have been. This is also where a statement is added.
+ * Every statement by the days it covers, and the ones missing where they
+ * would have been — the card each is for said by its mark, so a row is a
+ * period and an amount and nothing else. This is also where one is added.
  */
 export default function StatementsPage() {
   const { items, loading, error, add, replace } = useStatements();
@@ -115,6 +120,9 @@ export default function StatementsPage() {
   // list's place can save.
   const opened = contents?.length === items.length ? contents : undefined;
   const cards = opened ? coverageByCard(opened, today) : [];
+  // A card whose gaps are missing statements says so where they belong, in
+  // the list; one that has gone quiet has nowhere in the list to say it.
+  const late = cards.filter((card) => card.late);
   const listed: Listed[] = opened
     ? [
         ...items.map((statement, i) => ({
@@ -185,36 +193,21 @@ export default function StatementsPage() {
           <EmptyState>Todavía no hay resúmenes. Importá el PDF que manda el banco.</EmptyState>
         ) : (
           <>
-            <section>
-              <SectionLabel>Tarjetas</SectionLabel>
-              <ul>
-                {cards.map((card) => {
-                  const Icon = FORMAT_ICONS[card.format];
-                  return (
-                    <LinkRow
-                      key={card.format}
-                      title={FORMAT_LABELS[card.format]}
-                      subtitle={cardStateLabel(card)}
-                      leading={<Icon size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
-                      trailing={
-                        cardIsShort(card) ? (
-                          <span
-                            role="img"
-                            aria-label="Falta un resumen"
-                            title="Falta un resumen"
-                            className="flex shrink-0 text-warning"
-                          >
-                            <IconAlertTriangle size={18} stroke={1.75} />
-                          </span>
-                        ) : undefined
-                      }
-                    />
-                  );
-                })}
+            {late.length > 0 && (
+              <ul className="mb-5">
+                {late.map((card) => (
+                  <LinkRow
+                    key={card.format}
+                    title="No llega un resumen nuevo"
+                    subtitle={lateLabel(card)}
+                    leading={<CardMark format={card.format} />}
+                    trailing={MISSING_MARK}
+                  />
+                ))}
               </ul>
-            </section>
+            )}
 
-            <section className="mt-5">
+            <section>
               <SectionLabel>Resúmenes</SectionLabel>
               <ul>
                 {listed.map((row) => {
@@ -222,32 +215,34 @@ export default function StatementsPage() {
                     return (
                       <LinkRow
                         key={`gap-${row.format}-${row.on}`}
-                        title={gapTitle(row.format)}
-                        subtitle={`del ${formatDateShort(row.period.from)} al ${formatDateShort(row.period.to)}`}
-                        leading={
-                          <IconAlertTriangle
-                            size={20}
-                            stroke={1.75}
-                            className="shrink-0 text-warning"
-                          />
-                        }
+                        title="Falta un resumen"
+                        subtitle={`del ${formatDateCompact(row.period.from)} al ${formatDateCompact(row.period.to)}`}
+                        leading={<CardMark format={row.format} />}
+                        trailing={MISSING_MARK}
                       />
                     );
                   }
                   const { statement } = row;
                   const overdue = !statement.paid && isPast(statement.due_on, today);
-                  const due = `${dueWord(statement.due_on, today)} ${relativeDay(today, statement.due_on)}`;
-                  const Icon = FORMAT_ICONS[statement.format];
                   return (
                     <LinkRow
                       key={statement.id}
                       to={statementPath(statement.id)}
                       title={statementTitle(row.contents)}
-                      subtitle={`${statement.paid ? '' : `${due} · `}${formatArs(
-                        toPayCents(row.contents),
-                      )}`}
+                      // A statement that is paid has nothing left to say about
+                      // when it was due: the row is the days and the amount.
+                      subtitle={
+                        statement.paid
+                          ? undefined
+                          : `${dueWord(statement.due_on, today)} ${relativeDay(today, statement.due_on)}`
+                      }
                       overdue={overdue}
-                      leading={<Icon size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
+                      leading={<CardMark format={statement.format} />}
+                      trailing={
+                        <span className="shrink-0 tabular-nums">
+                          {formatArs(toPayCents(row.contents))}
+                        </span>
+                      }
                       chevron
                     />
                   );

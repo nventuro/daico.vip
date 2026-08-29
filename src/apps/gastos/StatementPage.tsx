@@ -5,7 +5,7 @@ import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { useEntry } from '../../hooks/useEntry';
 import { capitalize } from '../../utils/textUtils';
-import { dueWord, formatDate, isPast, todayIso } from '../../utils/dateUtils';
+import { dueWord, formatDateCompact, isPast, todayIso } from '../../utils/dateUtils';
 import CheckRow from '../../components/CheckRow';
 import ErrorLine from '../../components/ErrorLine';
 import SectionLabel from '../../components/SectionLabel';
@@ -226,7 +226,7 @@ export default function StatementPage() {
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-on-surface">Pagado</span>
           <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-            {capitalize(dueWord(contents.due_on, today))} el {formatDate(contents.due_on)}
+            {capitalize(dueWord(contents.due_on, today))} el {formatDateCompact(contents.due_on)}
           </span>
         </span>
       </CheckRow>

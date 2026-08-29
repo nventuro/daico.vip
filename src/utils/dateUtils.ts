@@ -41,6 +41,12 @@ export function formatDateShort(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Formats an ISO date string (yyyy-mm-dd) as dd/mm/yy. */
+export function formatDateCompact(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year.slice(2)}`;
+}
+
 /** Formats an ISO date string (yyyy-mm-dd) as dd/mm. */
 export function formatDayMonth(dateStr: string): string {
   const [, month, day] = dateStr.split('-');

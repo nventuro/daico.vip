@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { formatArs, formatArsCompact, formatPercentDelta, formatUsd, percentDelta } from './labels';
+import {
+  formatArs,
+  formatArsCompact,
+  formatPercentDelta,
+  formatUsd,
+  percentDelta,
+  periodShort,
+  statementTitle,
+} from './labels';
 
 describe('formatArsCompact', () => {
   it.each([
@@ -44,5 +52,25 @@ describe('percentDelta / formatPercentDelta', () => {
 
   it('has no change to write against nothing spent', () => {
     expect(percentDelta(100_000, 0)).toBeNull();
+  });
+});
+
+describe('periodShort / statementTitle', () => {
+  it('writes the days covered in numbers, the year once', () => {
+    expect(periodShort('2026-07-03', '2026-07-30')).toBe('03/07 – 30/07/26');
+    expect(periodShort('2026-05-29', '2026-07-02')).toBe('29/05 – 02/07/26');
+  });
+
+  it('writes both years when the days run into a new one', () => {
+    expect(periodShort('2025-12-24', '2026-01-22')).toBe('24/12/25 – 22/01/26');
+  });
+
+  it('names a statement with nothing before it by its closing day', () => {
+    expect(statementTitle({ previous_closed_on: null, closed_on: '2026-07-30' })).toBe(
+      'cierre 30/07/26',
+    );
+    expect(statementTitle({ previous_closed_on: '2026-07-02', closed_on: '2026-07-30' })).toBe(
+      '03/07 – 30/07/26',
+    );
   });
 });

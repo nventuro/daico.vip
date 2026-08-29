@@ -40,6 +40,7 @@ import {
   statementTitle,
 } from './labels';
 import BreakdownSkeleton from './BreakdownSkeleton';
+import CardMark from './CardMark';
 import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import LineRow from './LineRow';
@@ -279,6 +280,7 @@ export default function MonthPage() {
                   key={source.statement.id}
                   to={statementPath(source.statement.id)}
                   title={statementTitle(source.contents)}
+                  leading={<CardMark format={source.statement.format} />}
                   subtitle={`${source.movements.length} ${what} de ${monthName(month, 'long')} · ${formatArs(
                     sumCents(source.movements),
                   )}`}

@@ -1,6 +1,5 @@
-import { IconBrandMastercard, IconBrandVisa, type TablerIcon } from '@tabler/icons-react';
 import type { SpendingCategory, StatementFormat } from '../../lib/offline/specs';
-import { addDays, formatDateShort, monthName } from '../../utils/dateUtils';
+import { addDays, formatDateCompact, formatDayMonth, monthName } from '../../utils/dateUtils';
 import type { CardCoverage, Shortfall } from './coverage';
 import type { StatementContents } from './statement';
 
@@ -32,13 +31,6 @@ export const UNCATEGORIZED_LABEL = 'Sin categoría';
 export const FORMAT_LABELS: Record<StatementFormat, string> = {
   'galicia-visa': 'visa',
   'galicia-mastercard': 'mastercard',
-};
-
-/** The card's own mark, for a row that lists one. Line drawings from the
- *  icon set the rest of the app is drawn with, not the networks' artwork. */
-export const FORMAT_ICONS: Record<StatementFormat, TablerIcon> = {
-  'galicia-visa': IconBrandVisa,
-  'galicia-mastercard': IconBrandMastercard,
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -99,47 +91,31 @@ export function formatPercentDelta(value: number): string {
 const day = (date: string) => String(Number(date.slice(8)));
 
 /**
- * The days a statement covers, tight enough for a row: "3 al 30 jul 2026",
- * "29 may al 2 jul 2026", "24 dic 2025 al 22 ene 2026".
+ * The days a statement covers, in numbers and tight enough for a row:
+ * "03/07 – 30/07/26", or "24/12/25 – 22/01/26" when it runs into a new year,
+ * where the year of both ends is worth writing.
  */
 export function periodShort(from: string, to: string): string {
-  const [fromYear, fromMonth] = from.split('-');
-  const [toYear, toMonth] = to.split('-');
   const start =
-    fromYear !== toYear
-      ? `${day(from)} ${monthName(from, 'short')} ${fromYear}`
-      : fromMonth === toMonth
-        ? day(from)
-        : `${day(from)} ${monthName(from, 'short')}`;
-  return `${start} al ${day(to)} ${monthName(to, 'short')} ${toYear}`;
+    from.slice(0, 4) === to.slice(0, 4) ? formatDayMonth(from) : formatDateCompact(from);
+  return `${start} – ${formatDateCompact(to)}`;
 }
 
-/** How a statement is named wherever it is listed: the card it is for and the
- *  days it covers — never the month it closed in, which two statements of the
- *  same card can share. */
+/** How a statement is named wherever it is listed: the days it covers, the
+ *  card said by the mark beside it — never the month it closed in, which two
+ *  statements of the same card can share. */
 export function statementTitle(
-  contents: Pick<StatementContents, 'format' | 'previous_closed_on' | 'closed_on'>,
+  contents: Pick<StatementContents, 'previous_closed_on' | 'closed_on'>,
 ): string {
-  const period =
-    contents.previous_closed_on === null
-      ? `cierre ${formatDateShort(contents.closed_on)}`
-      : periodShort(addDays(contents.previous_closed_on, 1), contents.closed_on);
-  return `${FORMAT_LABELS[contents.format]} · ${period}`;
+  return contents.previous_closed_on === null
+    ? `cierre ${formatDateCompact(contents.closed_on)}`
+    : periodShort(addDays(contents.previous_closed_on, 1), contents.closed_on);
 }
 
-/** What a card's row says under its name: when it last closed, and whatever
- *  it is missing. */
-export function cardStateLabel(card: CardCoverage): string {
-  const parts = [`último cierre ${formatDateShort(card.lastClosedOn)}`];
-  if (card.late) parts.push(`hace ${card.daysSinceClose} días`);
-  if (card.gaps.length === 1) parts.push('falta 1 resumen');
-  if (card.gaps.length > 1) parts.push(`faltan ${card.gaps.length} resúmenes`);
-  return parts.join(' · ');
-}
-
-/** How a missing statement is named where it sits in the list. */
-export function gapTitle(format: StatementFormat): string {
-  return `Falta un resumen de ${FORMAT_LABELS[format]}`;
+/** What a card that has gone too long without closing again says under its
+ *  row: when the last statement closed, and how long ago that was. */
+export function lateLabel(card: CardCoverage): string {
+  return `el último cerró el ${formatDateCompact(card.lastClosedOn)}, hace ${card.daysSinceClose} días`;
 }
 
 function shortfallSentence(short: Shortfall, month: string): string {
@@ -174,14 +150,14 @@ export function monthShort(yearMonth: string): string {
   return `${monthName(yearMonth, 'short')} ${year}`;
 }
 
-/** The days a statement covers: "del 24/07/2026 al 20/08/2026", or its
+/** The days a statement covers: "del 24/07/26 al 20/08/26", or its
  *  closing day alone when the start is not known. */
 export function periodLabel(
   contents: Pick<StatementContents, 'previous_closed_on' | 'closed_on'>,
 ): string {
-  const to = formatDateShort(contents.closed_on);
+  const to = formatDateCompact(contents.closed_on);
   if (contents.previous_closed_on === null) return `cierre ${to}`;
-  return `del ${formatDateShort(addDays(contents.previous_closed_on, 1))} al ${to}`;
+  return `del ${formatDateCompact(addDays(contents.previous_closed_on, 1))} al ${to}`;
 }
 
 /** What the total carries from the statement before: what was left unpaid,
