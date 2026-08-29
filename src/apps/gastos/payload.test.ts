@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { openContents, openPattern, sealContents, sealPattern, upgradeContents } from './payload';
-import type { StatementContents } from './statement';
+import { STATEMENT_CONTENTS_SCHEMA, type StatementContents } from './statement';
 import { line, statement } from './testing/contents';
 
 const masterKey = () =>
@@ -51,6 +51,18 @@ describe('a statement payload', () => {
     expect(
       upgradeContents(JSON.parse(JSON.stringify(contents)) as Record<string, unknown>),
     ).toEqual(contents);
+  });
+
+  it('refuses one sealed under a schema it does not know', async () => {
+    for (const schema of [STATEMENT_CONTENTS_SCHEMA + 1, 0, null, undefined]) {
+      expect(() => upgradeContents({ ...contents, schema })).toThrow(/más nueva/);
+    }
+    const key = await masterKey();
+    const sealed = await sealContents(key, {
+      ...contents,
+      schema: STATEMENT_CONTENTS_SCHEMA + 1,
+    });
+    await expect(openContents(key, sealed)).rejects.toThrow(/más nueva/);
   });
 });
 

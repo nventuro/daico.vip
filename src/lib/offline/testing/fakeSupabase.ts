@@ -26,8 +26,8 @@ export interface ServerCall {
 export interface ServerObject {
   name: string;
   data: Uint8Array<ArrayBuffer>;
-  /** ISO timestamp. */
-  created_at: string;
+  /** ISO timestamp, or null for an object the bucket reports no age for. */
+  created_at: string | null;
 }
 
 /** How a call can be refused: the HTTP status a storage call reports, the code
@@ -51,18 +51,38 @@ function matches(call: ServerCall, op: ServerOp, table: string | undefined): boo
   return call.op === op && (table === undefined || call.table === table);
 }
 
+/** When a row was last written, as the trigger reads it. */
+function stamp(row: ServerRow): number {
+  return Date.parse(String(row.updated_at));
+}
+
+/** The error PostgREST reports for a row a policy will not take. */
+function rowLevelSecurity(): CallFailure {
+  const error: CallFailure = new Error('new row violates row-level security policy');
+  error.code = '42501';
+  return error;
+}
+
 export class FakeServer {
   private tables = new Map<string, Map<string, ServerRow>>();
   private buckets = new Map<string, Map<string, ServerObject>>();
   private interceptors = new Set<Interceptor>();
   /** Every call made, in order. */
   readonly calls: ServerCall[] = [];
+  /**
+   * Whether the calling session passes `private.is_member()`. Set false to
+   * answer as the server does to a signed-in account that is not a member:
+   * every row hidden, every write refused. Its delete is not refused so much
+   * as ignored — it matches no row it is allowed to see.
+   */
+  member = true;
 
   reset(): void {
     this.tables.clear();
     this.buckets.clear();
     this.interceptors.clear();
     this.calls.length = 0;
+    this.member = true;
   }
 
   /** Stop failing or holding calls; rows, objects and the call log stay. */
@@ -133,14 +153,21 @@ export class FakeServer {
     return {
       upsert: async (row: ServerRow) => {
         const error = await this.run({ op: 'upsert', table, id: row.id });
-        if (!error) this.table(table).set(row.id, { ...row });
-        return { error };
+        if (error) return { error };
+        if (!this.member) return { error: rowLevelSecurity() };
+        // The `last_write_wins` trigger every synced table carries: a write
+        // arriving with an older stamp than the stored row is skipped, and
+        // says nothing about it.
+        const stored = this.table(table).get(row.id);
+        if (stored && stamp(row) < stamp(stored)) return { error: null };
+        this.table(table).set(row.id, { ...row });
+        return { error: null };
       },
       delete: () => ({
         eq: async (column: string, value: string) => {
           if (column !== 'id') throw new Error(`fake server: unsupported filter column ${column}`);
           const error = await this.run({ op: 'delete', table, id: value });
-          if (!error) this.table(table).delete(value);
+          if (!error && this.member) this.table(table).delete(value);
           return { error };
         },
       }),
@@ -154,7 +181,7 @@ export class FakeServer {
           const error = await this.run({ op: 'select', table, range: range ?? undefined });
           if (error) return { data: null, error };
           const names = columns.split(',').map((name) => name.trim());
-          let rows = this.rows(table);
+          let rows = this.member ? this.rows(table) : [];
           if (filter !== null) rows = rows.filter((row) => row[filter!.column] === filter!.value);
           if (orderBy !== null) {
             rows.sort((a, b) => String(a[orderBy!]).localeCompare(String(b[orderBy!])));
@@ -200,9 +227,16 @@ export class FakeServer {
     const objects = this.bucket(bucket);
     const storageError = (error: Error | null) =>
       error ? { message: error.message, status: (error as CallFailure).status } : null;
+    // The bucket is gated by the same membership policy as the tables.
+    const forbidden = (): CallFailure | null => {
+      if (this.member) return null;
+      const error: CallFailure = new Error('new row violates row-level security policy');
+      error.status = 403;
+      return error;
+    };
     return {
       upload: async (path: string, body: Blob, options?: { upsert?: boolean }) => {
-        let error = await this.run({ op: 'upload', table: bucket, id: path });
+        let error = (await this.run({ op: 'upload', table: bucket, id: path })) ?? forbidden();
         if (!error && objects.has(path) && !options?.upsert) {
           const duplicate: CallFailure = new Error('The resource already exists');
           duplicate.status = 409;
@@ -218,7 +252,7 @@ export class FakeServer {
         return { data: error ? null : { path }, error: storageError(error) };
       },
       download: async (path: string) => {
-        const error = await this.run({ op: 'download', table: bucket, id: path });
+        const error = (await this.run({ op: 'download', table: bucket, id: path })) ?? forbidden();
         const object = objects.get(path);
         if (error) return { data: null, error: storageError(error) };
         if (!object) {
@@ -229,12 +263,12 @@ export class FakeServer {
         return { data: new Blob([object.data]), error: null };
       },
       remove: async (paths: string[]) => {
-        const error = await this.run({ op: 'remove', table: bucket });
+        const error = (await this.run({ op: 'remove', table: bucket })) ?? forbidden();
         if (!error) for (const path of paths) objects.delete(path);
         return { data: error ? null : [], error: storageError(error) };
       },
       list: async (_prefix?: string, options?: { limit?: number; offset?: number }) => {
-        const error = await this.run({ op: 'list', table: bucket });
+        const error = (await this.run({ op: 'list', table: bucket })) ?? forbidden();
         if (error) return { data: null, error: storageError(error) };
         const offset = options?.offset ?? 0;
         const limit = options?.limit ?? 100;

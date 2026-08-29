@@ -5,9 +5,11 @@ import {
   createMasterKey,
   decryptFile,
   encryptFile,
+  fromBase64,
   generatePhrase,
   isPhraseWord,
   parsePhrase,
+  toBase64,
   unwrapMasterKey,
 } from './householdKey';
 
@@ -77,6 +79,33 @@ describe('the master key', () => {
     expect(a.wrapped.salt).not.toBe(b.wrapped.salt);
     expect(a.wrapped.wrapped_master_key).not.toBe(b.wrapped.wrapped_master_key);
   });
+
+  it("is derived with the salt and rounds the record carries, not with today's", async () => {
+    const { wrapped } = await createMasterKey(PHRASE);
+    const otherSalt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
+    expect(await unwrapMasterKey(PHRASE, { ...wrapped, salt: otherSalt })).toBeNull();
+    expect(
+      await unwrapMasterKey(PHRASE, { ...wrapped, iterations: wrapped.iterations - 1 }),
+    ).toBeNull();
+  });
+
+  it('does not care how the phrase it is given is composed', async () => {
+    // An accented word can be typed, pasted or stored either composed or
+    // decomposed; the same six words must always reach the same key.
+    const { wrapped } = await createMasterKey(PHRASE);
+    const composed = PHRASE.map((word) => word.normalize('NFC'));
+    expect(composed).not.toEqual(PHRASE);
+    expect(await unwrapMasterKey(composed, wrapped)).not.toBeNull();
+  });
+
+  it('will not unwrap from an altered record', async () => {
+    const { wrapped } = await createMasterKey(PHRASE);
+    const altered = fromBase64(wrapped.wrapped_master_key);
+    altered[0] ^= 1;
+    expect(
+      await unwrapMasterKey(PHRASE, { ...wrapped, wrapped_master_key: toBase64(altered) }),
+    ).toBeNull();
+  });
 });
 
 describe('a file', () => {
@@ -105,5 +134,53 @@ describe('a file', () => {
     altered[altered.length - 1] ^= 1;
     await expect(decryptFile(key, sealed.wrappedFileKey, altered)).rejects.toThrow();
     await expect(decryptFile(other, sealed.wrappedFileKey, sealed.data)).rejects.toThrow();
+  });
+
+  it('refuses a change to any part of it: the nonce, the body, or its wrapped key', async () => {
+    const { key } = await createMasterKey(PHRASE);
+    const sealed = await encryptFile(key, bytes('un documento'));
+    // The nonce sits after the format byte, the body after the nonce.
+    for (const at of [1, 12, 13, sealed.data.length - 17]) {
+      const altered = sealed.data.slice();
+      altered[at] ^= 1;
+      await expect(decryptFile(key, sealed.wrappedFileKey, altered)).rejects.toThrow();
+    }
+    const wrappedKey = fromBase64(sealed.wrappedFileKey);
+    wrappedKey[0] ^= 1;
+    await expect(decryptFile(key, toBase64(wrappedKey), sealed.data)).rejects.toThrow();
+  });
+
+  it('refuses a format it does not know, saying which', async () => {
+    const { key } = await createMasterKey(PHRASE);
+    const sealed = await encryptFile(key, bytes('hola'));
+    for (const version of [0, 2, 255]) {
+      const other = sealed.data.slice();
+      other[0] = version;
+      await expect(decryptFile(key, sealed.wrappedFileKey, other)).rejects.toThrow(
+        `Unknown attachment file format ${version}`,
+      );
+    }
+  });
+
+  it('never seals two files under the same nonce', async () => {
+    const { key } = await createMasterKey(PHRASE);
+    const sealed = await Promise.all(
+      Array.from({ length: 50 }, () => encryptFile(key, bytes('x'))),
+    );
+    const nonces = sealed.map((file) => toBase64(file.data.subarray(1, 13)));
+    expect(new Set(nonces).size).toBe(nonces.length);
+  });
+});
+
+describe('base64', () => {
+  it('carries bytes past the size it spreads them in', () => {
+    // Past what one call to the random generator will fill, let alone one
+    // call to the spread that turns the bytes into text.
+    const big = new Uint8Array(100_000);
+    for (let i = 0; i < big.length; i += 0x10000) {
+      crypto.getRandomValues(big.subarray(i, i + 0x10000));
+    }
+    expect(fromBase64(toBase64(big))).toEqual(big);
+    expect(fromBase64(toBase64(new Uint8Array(0)))).toEqual(new Uint8Array(0));
   });
 });

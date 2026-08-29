@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ATTACHMENT_ORPHAN_MIN_AGE_MS, ATTACHMENTS_BUCKET } from './attachmentFiles';
+import {
+  ATTACHMENT_LIST_PAGE,
+  ATTACHMENT_ORPHAN_MIN_AGE_MS,
+  ATTACHMENTS_BUCKET,
+} from './attachmentFiles';
 import { ATTACHMENTS_SPEC } from './offline/specs';
 import { server } from './offline/testing/fakeSupabase';
 import { T0, at, network } from './offline/testing/clock';
@@ -164,6 +168,15 @@ describe('fetchAttachmentFile', () => {
     expect(await fetchAttachmentFile('b')).toBeNull();
     expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
   });
+
+  it('is null when the download fails, and keeps nothing from it', async () => {
+    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
+    server.fail('download', ATTACHMENTS_BUCKET, 'network down');
+    expect(await fetchAttachmentFile('a')).toBeNull();
+    expect(await localAttachmentFile('a')).toBeNull();
+    server.restore();
+    expect(await fetchAttachmentFile('a')).toEqual(bytes('abc'));
+  });
 });
 
 describe('syncAttachmentFiles', () => {
@@ -264,6 +277,82 @@ describe('syncAttachmentFiles', () => {
     expect(server.rows('attachments').map((r) => r.id)).toEqual(['a']);
     expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
     expect(await attachmentUploadState('a')).toBe('uploaded');
+  });
+
+  it('keeps an object exactly as old as the grace period, and one of no known age', async () => {
+    const ago = (ms: number) => new Date(Date.parse(T0) - ms).toISOString();
+    server.seedObjects(ATTACHMENTS_BUCKET, [
+      { name: 'at-cutoff', data: bytes('x'), created_at: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS) },
+      { name: 'ageless', data: bytes('x'), created_at: null },
+      {
+        name: 'a-moment-older',
+        data: bytes('x'),
+        created_at: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS + 1),
+      },
+    ]);
+    await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
+    await syncAttachmentFiles(pulled);
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['at-cutoff', 'ageless']);
+  });
+
+  it('reads the bucket past its first page, and sweeps by every page of it', async () => {
+    const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
+    const last = `object-${ATTACHMENT_LIST_PAGE}`;
+    server.seedObjects(
+      ATTACHMENTS_BUCKET,
+      Array.from({ length: ATTACHMENT_LIST_PAGE + 1 }, (_, i) => ({
+        name: `object-${i}`,
+        data: bytes('x'),
+        created_at: old,
+      })),
+    );
+    // The household's one attachment is the object listed last, a page in.
+    await engine.insert(ATTACHMENTS_SPEC, row, last);
+    await syncAttachmentFiles(pulled);
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual([last]);
+    expect(server.calls.filter((c) => c.op === 'list')).toHaveLength(2);
+  });
+
+  it('keeps the file of an attachment whose delete the server will not take', async () => {
+    const stop = afterSync(syncAttachmentFiles);
+    try {
+      await added('a');
+      await added('b');
+      await syncAll();
+      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a', 'b']);
+
+      // Deleted here, and the server refuses the delete for good: every other
+      // device keeps the row, so the file has to stay.
+      await engine.remove(ATTACHMENTS_SPEC, 'a');
+      server.fail('delete', 'attachments', 'row-level security', { code: '42501' });
+      at(new Date(Date.parse(T0) + 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString());
+      await syncAll();
+
+      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a', 'b']);
+    } finally {
+      stop();
+    }
+  });
+
+  it('stops at a bucket that cannot be listed or swept, leaving the objects alone', async () => {
+    const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
+    server.seedObjects(ATTACHMENTS_BUCKET, [
+      { name: 'orphan', data: bytes('x'), created_at: old },
+      { name: 'kept', data: bytes('x'), created_at: old },
+    ]);
+    await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
+
+    server.fail('list', ATTACHMENTS_BUCKET, 'network down');
+    await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
+    server.restore();
+
+    server.fail('remove', ATTACHMENTS_BUCKET, 'network down');
+    await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
+    server.restore();
+
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['orphan', 'kept']);
+    await syncAttachmentFiles(pulled);
+    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['kept']);
   });
 
   it('a failure in the file work is logged and leaves the queue for next time', async () => {

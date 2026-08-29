@@ -236,6 +236,63 @@ describe('syncAll', () => {
   });
 });
 
+describe('what the server settles', () => {
+  it('cannot push an edit older than the one the server already took', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    await syncAll();
+
+    // Edited here at T1, and elsewhere at T2 — but this device is the one
+    // that gets to push, a moment too late.
+    at(T1);
+    await engine.update<Chore>(CHORES_SPEC, 'a', { title: 'edited here' });
+    server.seed('chores', [serverChore('a', T2, { title: 'edited elsewhere' })]);
+    at(T2);
+    await syncAll();
+
+    // The later edit stands on the server and comes back down over the older
+    // one: both devices end up reading the same row.
+    expect(server.rows('chores')).toEqual([serverChore('a', T2, { title: 'edited elsewhere' })]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T2, { title: 'edited elsewhere' }),
+    ]);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
+  it('pushes an edit newer than the stored row, and it stands', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    await syncAll();
+    at(T1);
+    await engine.update<Chore>(CHORES_SPEC, 'a', { title: 'edited here' });
+    await syncAll();
+    expect(server.rows('chores')).toMatchObject([{ title: 'edited here', updated_at: T1 }]);
+  });
+
+  it('keeps a queued write the server will not take from a session that is not a member', async () => {
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await syncAll();
+
+    // The account is signed in but no longer on the allowlist: it reads
+    // nothing and writes nothing, whatever the gate on the device believes.
+    server.member = false;
+    at(T1);
+    await engine.update<Chore>(CHORES_SPEC, id, { title: 'edited while out' });
+    await syncAll();
+
+    // The edit did not reach the server, and the pull that came back empty
+    // did not take the row for one deleted elsewhere.
+    expect(server.rows('chores')).toMatchObject([{ title: 'Regar' }]);
+    expect(await bookkeeping('chores', id)).toEqual({ pending_op: 'upsert', synced: 1 });
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([
+      { id, title: 'edited while out' },
+    ]);
+
+    // Back on the allowlist, what stayed queued goes out.
+    server.member = true;
+    await syncAll();
+    expect(server.rows('chores')).toMatchObject([{ id, title: 'edited while out' }]);
+  });
+});
+
 describe('changes made while a push is in flight', () => {
   it('a row deleted while its insert is being pushed stays deleted everywhere', async () => {
     const id = await engine.insert(CHORES_SPEC, newChore);

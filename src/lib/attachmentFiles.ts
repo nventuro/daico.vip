@@ -34,7 +34,7 @@ export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
 export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 /** Objects fetched per page when listing the attachments bucket. */
-const ATTACHMENT_LIST_PAGE = 1000;
+export const ATTACHMENT_LIST_PAGE = 1000;
 
 const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
 
@@ -258,6 +258,11 @@ export async function removeAttachmentObject(id: string): Promise<void> {
  */
 async function sweepOrphans(): Promise<void> {
   const kept = new Set((await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).map((a) => a.id));
+  // A row waiting to be deleted is still a row everywhere else: until the
+  // server takes the delete, another device holds the attachment and will
+  // want its file. One the server refuses to delete would otherwise lose its
+  // file here, an hour on, while every device kept the row.
+  for (const id of await engine.getPendingDeletes(ATTACHMENTS_SPEC)) kept.add(id);
   // A household with no attachment at all reads exactly like one whose rows
   // this device has not got yet, and the difference is every file there is.
   if (kept.size === 0) return;

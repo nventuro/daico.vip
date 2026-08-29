@@ -29,11 +29,20 @@ function without(record: Record<string, unknown>, ...keys: string[]): Record<str
   return Object.fromEntries(Object.entries(record).filter(([name]) => !keys.includes(name)));
 }
 
-/** `contents` as sealed under an earlier schema, brought to the current
- *  shape: what a later schema dropped is left out, what it added is unknown. */
+/**
+ * `contents` as sealed under an earlier schema, brought to the current shape:
+ * what a later schema dropped is left out, what it added is unknown.
+ *
+ * A schema this version does not know is refused rather than read as the
+ * oldest one. Reading it would quietly drop whatever it added, and since
+ * marking a line reseals the whole statement, the next mark would write that
+ * loss back for every device.
+ */
 export function upgradeContents(contents: Record<string, unknown>): StatementContents {
   if (contents.schema === STATEMENT_CONTENTS_SCHEMA)
     return contents as unknown as StatementContents;
+  if (contents.schema !== 1)
+    throw new Error('Este resumen se guardó con una versión más nueva de la app.');
   // Schema 1 named who made each purchase, carried the bank's schedule of
   // installments to come, and did not say when the period began.
   const lines = (contents.lines as Record<string, unknown>[]).map((line) =>
