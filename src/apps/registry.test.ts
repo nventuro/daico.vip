@@ -2,20 +2,29 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { apps } from './registry';
-import { appHue, appPath, entryPath } from './types';
+import { APP_IDS, appHue, appPath, entryPath } from './types';
 import { ALL_SPECS, SHELL_SPECS } from '../lib/offline/specs';
 
 describe('apps registry', () => {
-  it('has unique ids', () => {
+  it('mounts every app there is, once', () => {
     const ids = apps.map((a) => a.id);
-    expect(new Set(ids).size).toBe(ids.length);
+    expect([...ids].sort()).toEqual([...APP_IDS].sort());
   });
 
-  it('gives every app at least one route, all relative', () => {
+  it('gives every app a name of its own and an icon', () => {
+    const names = apps.map((a) => a.name);
+    expect(new Set(names).size).toBe(names.length);
+    for (const app of apps) expect(app.icon).toBeTruthy();
+  });
+
+  it('gives every app at least one route, all relative and lazily loaded', () => {
     for (const app of apps) {
       expect(app.routes.length).toBeGreaterThan(0);
       for (const route of app.routes) {
         if (route.path != null) expect(route.path.startsWith('/')).toBe(false);
+        // `lazy()` at module scope: opening one app must not load the others.
+        const component = route.Component as unknown as { $$typeof?: symbol };
+        expect(component?.$$typeof).toBe(Symbol.for('react.lazy'));
       }
     }
   });
@@ -50,8 +59,9 @@ describe('apps registry', () => {
     expect(new Set(tables).size).toBe(tables.length);
   });
 
-  it('has a colour token for every hue', () => {
+  it('has a colour token for every app and for nothing else', () => {
     const css = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
-    for (const app of apps) expect(css).toContain(`--color-${appHue(app.id)}:`);
+    const declared = [...css.matchAll(/--color-(app-[a-z]+):/g)].map((match) => match[1]);
+    expect([...declared].sort()).toEqual(apps.map((app) => appHue(app.id)).sort());
   });
 });

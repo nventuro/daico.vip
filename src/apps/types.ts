@@ -3,7 +3,19 @@ import type { TablerIcon } from '@tabler/icons-react';
 import type { TableSpec } from '../lib/offline/specs';
 import type { EntryMark } from '../types';
 
-export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas' | 'recetas' | 'documentos' | 'gastos';
+/** Every app there is. The one home of the list: the registry is checked
+ *  against it, and so is the set of app colours in the theme. */
+export const APP_IDS = [
+  'tareas',
+  'compras',
+  'guias',
+  'fechas',
+  'recetas',
+  'documentos',
+  'gastos',
+] as const;
+
+export type AppId = (typeof APP_IDS)[number];
 
 /** Colour token name (`--color-<hue>` in the theme) an app is painted with:
  *  one per app, named after it, so a new app is a new token and nothing else. */

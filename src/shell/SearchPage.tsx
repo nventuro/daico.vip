@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { errorMessage } from '../utils/textUtils';
+import { apps } from '../apps/registry';
 import { appHue } from '../apps/types';
 import { searchAll, type SearchGroup } from './search';
 import ErrorLine from '../components/ErrorLine';
@@ -9,6 +10,11 @@ import { hueStyle } from '../components/hue';
 
 /** Pause in typing (ms) before the search box runs a search. */
 const SEARCH_DEBOUNCE_MS = 200;
+
+/** What the box says it looks through: the apps that search, as they are named. */
+const SEARCHABLE = new Intl.ListFormat('es-AR', { type: 'conjunction' }).format(
+  apps.filter((app) => app.search).map((app) => app.name.toLowerCase()),
+);
 
 interface SearchResult {
   /** The query these groups answer, so a stale answer is told apart from the current one. */
@@ -55,7 +61,7 @@ export default function SearchPage() {
   if (!debounced.trim() || !result.query.trim()) {
     // Nothing searched yet: the hint also stays up while the first search runs,
     // rather than flashing an empty state.
-    body = <p className="text-muted">Buscá tareas, compras, guías, fechas y recetas.</p>;
+    body = <p className="text-muted">Buscá {SEARCHABLE}.</p>;
   } else if (result.groups.length === 0) {
     // While a newer search is still running the previous answer stays on screen.
     body = <p className="text-muted">Nada por acá</p>;

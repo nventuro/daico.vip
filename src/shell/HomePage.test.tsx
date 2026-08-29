@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage from './HomePage';
+import { apps } from '../apps/registry';
+import { appPath } from '../apps/types';
 
 describe('HomePage', () => {
   it('renders one tile per app, in registry order', () => {
@@ -11,21 +13,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs).toEqual([
-      '/tareas',
-      '/compras',
-      '/guias',
-      '/fechas',
-      '/recetas',
-      '/documentos',
-      '/gastos',
-    ]);
-    expect(html).toContain('Tareas');
-    expect(html).toContain('Compras');
-    expect(html).toContain('Guías');
-    expect(html).toContain('Fechas');
-    expect(html).toContain('Recetas');
-    expect(html).toContain('Documentos');
-    expect(html).toContain('Gastos');
+    expect(hrefs).toEqual(apps.map((app) => appPath(app.id)));
+    for (const app of apps) expect(html).toContain(app.name);
   });
 });
