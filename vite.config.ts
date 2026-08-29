@@ -45,10 +45,13 @@ export default defineConfig({
     tailwindcss(),
     // Progressive Web App: precaches the app shell (incl. the SQLite wasm) so the
     // app opens and runs with no connection — required for offline shopping-list
-    // use at the store. `autoUpdate` ships new versions silently on next load.
+    // use at the store. `prompt` leaves a new build waiting instead of letting it
+    // take over a page that is already running the old one, which would leave the
+    // two mixed; `src/lib/appUpdate.ts` decides when it goes in, and registers the
+    // worker itself, so the plugin injects no script of its own.
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      registerType: 'prompt',
+      injectRegister: null,
       includeAssets: ['favicon.ico', 'favicon-32.png', 'favicon-48.png', 'favicon-180.png'],
       manifest: {
         name: 'daico',

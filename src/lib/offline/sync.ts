@@ -13,7 +13,7 @@
 // =============================================================================
 import { supabase } from '../supabase';
 import { isPermanentRowError } from '../refusals';
-import { ALL_SPECS, columnNames, type TableSpec } from './specs';
+import { ALL_SPECS, type TableSpec } from './specs';
 import * as engine from './engine';
 
 /** How recently (ms) a sync run must have ended for a screen that opens not
@@ -252,14 +252,15 @@ function refusedForGood(table: string, error: { code?: string; message?: string 
  *  a short read would look exactly like rows deleted elsewhere. Ordered by id
  *  so the pages stay a partition while other devices write. */
 async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
-  // The table name is dynamic, so supabase-js can't infer a row type — cast
-  // the plain rows we asked for.
-  const columns = ['id', ...columnNames(spec), 'created_at', 'updated_at'].join(', ');
+  // Every column, rather than the ones this build's spec names: a build older
+  // than the database would ask for a column that is not there yet and lose
+  // the whole table over it. `reconcile` reads only what its spec declares, so
+  // the extra ones cost a few bytes and are ignored.
   const rows: Record<string, unknown>[] = [];
   for (let from = 0; ; from += SYNC_PULL_PAGE) {
     const { data, error } = await supabase
       .from(spec.table)
-      .select(columns)
+      .select('*')
       .order('id')
       .range(from, from + SYNC_PULL_PAGE - 1);
     if (error) throw error;

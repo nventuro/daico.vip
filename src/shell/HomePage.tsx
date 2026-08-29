@@ -4,6 +4,7 @@ import { relativeDayTime, todayIso } from '../utils/dateUtils';
 import Motif from '../components/Motif';
 import OfflineBanner from '../components/OfflineBanner';
 import AppTile from './AppTile';
+import UpdateNotice from './UpdateNotice';
 import UpcomingStrip from './UpcomingStrip';
 
 /** Mirrors the grid's `grid-cols-2 sm:grid-cols-3`: the floor is completed
@@ -22,6 +23,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col gap-5 pt-5">
+      <UpdateNotice className="" />
       {/* With no connection, what the screen shows is as old as the last run
           that brought everything down: said here, once, for every app. */}
       <OfflineBanner className="">

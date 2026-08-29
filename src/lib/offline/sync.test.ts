@@ -115,6 +115,16 @@ describe('syncAll', () => {
     ]);
   });
 
+  it('takes a table whose rows carry a column this build does not know', async () => {
+    // A database migrated ahead of the build running here. The pull asks for
+    // the whole row rather than the columns this spec names, so the table
+    // still comes down; what the spec does not declare is dropped.
+    server.seed('chores', [{ ...serverChore('a', T0), colour: 'verde' }]);
+    await syncAll();
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T0)]);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
   it('keeps a row added during the pull and pushes it next time', async () => {
     const pull = server.hold('select', 'chores');
     const run = syncAll();

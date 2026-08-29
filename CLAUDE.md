@@ -120,6 +120,16 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `optimizeDeps.exclude: ['sqlocal', '@sqlite.org/sqlite-wasm']` in
   `vite.config.ts`. That VFS takes one connection per origin, which is what
   `src/lib/offline/singleTab.ts` is for; leave the lock in place.
+- **A new build never replaces the one a page is running.** `registerType` is
+  `'prompt'` — **never `'autoUpdate'`**, which lets a new worker seize a page
+  mid-flight and leaves the running code and the cache from different builds,
+  the state that breaks every `lazy()` route not yet loaded. `injectRegister` is
+  `null` and `src/lib/appUpdate.ts` registers the worker itself; it is the only
+  place that decides when a version goes in (boot, and the app leaving the
+  screen) and the only place that talks to `navigator.serviceWorker`; a change
+  to when a version goes in must come with a test in `appUpdate.test.ts`, over
+  the stand-in service worker there. A pull asks for `*`, never the columns a
+  spec names, so a build a migration got ahead of still brings its tables down.
 - **The membership check is offline-tolerant** (`AppContext` falls back to a
   per-user cached verdict when the live read fails). This is only a UI gate — the
   server's RLS is the real authority, so a stale `true` still reads nothing and has

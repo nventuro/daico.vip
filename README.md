@@ -58,6 +58,22 @@ Three pieces make this work:
   app-like launch. GitHub Pages serves it over HTTPS, which service workers
   require; no custom headers are needed (see the SQLite note below).
 
+### Updating
+
+A new build is downloaded whole and then **waits**: it never replaces the one a
+page is already running, which would leave a screen half of each. It goes in at
+one of two moments, both with nobody looking — at boot, before anything is
+drawn, and when the app leaves the screen, so coming back is coming back to the
+new one. Whoever never puts the app down is told on the home screen and can ask
+for it outright. `src/lib/appUpdate.ts` is the whole of it: it registers the
+worker itself (so the plugin injects no script), asks for a new one when the
+connection or the app comes back, and hands the page over.
+
+The app can therefore be a version behind the database for as long as one
+session. That costs nothing for a migration that **adds**: the pull asks for
+whole rows, and the reconcile keeps only what its spec declares. A column that
+goes away is the other case — add it, deploy, and drop it in a later migration.
+
 - **Local SQLite** (`src/lib/offline/`). [SQLocal](https://sqlocal.dev) runs SQLite
   in a Web Worker, persisted to the browser's [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).
   A custom worker (`sahpoolWorker.ts`) opens the database through the **OPFS

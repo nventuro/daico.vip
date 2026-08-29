@@ -180,7 +180,6 @@ export class FakeServer {
         const run = async () => {
           const error = await this.run({ op: 'select', table, range: range ?? undefined });
           if (error) return { data: null, error };
-          const names = columns.split(',').map((name) => name.trim());
           let rows = this.member ? this.rows(table) : [];
           if (filter !== null) rows = rows.filter((row) => row[filter!.column] === filter!.value);
           if (orderBy !== null) {
@@ -189,6 +188,10 @@ export class FakeServer {
           // PostgREST answers a plain select with its first page and says
           // nothing about the rest; a range asks for the page it names.
           rows = rows.slice(range?.from ?? 0, (range?.to ?? DEFAULT_MAX_ROWS - 1) + 1);
+          // `*` answers with every column the row has, as PostgREST does;
+          // anything else is the projection it names.
+          if (columns.trim() === '*') return { data: rows.map((row) => ({ ...row })), error: null };
+          const names = columns.split(',').map((name) => name.trim());
           const data = rows.map((row) =>
             Object.fromEntries(names.map((name) => [name, row[name] ?? null])),
           );
