@@ -1,5 +1,5 @@
 import { IconCheck, IconShoppingCartPlus } from '@tabler/icons-react';
-import CheckSquare from './CheckSquare';
+import CheckSquare from '../../components/CheckSquare';
 
 interface IngredientRowProps {
   label: string;

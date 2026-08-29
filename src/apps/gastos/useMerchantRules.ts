@@ -1,34 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { MerchantRule, SpendingCategory } from '../../types';
-import { normalize } from '../../lib/search';
-import { MERCHANT_RULES_SPEC } from '../../lib/offline/specs';
+import { MERCHANT_RULES_SPEC, type SpendingCategory } from '../../lib/offline/specs';
+import { normalize } from '../../utils/textUtils';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { useMasterKey } from '../../hooks/useMasterKey';
+import { openOnce } from './openOnce';
 import { openPattern, sealPattern } from './payload';
 import type { Rule } from './rules';
-
-// A pattern is unsealed once per version of its row.
-const opened = new Map<string, Promise<string>>();
-
-function pattern(rule: MerchantRule, masterKey: CryptoKey): Promise<string> {
-  const key = `${rule.id}:${rule.updated_at}`;
-  let promise = opened.get(key);
-  if (!promise) {
-    promise = openPattern(masterKey, rule);
-    opened.set(key, promise);
-    promise.catch(() => opened.delete(key));
-  }
-  return promise;
-}
 
 /** Local-first merchant rules with their patterns in the clear, undefined
  *  until every one is unsealed. Adding or changing one seals the pattern on
  *  the device; `addMany` takes rules in bulk, moving a rule that already has
  *  the pattern to the category given rather than doubling it, and never
- *  removes one. Every action is instant and works offline. */
+ *  removes one. Sealing is part of the write, so it happens inside `mutate`
+ *  like the write itself: what it fails at is reported on the screen, never
+ *  thrown at the caller, which has nowhere to say it. Every action is instant
+ *  and works offline. */
 export function useMerchantRules() {
-  const { items, loading, error, mutate } = useOfflineTable<MerchantRule>(MERCHANT_RULES_SPEC);
+  const { items, loading, error, mutate, remove } = useOfflineTable(MERCHANT_RULES_SPEC);
   const masterKey = useMasterKey();
   const [rules, setRules] = useState<Rule[] | undefined>();
 
@@ -39,7 +28,7 @@ export function useMerchantRules() {
       items.map(async (row) => ({
         id: row.id,
         category: row.category,
-        pattern: await pattern(row, masterKey.key),
+        pattern: await openOnce(row, () => openPattern(masterKey.key, row)),
       })),
     ).then((unsealed) => {
       if (active) setRules(unsealed);
@@ -87,11 +76,6 @@ export function useMerchantRules() {
         }
       }),
     [mutate, rules],
-  );
-
-  const remove = useCallback(
-    (id: string) => mutate(() => engine.remove(MERCHANT_RULES_SPEC, id)),
-    [mutate],
   );
 
   return { rules, loading, error, add, addMany, save, remove };

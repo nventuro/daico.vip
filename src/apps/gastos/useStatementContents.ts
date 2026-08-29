@@ -1,30 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Statement } from '../../types';
+import type { Statement } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
+import { errorMessage } from '../../utils/textUtils';
+import { openOnce } from './openOnce';
 import { openContents } from './payload';
 import type { StatementContents } from './statement';
-
-// Opened once per version of a row, so returning to a statement, or reading
-// every statement for the trends, never decrypts the same payload twice.
-const opened = new Map<string, Promise<StatementContents>>();
 
 /** The contents of `statement`, unsealed with `masterKey`. */
 export function openStatement(
   statement: Statement,
   masterKey: CryptoKey,
 ): Promise<StatementContents> {
-  const key = `${statement.id}:${statement.updated_at}`;
-  let promise = opened.get(key);
-  if (!promise) {
-    promise = openContents(masterKey, statement);
-    opened.set(key, promise);
-    promise.catch(() => opened.delete(key));
-  }
-  return promise;
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return openOnce(statement, () => openContents(masterKey, statement));
 }
 
 /** The contents of every statement given, in the same order; undefined
@@ -47,7 +34,7 @@ export function useStatementsContents(statements: Statement[]): {
         if (active) setState({ contents, error: null });
       },
       (error: unknown) => {
-        if (active) setState({ contents: undefined, error: message(error) });
+        if (active) setState({ contents: undefined, error: errorMessage(error) });
       },
     );
     return () => {

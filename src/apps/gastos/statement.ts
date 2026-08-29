@@ -4,7 +4,11 @@
 // the pages; the result is the contents that get sealed into the row's
 // payload. Nothing here touches the store.
 // =============================================================================
-import type { StatementFormat } from '../../types';
+import type { StatementFormat } from '../../lib/offline/specs';
+
+/** Shape of a statement's contents as sealed in its payload; bump it when
+ *  the shape changes, so an older payload is told apart. */
+export const STATEMENT_CONTENTS_SCHEMA = 2;
 
 /** A word of a PDF page with its horizontal extent, in page units. A layout
  *  is read by where a word sits as much as by what it says. */

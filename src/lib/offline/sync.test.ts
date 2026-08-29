@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SYNC_FRESH_MS, SYNC_PULL_PAGE, type Chore } from '../../types';
-import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
+import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from './sync';
+import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
 import { localDb } from './testing/sqlocalInMemory';
 import { server } from './testing/fakeSupabase';
 import * as engine from './engine';
@@ -238,7 +238,7 @@ describe('syncAll', () => {
 
   it('a failing table does not stop the others from syncing', async () => {
     server.fail('select', 'chores');
-    const id = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false });
+    const id = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: null });
     await syncAll();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);

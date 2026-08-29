@@ -1,39 +1,32 @@
 import { useCallback, useMemo } from 'react';
-import {
-  ATTACHMENT_FILE_TYPES,
-  ATTACHMENT_MAX_BYTES,
-  type Attachment,
-  type AttachmentOwner,
-} from '../types';
-import { ATTACHMENTS_SPEC } from '../lib/offline/specs';
+import { ATTACHMENTS_SPEC, type Attachment } from '../lib/offline/specs';
+import type { AttachmentOwner, AttachmentOwnerKind } from '../types';
 import * as engine from '../lib/offline/engine';
 import { encryptFile } from '../lib/householdKey';
-import { removeAttachmentObject } from '../lib/attachmentFiles';
+import {
+  attachmentType,
+  deleteAttachmentFile,
+  putAttachmentFile,
+  removeAttachmentObject,
+} from '../lib/attachmentFiles';
 import { useOfflineTable } from './useOfflineTable';
-import { formatBytes, lowercaseTrimmed } from '../utils/textUtils';
+import { lowercaseTrimmed } from '../utils/textUtils';
 
-/**
- * The attachment MIME type for `file`, or null when it is not one we take.
- * Trusts `file.type` when it is one of ours; otherwise falls back to the
- * filename extension, since some devices report `image/jpg` or no type at all
- * for a perfectly good picture.
- */
-export function attachmentType(file: File): string | null {
-  if (file.type in ATTACHMENT_FILE_TYPES) return file.type;
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  const match = Object.entries(ATTACHMENT_FILE_TYPES).find(([, ext]) => ext === extension);
-  return match ? match[0] : null;
+/** The entries of `kind` that have at least one attachment — what tells a row
+ *  with pictures from one without, wherever it is listed. */
+export function ownersWithAttachments(
+  attachments: Attachment[],
+  kind: AttachmentOwnerKind,
+): Set<string> {
+  return new Set(attachments.filter((a) => a.owner_kind === kind).map((a) => a.owner_id));
 }
 
-/** Why `file` cannot be attached, in the user's words, or null when it can. */
-export function attachmentProblem(file: File): string | null {
-  if (!attachmentType(file)) {
-    return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF).';
-  }
-  if (file.size > ATTACHMENT_MAX_BYTES) {
-    return `El archivo pesa ${formatBytes(file.size)}; el máximo es ${formatBytes(ATTACHMENT_MAX_BYTES)}.`;
-  }
-  return null;
+/** The row, this device's copy of the file, and (best effort) the bucket's
+ *  object. */
+async function removeAttachment(attachment: Attachment): Promise<void> {
+  await engine.remove(ATTACHMENTS_SPEC, attachment.id);
+  await deleteAttachmentFile(attachment.id);
+  void removeAttachmentObject(attachment.id);
 }
 
 /**
@@ -69,7 +62,7 @@ export function useAttachments(owner?: AttachmentOwner) {
         // The file first, under the id the row will carry: a crash in between
         // leaves an orphan file to prune, never a row with nothing to show.
         const id = crypto.randomUUID();
-        await engine.putAttachmentFile(id, data, false);
+        await putAttachmentFile(id, data, false);
         return engine.insert(
           ATTACHMENTS_SPEC,
           {
@@ -87,14 +80,19 @@ export function useAttachments(owner?: AttachmentOwner) {
   );
 
   const remove = useCallback(
-    (attachment: Attachment) =>
-      mutate(async () => {
-        await engine.remove(ATTACHMENTS_SPEC, attachment.id);
-        await engine.deleteAttachmentFile(attachment.id);
-        void removeAttachmentObject(attachment.id);
-      }),
+    (attachment: Attachment) => mutate(() => removeAttachment(attachment)),
     [mutate],
   );
 
-  return { items, loading, error, add, remove };
+  /** Take every attachment of this entry at once, for an entry being deleted:
+   *  nothing else would ever list them. */
+  const removeAll = useCallback(
+    () =>
+      mutate(async () => {
+        for (const attachment of items) await removeAttachment(attachment);
+      }),
+    [mutate, items],
+  );
+
+  return { items, loading, error, add, remove, removeAll };
 }

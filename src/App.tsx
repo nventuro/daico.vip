@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 import { afterSync } from './lib/offline/sync';
 import { syncAttachmentFiles } from './lib/attachmentFiles';
 import { clearDevice } from './lib/clearDevice';
-import { AppProvider } from './context/AppContext';
+import { AppProvider } from './shell/AppContext';
 import MainLayout from './shell/MainLayout';
 
 // Attachment files travel outside the tables; they follow every sync so a file

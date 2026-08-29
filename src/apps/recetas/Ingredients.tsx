@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useShoppingList } from '../apps/compras/useShoppingList';
-import Button from './Button';
+import { useShoppingList } from '../compras/useShoppingList';
+import Button from '../../components/Button';
 import IngredientRow from './IngredientRow';
 
 interface IngredientsProps {

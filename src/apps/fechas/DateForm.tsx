@@ -1,10 +1,9 @@
-import { type FormEvent, useState } from 'react';
-import type { DateEntry } from '../../types';
-import FormField from '../../components/FormField';
-import TextInput from '../../components/TextInput';
-import TextArea from '../../components/TextArea';
+import { useState } from 'react';
+import type { DateEntry } from '../../lib/offline/specs';
+import TitleField from '../../components/TitleField';
+import NotesField from '../../components/NotesField';
 import FormFooter from '../../components/FormFooter';
-import { hasChanges } from '../../utils/formUtils';
+import { entryForm } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import type { DateInput } from './useDates';
 import DateFields, { type DateFieldsValue } from './DateFields';
@@ -32,26 +31,16 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
     ...fields,
     notes: notes.trim() || null,
   };
-  const canSave = input.title !== '' && input.occurs_on !== '' && hasChanges(input, entry);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canSave) return;
-    onSave(input);
-  }
+  const { canSave, onSubmit } = entryForm(
+    input,
+    entry,
+    onSave,
+    input.title !== '' && input.occurs_on !== '',
+  );
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <FormField label="Título">
-        <TextInput
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label="Título"
-          autoCapitalize="none"
-          required
-        />
-      </FormField>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <TitleField value={title} onChange={setTitle} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <DateFields
@@ -64,14 +53,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
         />
       </div>
 
-      <FormField label="Notas">
-        <TextArea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          aria-label="Notas"
-          rows={4}
-        />
-      </FormField>
+      <NotesField value={notes} onChange={setNotes} rows={4} />
 
       <FormFooter
         removeLabel="Eliminar fecha"

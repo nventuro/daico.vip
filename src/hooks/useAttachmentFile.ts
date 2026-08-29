@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ATTACHMENT_FILE_TYPES, type Attachment } from '../types';
+import { ATTACHMENT_FILE_TYPES, fetchAttachmentFile } from '../lib/attachmentFiles';
+import type { Attachment } from '../lib/offline/specs';
 import { decryptFile } from '../lib/householdKey';
-import { fetchAttachmentFile } from '../lib/attachmentFiles';
 import { useMasterKey } from './useMasterKey';
 
 /** An attachment's file as the page can use it, once it can. */

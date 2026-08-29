@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { guideImageUrl } from '../../lib/guideImages';
+import { guideImageUrl } from './guideImages';
 import LoadingLine from '../../components/LoadingLine';
 import Motif from '../../components/Motif';
 

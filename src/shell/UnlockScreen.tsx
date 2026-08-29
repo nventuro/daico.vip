@@ -1,35 +1,27 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { IconKey, IconLock } from '@tabler/icons-react';
-import { HOUSEHOLD_PHRASE_WORDS, type HouseholdKey } from '../types';
+import {
+  HOUSEHOLD_PHRASE_WORDS,
+  createMasterKey,
+  generatePhrase,
+  parsePhrase,
+  unwrapMasterKey,
+} from '../lib/householdKey';
+import { HOUSEHOLD_KEY_SPEC, type HouseholdKey } from '../lib/offline/specs';
 import { supabase } from '../lib/supabase';
-import { HOUSEHOLD_KEY_SPEC } from '../lib/offline/specs';
 import { syncAll } from '../lib/offline/sync';
-import { createMasterKey, generatePhrase, parsePhrase, unwrapMasterKey } from '../lib/householdKey';
 import { useOfflineTable } from '../hooks/useOfflineTable';
 import { useOnline } from '../hooks/useOnline';
-import { setMasterKey } from '../hooks/useMasterKey';
-import { useAppContext } from '../context/appContext';
-import Button from './Button';
-import CheckSquare from './CheckSquare';
+import { setMasterKey } from '../lib/masterKeyStore';
+import Button from '../components/Button';
+import CheckRow from '../components/CheckRow';
+import ErrorLine from '../components/ErrorLine';
 import Gate from './Gate';
 import PhraseWords from './PhraseWords';
+import SignOutLink from './SignOutLink';
 
 /** Postgres: a row that would break a unique index. */
 const UNIQUE_VIOLATION = '23505';
-
-function SignOutLink() {
-  const { signOut } = useAppContext();
-  const online = useOnline();
-  return (
-    <button
-      onClick={signOut}
-      disabled={!online}
-      className="mt-6 text-muted underline transition-colors hover:text-muted-strong disabled:cursor-not-allowed disabled:no-underline disabled:hover:text-muted"
-    >
-      Cerrar sesión
-    </button>
-  );
-}
 
 /** Typing the phrase on a device that has the household's wrapped key. */
 function UnlockForm({ wrapped }: { wrapped: HouseholdKey }) {
@@ -64,7 +56,7 @@ function UnlockForm({ wrapped }: { wrapped: HouseholdKey }) {
     >
       <form onSubmit={handleSubmit} className="mt-7 flex w-full flex-col">
         <PhraseWords words={words} onChange={setWords} />
-        {problem && <p className="mt-3 text-left text-sm text-error">{problem}</p>}
+        <ErrorLine problem={problem} className="mt-3 text-left" />
         <Button type="submit" disabled={busy} className="mt-4 w-full">
           {busy ? 'Abriendo...' : 'Abrir'}
         </Button>
@@ -117,16 +109,10 @@ function NewPhraseForm() {
         Son la única forma de abrir los documentos en un dispositivo nuevo. Si se pierden, no se
         pueden recuperar.
       </p>
-      <button
-        type="button"
-        onClick={() => setNoted((v) => !v)}
-        aria-pressed={noted}
-        className="mt-5 flex items-center gap-3 self-start"
-      >
-        <CheckSquare checked={noted} />
+      <CheckRow checked={noted} onToggle={() => setNoted((v) => !v)} className="mt-5 self-start">
         Ya las anoté
-      </button>
-      {problem && <p className="mt-3 self-start text-left text-sm text-error">{problem}</p>}
+      </CheckRow>
+      <ErrorLine problem={problem} className="mt-3 self-start text-left" />
       <Button onClick={finish} disabled={!noted || busy} className="mt-4 w-full">
         {busy ? 'Guardando...' : 'Listo'}
       </Button>

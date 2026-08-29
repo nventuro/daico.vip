@@ -5,16 +5,23 @@ import type { EntryMark } from '../types';
 
 export type AppId = 'tareas' | 'compras' | 'guias' | 'fechas' | 'recetas' | 'documentos' | 'gastos';
 
-/** Colour token name (`--color-<hue>` in the theme) an app is painted with. */
-export type AppHue =
-  | 'app-tareas'
-  | 'app-compras'
-  | 'app-guias'
-  | 'app-recetas'
-  | 'app-viajes'
-  | 'app-fechas'
-  | 'app-documentos'
-  | 'app-gastos';
+/** Colour token name (`--color-<hue>` in the theme) an app is painted with:
+ *  one per app, named after it, so a new app is a new token and nothing else. */
+export type AppHue = `app-${AppId}`;
+
+export function appHue(appId: AppId): AppHue {
+  return `app-${appId}`;
+}
+
+/** Where an app's own screens hang: under the root, by its id. */
+export function appPath(appId: AppId): string {
+  return `/${appId}`;
+}
+
+/** Where one of an app's entries is: a page of its own under the app's. */
+export function entryPath(appId: AppId, entryId: string): string {
+  return `/${appId}/${entryId}`;
+}
 
 /** One result of an app's `search`. */
 export interface SearchHit {
@@ -33,12 +40,28 @@ export interface Upcoming {
   marks?: EntryMark[];
 }
 
+/**
+ * An app's upcoming entries out of what its table hook has read: whatever
+ * `toUpcoming` makes of each entry that has one. Undefined while the table is
+ * still being read, which is how the home screen tells a list still to come
+ * from an empty one.
+ */
+export function upcomingFrom<Row>(
+  { items, loading }: { items: Row[]; loading: boolean },
+  toUpcoming: (row: Row) => Upcoming | null,
+): Upcoming[] | undefined {
+  if (loading) return undefined;
+  return items.flatMap((row): Upcoming[] => {
+    const upcoming = toUpcoming(row);
+    return upcoming ? [upcoming] : [];
+  });
+}
+
 /** What the shell needs from a feature to mount it: identity, looks, the
  *  offline tables it owns and its screens. */
 export interface AppModule {
   id: AppId;
   name: string;
-  hue: AppHue;
   icon: TablerIcon;
   /** Tables this app owns. Every one must also be in `ALL_SPECS` (test-enforced). */
   specs: TableSpec[];

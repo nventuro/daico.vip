@@ -1,5 +1,6 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { IconArrowLeft, type TablerIcon } from '@tabler/icons-react';
+import IconButton from '../components/IconButton';
 import Motif from '../components/Motif';
 import { parentPath } from './parentPath';
 
@@ -11,14 +12,14 @@ export default function AppHeader({ name, icon: Icon }: { name: string; icon?: T
   return (
     <div className="relative -mx-4 mb-4 flex h-14 items-center gap-2.5 overflow-hidden bg-(--app) px-3 text-on-primary">
       <Motif band />
-      <Link
+      <IconButton
+        label="Volver"
+        icon={IconArrowLeft}
+        size={22}
         to={parentPath(pathname)}
-        aria-label="Volver"
-        title="Volver"
-        className="relative p-1 transition-opacity hover:opacity-80"
-      >
-        <IconArrowLeft size={22} stroke={1.75} />
-      </Link>
+        tone="band"
+        className="relative p-1"
+      />
       {Icon && <Icon size={24} stroke={1.75} className="relative" />}
       <span className="relative font-display text-2xl font-black tracking-tight">{name}</span>
     </div>

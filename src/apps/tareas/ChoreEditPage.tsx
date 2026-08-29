@@ -1,37 +1,35 @@
-import { useNavigate, useParams } from 'react-router-dom';
-import type { ChoreInput } from './useChores';
+import { useNavigate } from 'react-router-dom';
 import { useAttachments } from '../../hooks/useAttachments';
-import { useChores } from './useChores';
+import { useEntry } from '../../hooks/useEntry';
+import { appPath } from '../types';
+import { useChores, type ChoreInput } from './useChores';
 import ChoreForm from './ChoreForm';
-import SkeletonRows from '../../components/SkeletonRows';
+import EntryPage from '../../components/EntryPage';
 
 export default function ChoreEditPage() {
-  const { id } = useParams();
   const { items, loading, error, save, remove } = useChores();
-  const attachments = useAttachments({ kind: 'chore', id: id ?? '' });
+  const chore = useEntry(items);
+  const attachments = useAttachments({ kind: 'chore', id: chore?.id ?? '' });
   const navigate = useNavigate();
 
-  const chore = items.find((c) => c.id === id);
-
-  if (loading) return <SkeletonRows />;
-  if (!chore) return <p className="text-muted">Tarea no encontrada.</p>;
-
-  const handleSave = async (input: ChoreInput) => {
-    await save(chore.id, input);
-    navigate('/tareas');
-  };
-
-  const handleRemove = async () => {
-    // The chore's attachments go with it; nothing else would ever list them.
-    for (const attachment of attachments.items) await attachments.remove(attachment);
-    await remove(chore);
-    navigate('/tareas');
-  };
-
   return (
-    <>
-      {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
-      <ChoreForm key={chore.id} chore={chore} onSave={handleSave} onRemove={handleRemove} />
-    </>
+    <EntryPage entry={chore} loading={loading} error={error} missing="Tarea no encontrada.">
+      {(chore) => (
+        <ChoreForm
+          key={chore.id}
+          chore={chore}
+          onSave={async (input: ChoreInput) => {
+            await save(chore.id, input);
+            navigate(appPath('tareas'));
+          }}
+          onRemove={async () => {
+            // The chore's attachments go with it; nothing else would ever list them.
+            await attachments.removeAll();
+            await remove(chore.id);
+            navigate(appPath('tareas'));
+          }}
+        />
+      )}
+    </EntryPage>
   );
 }

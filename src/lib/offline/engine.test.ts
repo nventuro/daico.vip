@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Chore, ShoppingItem } from '../../types';
-import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC } from './specs';
+import {
+  ALL_SPECS,
+  CHORES_SPEC,
+  SHOPPING_SPEC,
+  columnNames,
+  type Chore,
+  type ShoppingItem,
+} from './specs';
+import { GUIDE_IMAGE_CACHE, LOCAL_SPECS } from './localTables';
 import { localDb } from './testing/sqlocalInMemory';
 import * as engine from './engine';
 
@@ -54,6 +61,17 @@ async function pulled(chore: ChoreRow): Promise<void> {
 
 const newChore = { title: 'Regar', notes: null, done: false, due_on: null };
 
+/** A row of a local-only table, written the way its owner would. */
+async function cacheImage(key: string, data: string): Promise<void> {
+  await engine.localWrite(
+    GUIDE_IMAGE_CACHE.table,
+    `INSERT OR REPLACE INTO ${GUIDE_IMAGE_CACHE.table} (key, mime, data) VALUES (?, ?, ?)`,
+    key,
+    'image/png',
+    data,
+  );
+}
+
 function watch(table: string): { calls: number; stop: () => void } {
   const watcher = { calls: 0, stop: () => {} };
   watcher.stop = engine.subscribe(table, () => {
@@ -78,7 +96,7 @@ describe('local schema', () => {
       const info = await localDb().sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
       expect(info.map((c) => c.name)).toEqual([
         'id',
-        ...spec.columns.map((c) => c.name),
+        ...columnNames(spec),
         'created_at',
         'updated_at',
         'pending_op',
@@ -105,8 +123,16 @@ describe('insert', () => {
   });
 
   it('maps booleans and missing values', async () => {
-    const checked = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: true });
-    const unchecked = await engine.insert(SHOPPING_SPEC, { name: 'Leche', checked: false });
+    const checked = await engine.insert(SHOPPING_SPEC, {
+      name: 'Pan',
+      checked: true,
+      position: null,
+    });
+    const unchecked = await engine.insert(SHOPPING_SPEC, {
+      name: 'Leche',
+      checked: false,
+      position: null,
+    });
     const items = await engine.listVisible<ShoppingItem>(SHOPPING_SPEC);
     expect(items.find((i) => i.id === checked)).toMatchObject({ checked: true, position: null });
     expect(items.find((i) => i.id === unchecked)).toMatchObject({ checked: false, position: null });
@@ -189,7 +215,9 @@ describe('update', () => {
 
   it('ignores keys that are not spec columns', async () => {
     const id = await engine.insert(CHORES_SPEC, newChore);
-    await engine.update(CHORES_SPEC, id, { id: 'other', created_at: T2, bogus: 1, title: 'x' });
+    // A patch is typed, so these keys can only come from a plain object.
+    const patch = { id: 'other', created_at: T2, bogus: 1, title: 'x' } as Partial<Chore>;
+    await engine.update(CHORES_SPEC, id, patch);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
       { id, ...newChore, title: 'x', created_at: T0, updated_at: T0 },
     ]);
@@ -270,23 +298,25 @@ describe('remove', () => {
 });
 
 describe('clearAll', () => {
-  it('wipes every table, tombstones included, and the image cache', async () => {
+  it('wipes every table, tombstones included, and the local-only ones', async () => {
     await engine.insert(CHORES_SPEC, newChore);
     await pulled(serverChore('a', T0));
     await engine.remove(CHORES_SPEC, 'a');
-    await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false });
-    await engine.putCachedImage('img', { mime: 'image/png', data: 'AAAA' });
+    await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: null });
+    await cacheImage('img', 'AAAA');
 
     await engine.clearAll();
 
     for (const spec of ALL_SPECS) {
       expect(await localDb().sql(`SELECT id FROM ${spec.table}`)).toEqual([]);
     }
-    expect(await engine.getCachedImage('img')).toBeNull();
+    for (const spec of LOCAL_SPECS) {
+      expect(await localDb().sql(`SELECT * FROM ${spec.table}`)).toEqual([]);
+    }
   });
 
   it('notifies every table', async () => {
-    const watchers = ALL_SPECS.map((spec) => watch(spec.table));
+    const watchers = [...ALL_SPECS, ...LOCAL_SPECS].map((spec) => watch(spec.table));
     await engine.clearAll();
     for (const watcher of watchers) {
       watcher.stop();
@@ -313,16 +343,23 @@ describe('subscribe', () => {
   });
 });
 
-describe('image cache', () => {
-  it('returns null for an image never fetched', async () => {
-    expect(await engine.getCachedImage('missing')).toBeNull();
+describe('local-only tables', () => {
+  const rows = () =>
+    engine.localQuery<{ key: string; data: string }>(
+      `SELECT key, data FROM ${GUIDE_IMAGE_CACHE.table}`,
+    );
+
+  it('reads back what was written, and nothing for a key never written', async () => {
+    expect(await rows()).toEqual([]);
+    await cacheImage('img', 'AAAA');
+    expect(await rows()).toEqual([{ key: 'img', data: 'AAAA' }]);
   });
 
-  it('stores an image and replaces it on the same key', async () => {
-    await engine.putCachedImage('img', { mime: 'image/png', data: 'AAAA' });
-    expect(await engine.getCachedImage('img')).toEqual({ mime: 'image/png', data: 'AAAA' });
-    await engine.putCachedImage('img', { mime: 'image/jpeg', data: 'BBBB' });
-    expect(await engine.getCachedImage('img')).toEqual({ mime: 'image/jpeg', data: 'BBBB' });
+  it("tells the table's watchers about a write", async () => {
+    const watcher = watch(GUIDE_IMAGE_CACHE.table);
+    await cacheImage('img', 'AAAA');
+    watcher.stop();
+    expect(watcher.calls).toBe(1);
   });
 });
 
@@ -465,7 +502,11 @@ describe('reconcile', () => {
   });
 
   it('only touches the given table', async () => {
-    const item = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false });
+    const item = await engine.insert(SHOPPING_SPEC, {
+      name: 'Pan',
+      checked: false,
+      position: null,
+    });
     await engine.markUpserted(SHOPPING_SPEC, item, T0);
     await engine.reconcile(CHORES_SPEC, []);
     expect(await engine.listVisible<ShoppingItem>(SHOPPING_SPEC)).toMatchObject([{ id: item }]);

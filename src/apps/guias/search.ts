@@ -1,13 +1,12 @@
+import { SEARCH_EXCERPT_RADIUS, excerpt, matches } from '../../lib/search';
 import {
-  SEARCH_EXCERPT_RADIUS,
-  SEARCH_MAX_HITS_PER_APP,
+  GUIDES_SPEC,
+  GUIDE_CHAPTERS_SPEC,
   type Guide,
   type GuideChapter,
-} from '../../types';
+} from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
-import { GUIDES_SPEC, GUIDE_CHAPTERS_SPEC } from '../../lib/offline/specs';
-import { excerpt, matches } from '../../lib/search';
-import type { SearchHit } from '../types';
+import { entryPath, type SearchHit } from '../types';
 
 /**
  * Guides whose title mentions `query`, then chapters that mention it in their
@@ -22,12 +21,12 @@ export async function searchGuides(query: string): Promise<SearchHit[]> {
   const guideTitles = new Map(guides.map((guide) => [guide.id, guide.title]));
 
   const guideHits = guides.flatMap((guide): SearchHit[] =>
-    matches(guide.title, query) ? [{ title: guide.title, to: `/guias/${guide.id}` }] : [],
+    matches(guide.title, query) ? [{ title: guide.title, to: entryPath('guias', guide.id) }] : [],
   );
   const chapterHits = chapters.flatMap((chapter): SearchHit[] => {
     const guideTitle = guideTitles.get(chapter.guide_id);
     if (guideTitle === undefined) return [];
-    const to = `/guias/${chapter.guide_id}/${chapter.id}`;
+    const to = `${entryPath('guias', chapter.guide_id)}/${chapter.id}`;
     if (matches(chapter.title, query)) return [{ title: chapter.title, subtitle: guideTitle, to }];
     if (matches(chapter.body, query)) {
       return [
@@ -36,5 +35,5 @@ export async function searchGuides(query: string): Promise<SearchHit[]> {
     }
     return [];
   });
-  return [...guideHits, ...chapterHits].slice(0, SEARCH_MAX_HITS_PER_APP);
+  return [...guideHits, ...chapterHits];
 }

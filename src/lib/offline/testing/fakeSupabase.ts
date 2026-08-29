@@ -1,8 +1,10 @@
 // =============================================================================
 // In-memory stand-in for the Supabase client, covering exactly the PostgREST
-// calls the sync engine makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
-// and `from(t).select(columns).order(c).range(from, to)`, plus the Storage calls the attachment files
-// make: `storage.from(b).upload / download / remove / list`. A test installs it with
+// calls the app makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`,
+// `from(t).select(columns).order(c).range(from, to)` and the one-row read
+// `from(t).select(columns).eq(c, v).maybeSingle()`, plus the Storage calls the
+// attachment files make: `storage.from(b).upload / download / remove / list`.
+// A test installs it with
 //   vi.mock('../supabase', () => import('./testing/fakeSupabase'))
 // and drives the server through `server`: seed rows and objects, inspect the
 // calls made, and hold or fail calls to reproduce timings between the app and
@@ -147,11 +149,13 @@ export class FakeServer {
       select: (columns: string) => {
         let orderBy: string | null = null;
         let range: { from: number; to: number } | null = null;
+        let filter: { column: string; value: unknown } | null = null;
         const run = async () => {
           const error = await this.run({ op: 'select', table, range: range ?? undefined });
           if (error) return { data: null, error };
           const names = columns.split(',').map((name) => name.trim());
           let rows = this.rows(table);
+          if (filter !== null) rows = rows.filter((row) => row[filter!.column] === filter!.value);
           if (orderBy !== null) {
             rows.sort((a, b) => String(a[orderBy!]).localeCompare(String(b[orderBy!])));
           }
@@ -164,6 +168,10 @@ export class FakeServer {
           return { data, error: null };
         };
         const builder = {
+          eq: (column: string, value: unknown) => {
+            filter = { column, value };
+            return builder;
+          },
           order: (column: string) => {
             orderBy = column;
             return builder;
@@ -171,6 +179,12 @@ export class FakeServer {
           range: (from: number, to: number) => {
             range = { from, to };
             return builder;
+          },
+          // The row the filters name, or null when there is none — PostgREST
+          // only errors here if more than one comes back.
+          maybeSingle: async () => {
+            const { data, error } = await run();
+            return { data: data?.[0] ?? null, error };
           },
           then: <R>(
             resolve: (value: Awaited<ReturnType<typeof run>>) => R,

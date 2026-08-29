@@ -11,7 +11,6 @@ const ChoreEditPage = lazy(() => import('./ChoreEditPage'));
 const tareas: AppModule = {
   id: 'tareas',
   name: 'Tareas',
-  hue: 'app-tareas',
   icon: IconListCheck,
   specs: [CHORES_SPEC],
   routes: [

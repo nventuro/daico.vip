@@ -1,37 +1,35 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAttachments } from '../../hooks/useAttachments';
-import type { DocumentInput } from './useDocuments';
-import { useDocuments } from './useDocuments';
+import { useEntry } from '../../hooks/useEntry';
+import EntryPage from '../../components/EntryPage';
+import { appPath } from '../types';
+import { useDocuments, type DocumentInput } from './useDocuments';
 import DocumentForm from './DocumentForm';
-import SkeletonRows from '../../components/SkeletonRows';
 
 export default function DocumentEditPage() {
-  const { id } = useParams();
   const { items, loading, error, save, remove } = useDocuments();
-  const attachments = useAttachments({ kind: 'document', id: id ?? '' });
+  const entry = useEntry(items);
+  const attachments = useAttachments({ kind: 'document', id: entry?.id ?? '' });
   const navigate = useNavigate();
 
-  const entry = items.find((d) => d.id === id);
-
-  if (loading) return <SkeletonRows />;
-  if (!entry) return <p className="text-muted">Documento no encontrado.</p>;
-
-  const handleSave = async (input: DocumentInput) => {
-    await save(entry.id, input);
-    navigate('/documentos');
-  };
-
-  const handleRemove = async () => {
-    // The document's files go with it; nothing else would ever list them.
-    for (const attachment of attachments.items) await attachments.remove(attachment);
-    await remove(entry);
-    navigate('/documentos');
-  };
-
   return (
-    <>
-      {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
-      <DocumentForm key={entry.id} entry={entry} onSave={handleSave} onRemove={handleRemove} />
-    </>
+    <EntryPage entry={entry} loading={loading} error={error} missing="Documento no encontrado.">
+      {(entry) => (
+        <DocumentForm
+          key={entry.id}
+          entry={entry}
+          onSave={async (input: DocumentInput) => {
+            await save(entry.id, input);
+            navigate(appPath('documentos'));
+          }}
+          onRemove={async () => {
+            // The document's files go with it; nothing else would ever list them.
+            await attachments.removeAll();
+            await remove(entry.id);
+            navigate(appPath('documentos'));
+          }}
+        />
+      )}
+    </EntryPage>
   );
 }

@@ -15,9 +15,14 @@
 // bytes instead of re-encrypting every file; each file has a key of its own so
 // a GCM nonce is never reused and a file can one day be shared on its own.
 // =============================================================================
-import { HOUSEHOLD_KEY_KDF_ITERATIONS, HOUSEHOLD_PHRASE_WORDS } from '../types';
-import { normalize } from './search';
+import { normalize } from '../utils/textUtils';
 import { PHRASE_WORDS } from './phraseWords';
+
+/** Words in the household phrase. */
+export const HOUSEHOLD_PHRASE_WORDS = 6;
+
+/** PBKDF2 rounds a phrase goes through to derive the key that wraps the master key. */
+const HOUSEHOLD_KEY_KDF_ITERATIONS = 600_000;
 
 const SALT_BYTES = 16;
 const NONCE_BYTES = 12;

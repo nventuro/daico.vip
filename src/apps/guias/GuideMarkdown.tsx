@@ -1,5 +1,5 @@
 import type { Components } from 'react-markdown';
-import Markdown from '../../components/Markdown';
+import Markdown from '../../components/markdown/Markdown';
 import GuideImage from './GuideImage';
 
 // Custom element names come from the directive plugin; react-markdown's

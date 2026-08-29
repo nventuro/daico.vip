@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { HOUSEHOLD_PHRASE_WORDS } from '../types';
+import { HOUSEHOLD_PHRASE_WORDS } from './householdKey';
 import { PHRASE_WORDS } from './phraseWords';
 import {
   createMasterKey,

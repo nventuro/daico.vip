@@ -1,9 +1,14 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { SEARCH_DEBOUNCE_MS } from '../types';
-import { searchAll, type SearchGroup } from '../apps/search';
+import { errorMessage } from '../utils/textUtils';
+import { appHue } from '../apps/types';
+import { searchAll, type SearchGroup } from './search';
+import ErrorLine from '../components/ErrorLine';
+import LinkRow from '../components/LinkRow';
 import SectionLabel from '../components/SectionLabel';
-import { hueStyle } from './hue';
+import { hueStyle } from '../components/hue';
+
+/** Pause in typing (ms) before the search box runs a search. */
+const SEARCH_DEBOUNCE_MS = 200;
 
 interface SearchResult {
   /** The query these groups answer, so a stale answer is told apart from the current one. */
@@ -32,7 +37,7 @@ export default function SearchPage() {
         setError(null);
       })
       .catch((e: unknown) => {
-        if (active) setError(e instanceof Error ? e.message : String(e));
+        if (active) setError(errorMessage(e));
       });
     return () => {
       active = false;
@@ -57,19 +62,12 @@ export default function SearchPage() {
   } else {
     body = result.groups.map(({ module, hits }) => (
       <section key={module.id}>
-        <SectionLabel className="text-(--app)" style={hueStyle(module.hue)}>
+        <SectionLabel className="text-(--app)" style={hueStyle(appHue(module.id))}>
           {module.name}
         </SectionLabel>
-        <ul className="divide-y divide-border">
+        <ul>
           {hits.map((hit, i) => (
-            <li key={i}>
-              <Link to={hit.to} className="block py-2.5 transition-colors hover:bg-border-subtle">
-                <span className="block truncate">{hit.title}</span>
-                {hit.subtitle && (
-                  <span className="block truncate text-xs text-muted">{hit.subtitle}</span>
-                )}
-              </Link>
-            </li>
+            <LinkRow key={i} to={hit.to} title={hit.title} subtitle={hit.subtitle} />
           ))}
         </ul>
       </section>
@@ -87,11 +85,11 @@ export default function SearchPage() {
           enterKeyHint="search"
           aria-label="Buscar"
           placeholder="Buscar en todo..."
-          className="w-full border border-border bg-surface-raised px-4 py-3 text-base outline-none placeholder:text-muted focus:border-primary"
+          className="w-full border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary"
         />
       </form>
 
-      {error && <p className="text-sm text-error">Error: {error}</p>}
+      <ErrorLine error={error} />
 
       {body}
     </div>

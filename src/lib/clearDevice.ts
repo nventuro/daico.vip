@@ -8,7 +8,7 @@
 // Best effort, step by step: a step that fails is said out loud and the others
 // still run.
 // =============================================================================
-import { clearMasterKey } from '../hooks/useMasterKey';
+import { clearMasterKey } from './masterKeyStore';
 import { clearAll } from './offline/engine';
 import { resetSyncStatus } from './offline/sync';
 import { forgetVerdict } from './membershipCache';

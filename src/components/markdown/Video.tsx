@@ -1,5 +1,5 @@
-import { YOUTUBE_EMBED_URL, YOUTUBE_ID_PATTERN, YOUTUBE_WATCH_URL } from '../types';
-import { useOnline } from '../hooks/useOnline';
+import { YOUTUBE_EMBED_URL, YOUTUBE_ID_PATTERN, YOUTUBE_WATCH_URL } from '../../config';
+import { useOnline } from '../../hooks/useOnline';
 
 interface Props {
   id: string;

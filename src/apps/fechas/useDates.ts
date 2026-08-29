@@ -1,7 +1,5 @@
 import { useCallback } from 'react';
-import type { DateEntry, RepeatKind } from '../../types';
-import { DATES_SPEC } from '../../lib/offline/specs';
-import * as engine from '../../lib/offline/engine';
+import { DATES_SPEC, type RepeatKind } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
@@ -25,30 +23,23 @@ function withInterval<T extends Partial<DateInput>>(patch: T, repeat: RepeatKind
 /** Local-first dates: add / edit / delete, syncing in the background. Every
  *  action is instant and works offline. */
 export function useDates() {
-  const { items, loading, error, mutate } = useOfflineTable<DateEntry>(DATES_SPEC);
+  const { items, loading, error, insert, update, remove } = useOfflineTable(DATES_SPEC);
 
   const add = useCallback(
     (input: DateInput) => {
       const title = lowercaseTrimmed(input.title);
-      if (!title) return Promise.resolve();
-      return mutate(() =>
-        engine.insert(DATES_SPEC, withInterval({ ...input, title }, input.repeat)),
-      );
+      if (!title) return Promise.resolve(undefined);
+      return insert(withInterval({ ...input, title }, input.repeat));
     },
-    [mutate],
+    [insert],
   );
 
   const save = useCallback(
     (id: string, patch: Partial<DateInput>) => {
       const repeat = patch.repeat ?? items.find((entry) => entry.id === id)?.repeat;
-      return mutate(() => engine.update(DATES_SPEC, id, withInterval(patch, repeat)));
+      return update(id, withInterval(patch, repeat));
     },
-    [items, mutate],
-  );
-
-  const remove = useCallback(
-    (entry: DateEntry) => mutate(() => engine.remove(DATES_SPEC, entry.id)),
-    [mutate],
+    [items, update],
   );
 
   return { items, loading, error, add, save, remove };

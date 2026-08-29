@@ -1,15 +1,19 @@
-import { type FormEvent, useState } from 'react';
-import { DOCUMENT_NOTICE_DAYS_OPTIONS, type DocumentEntry } from '../../types';
-import { noticeLabel } from '../../utils/dateUtils';
-import { hasChanges } from '../../utils/formUtils';
+import { useState } from 'react';
+import type { DocumentEntry } from '../../lib/offline/specs';
 import { lowercaseTrimmed } from '../../utils/textUtils';
+import { entryForm } from '../../utils/formUtils';
 import FormField from '../../components/FormField';
-import TextInput from '../../components/TextInput';
+import TitleField from '../../components/TitleField';
 import DatePicker from '../../components/DatePicker';
+import NoticeDaysSelect from '../../components/NoticeDaysSelect';
 import FormFooter from '../../components/FormFooter';
 import AttachmentGrid from '../../components/AttachmentGrid';
-import { CONTROL_CLASS } from '../../components/controlClasses';
+import { entryPath } from '../types';
 import type { DocumentInput } from './useDocuments';
+
+/** Notice windows offered for a document's expiry — up to six months, the
+ *  margin a passport is often required to have left. */
+const DOCUMENT_NOTICE_DAYS_OPTIONS = [7, 30, 90, 180];
 
 interface DocumentFormProps {
   entry: DocumentEntry;
@@ -29,26 +33,11 @@ export default function DocumentForm({ entry, onSave, onRemove }: DocumentFormPr
     expires_on: expiresOn,
     notice_days: noticeDays,
   };
-  const canSave = input.title !== '' && hasChanges(input, entry);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canSave) return;
-    onSave(input);
-  }
+  const { canSave, onSubmit } = entryForm(input, entry, onSave, input.title !== '');
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <FormField label="Título">
-        <TextInput
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label="Título"
-          autoCapitalize="none"
-          required
-        />
-      </FormField>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <TitleField value={title} onChange={setTitle} />
 
       <FormField label="Vence">
         <DatePicker value={expiresOn} onChange={setExpiresOn} label="Vence" />
@@ -56,25 +45,18 @@ export default function DocumentForm({ entry, onSave, onRemove }: DocumentFormPr
 
       {expiresOn && (
         <FormField label="Aviso">
-          <select
+          <NoticeDaysSelect
             value={noticeDays}
-            onChange={(e) => setNoticeDays(Number(e.target.value))}
-            aria-label="Aviso"
-            className={CONTROL_CLASS}
-          >
-            {DOCUMENT_NOTICE_DAYS_OPTIONS.map((days) => (
-              <option key={days} value={days}>
-                {noticeLabel(days)}
-              </option>
-            ))}
-          </select>
+            onChange={setNoticeDays}
+            options={DOCUMENT_NOTICE_DAYS_OPTIONS}
+          />
         </FormField>
       )}
 
       <FormField label="Adjuntos" group>
         <AttachmentGrid
           owner={{ kind: 'document', id: entry.id }}
-          ownerPath={`/documentos/${entry.id}`}
+          ownerPath={entryPath('documentos', entry.id)}
         />
       </FormField>
 

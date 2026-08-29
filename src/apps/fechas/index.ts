@@ -11,7 +11,6 @@ const DateEditPage = lazy(() => import('./DateEditPage'));
 const fechas: AppModule = {
   id: 'fechas',
   name: 'Fechas',
-  hue: 'app-fechas',
   icon: IconCalendarEvent,
   specs: [DATES_SPEC],
   routes: [

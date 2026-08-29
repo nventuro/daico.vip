@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DB_OWNER_LOCK } from '../../types';
+import { DB_OWNER_LOCK } from './singleTab';
 
 type LockCallback = (lock: { name: string } | null) => unknown;
 

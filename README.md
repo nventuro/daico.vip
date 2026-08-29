@@ -34,11 +34,11 @@ the first `UPCOMING_MAX_ROWS` (4); when there are more, "Ver todo" opens
 
 ### Adding an app
 
-1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`, `hue`,
+1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`,
    `icon`, the `TableSpec`s it owns and its `routes` (relative to `/<id>`, pages
    `lazy()`-loaded at module scope).
-2. Add a `--color-app-<id>` token to the `@theme static` block in `src/index.css`
-   and the hue to `AppHue` (and the id to `AppId`) in `src/apps/types.ts`.
+2. Add the id to `AppId` in `src/apps/types.ts` and a `--color-app-<id>` token to
+   the `@theme static` block in `src/index.css` — an app's colour is its id.
 3. Append the module to `apps` in `src/apps/registry.ts`.
 4. Its tables go in `src/lib/offline/specs.ts` / `ALL_SPECS` **and** in the
    module's `specs` — a test checks the two agree.
@@ -232,7 +232,7 @@ own rate. A statement shows in Próximo until a member marks it **pagado**
 
 ## Markdown dialect
 
-Guide chapters and recipe bodies share one reader (`src/components/Markdown.tsx`):
+Guide chapters and recipe bodies share one reader (`src/components/markdown/`):
 CommonMark + GFM tables, plus these
 [remark-directive](https://github.com/remarkjs/remark-directive) forms mapped to
 components:
@@ -243,9 +243,10 @@ components:
 - `::youtube{id="…" start="0"}` — an embed; a plain link when offline.
 - `:spoiler[text]` — tap to reveal.
 - `:::ingredients` … `:::` — a markdown list (`-`, `*` or `1.`) inside; each
-  item becomes a tickable row with an "add to Compras" button. Inline markup in
-  an item is flattened to plain text; anything that isn't a list item is
-  ignored.
+  item becomes a tickable row with an "add to Compras" button. Only a recipe
+  renders it (`RecipeMarkdown`), since only there is there a list to add to.
+  Inline markup in an item is flattened to plain text; anything that isn't a
+  list item is ignored.
 
 Links to other guides or chapters are ordinary relative links
 (`/guias/<guide>/<chapter>`).

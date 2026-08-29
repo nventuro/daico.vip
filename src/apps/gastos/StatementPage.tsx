@@ -1,13 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
-import type { SpendingCategory } from '../../types';
+import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { formatDate, todayIso } from '../../utils/dateUtils';
+import { useEntry } from '../../hooks/useEntry';
+import { capitalize } from '../../utils/textUtils';
+import { dueWord, formatDate, isPast, todayIso } from '../../utils/dateUtils';
+import CheckRow from '../../components/CheckRow';
+import ErrorLine from '../../components/ErrorLine';
 import SkeletonRows from '../../components/SkeletonRows';
 import SectionLabel from '../../components/SectionLabel';
 import FormFooter from '../../components/FormFooter';
-import CheckSquare from '../../components/CheckSquare';
+import { appPath } from '../types';
 import { useStatements } from './useStatements';
 import { useStatementContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
@@ -39,6 +43,7 @@ import {
   periodLabel,
 } from './labels';
 import SpendBar from './SpendBar';
+import SpendLegend from './SpendLegend';
 import LineRow from './LineRow';
 import Delta from './Delta';
 import RuleDialog, { type RuleChange } from './RuleDialog';
@@ -47,13 +52,12 @@ import RuleDialog, { type RuleChange } from './RuleDialog';
 const shareKey = (category: SpendingCategory | null) => category ?? 'none';
 
 export default function StatementPage() {
-  const { id } = useParams();
   const { items, loading, error, replace, setPaid, remove } = useStatements();
   const masterKey = useMasterKey();
   const navigate = useNavigate();
   const today = todayIso();
 
-  const statement = items.find((s) => s.id === id);
+  const statement = useEntry(items);
   // The statement before this one of the same card: what "vs." compares with.
   const previous = useMemo(
     () =>
@@ -86,7 +90,7 @@ export default function StatementPage() {
 
   if (loading || (statement && !contents && !openError)) return <SkeletonRows />;
   if (!statement) return <p className="text-muted">Resumen no encontrado.</p>;
-  if (!contents) return <p className="text-sm text-error">Error: {openError}</p>;
+  if (!contents) return <ErrorLine error={openError} />;
 
   const toPay = toPayCents(contents);
   const total = totalCents(contents);
@@ -96,8 +100,7 @@ export default function StatementPage() {
   const oneOffs = contents.lines.flatMap((line, i) => (isOneOff(line, rules) ? [i] : []));
   // The due date has passed or it has not, whether or not it was paid; only
   // an unpaid statement past it is a problem.
-  const expired = contents.due_on < today;
-  const overdue = !statement.paid && expired;
+  const overdue = !statement.paid && isPast(contents.due_on, today);
   const cents = (i: number) => lineCents(contents.lines[i], contents.usd_rate);
   const selectedLine = selected === null ? null : contents.lines[selected];
   const selectedFiling = selectedLine ? categoryOf(selectedLine, rules) : null;
@@ -142,8 +145,8 @@ export default function StatementPage() {
 
   async function handleRemove() {
     if (!statement) return;
-    await remove(statement);
-    navigate('/gastos');
+    await remove(statement.id);
+    navigate(appPath('gastos'));
   }
 
   // The lines `indices` name, hairlines between them; `closed` draws one
@@ -170,9 +173,7 @@ export default function StatementPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {(error || rulesStore.error) && (
-        <p className="text-sm text-error">Error: {error ?? rulesStore.error}</p>
-      )}
+      <ErrorLine error={error ?? rulesStore.error} />
 
       <div className="flex flex-col gap-0.5">
         <span className="text-sm text-muted">
@@ -207,33 +208,26 @@ export default function StatementPage() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => void setPaid(statement.id, !statement.paid)}
-        aria-pressed={statement.paid}
-        className="flex w-full items-center gap-3 border-y border-border py-3 text-left"
+      <CheckRow
+        checked={statement.paid}
+        onToggle={() => void setPaid(statement.id, !statement.paid)}
+        className="w-full border-y border-border py-3"
       >
-        <CheckSquare checked={statement.paid} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-on-surface">Pagado</span>
           <span className={`mt-0.5 text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-            {expired ? 'Venció' : 'Vence'} el {formatDate(contents.due_on)}
+            {capitalize(dueWord(contents.due_on, today))} el {formatDate(contents.due_on)}
           </span>
         </span>
-      </button>
+      </CheckRow>
 
       <div className="flex flex-col gap-2">
         <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
-        <div className="flex justify-between gap-3 text-sm">
-          <span className="flex items-center gap-2">
-            <span aria-hidden className="size-2.5 bg-(--app)" />
-            Base <span className="tabular-nums">{formatArs(usual)}</span>
-          </span>
-          <span className="flex items-center gap-2">
-            <span aria-hidden className="size-2.5 bg-(--app) opacity-40" />
-            Puntual <span className="tabular-nums">{formatArs(oneOff)}</span>
-          </span>
-        </div>
+        <SpendLegend
+          usual={formatArs(usual)}
+          oneOff={formatArs(oneOff)}
+          className="flex justify-between gap-3"
+        />
       </div>
 
       <section>
@@ -280,10 +274,7 @@ export default function StatementPage() {
 
       {oneOffs.length > 0 && (
         <section>
-          <SectionLabel>
-            Puntuales{' '}
-            <span className="font-normal tracking-normal normal-case">· {formatArs(oneOff)}</span>
-          </SectionLabel>
+          <SectionLabel detail={formatArs(oneOff)}>Puntuales</SectionLabel>
           {renderLines(oneOffs, true)}
         </section>
       )}

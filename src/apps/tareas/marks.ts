@@ -1,4 +1,5 @@
-import type { Chore, EntryMark } from '../../types';
+import type { Chore } from '../../lib/offline/specs';
+import type { EntryMark } from '../../types';
 
 /** The marks drawn on a chore wherever it is listed. Notes and attachments
  *  are one mark: either way there is more to the chore than its title. */

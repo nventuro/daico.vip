@@ -1,4 +1,4 @@
-import type { RepeatKind } from '../../types';
+import type { RepeatKind } from '../../lib/offline/specs';
 
 /** How a date repeats, as shown to the user. */
 export function repeatLabel(repeat: RepeatKind, months: number | null): string {

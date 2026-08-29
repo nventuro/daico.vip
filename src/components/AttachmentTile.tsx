@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { IconCloudOff, IconCloudUpload, IconPhoto } from '@tabler/icons-react';
-import { LIGHTBOX_FROM_ENTRY_PAGE, type Attachment } from '../types';
+import type { Attachment } from '../lib/offline/specs';
+import { LIGHTBOX_FROM_ENTRY_PAGE } from './AttachmentLightbox';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
 import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';

@@ -1,8 +1,17 @@
-import { MONTHS_PER_YEAR, MS_PER_DAY, RELATIVE_DAY_LIMIT } from '../types';
+import { capitalize, pad2 } from './textUtils';
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Milliseconds in one day, for calendar-day arithmetic. */
+const MS_PER_DAY = 86_400_000;
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
+/** Months in a year, for calendar-month arithmetic. */
+export const MONTHS_PER_YEAR = 12;
+
+/**
+ * Beyond ±this many days a relative date label switches to the spelled date.
+ * Within it, days ahead are named by weekday alone, so this must stay under 7
+ * or a name could mean either of two days.
+ */
+export const RELATIVE_DAY_LIMIT = 6;
 
 /** The numeric year, month (1-12) and day of a yyyy-mm-dd string. */
 function parseIso(dateStr: string): [number, number, number] {
@@ -36,6 +45,22 @@ export function formatDateShort(dateStr: string): string {
 export function formatDayMonth(dateStr: string): string {
   const [, month, day] = dateStr.split('-');
   return `${day}/${month}`;
+}
+
+/** The month a yyyy-mm-dd date falls in, as yyyy-mm. */
+export function yearMonthOf(date: string): string {
+  return date.slice(0, 7);
+}
+
+/** Whether `date` (yyyy-mm-dd) has gone by on `today`. */
+export function isPast(date: string, today: string): boolean {
+  return date < today;
+}
+
+/** How a due date is announced: "vence" while it is ahead, "venció" once it
+ *  has gone by. */
+export function dueWord(date: string, today: string): string {
+  return isPast(date, today) ? 'venció' : 'vence';
 }
 
 /** Today's date as yyyy-mm-dd in the device's local time zone. */

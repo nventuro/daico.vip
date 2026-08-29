@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DateEntry } from '../../types';
+import type { DateEntry } from '../../lib/offline/specs';
 import {
   displayDate,
   groupByMonth,

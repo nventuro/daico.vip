@@ -1,10 +1,10 @@
-import {
-  COMPACT_AMOUNT_DECIMAL_BELOW_CENTS,
-  type SpendingCategory,
-  type StatementFormat,
-} from '../../types';
-import { addDays, formatDateShort, monthName } from '../../utils/dateUtils';
+import type { SpendingCategory, Statement, StatementFormat } from '../../lib/offline/specs';
+import { addDays, formatDateShort, monthName, yearMonthOf } from '../../utils/dateUtils';
 import type { StatementContents } from './statement';
+
+/** Under this many pesos (in cents) an amount written in thousands keeps a
+ *  decimal ("45.7k"); from here on it is whole thousands ("123k"). */
+const COMPACT_AMOUNT_DECIMAL_BELOW_CENTS = 100_000 * 100;
 
 /** Each category as shown to the user. */
 export const CATEGORY_LABELS: Record<SpendingCategory, string> = {
@@ -79,6 +79,12 @@ export function formatPercentDelta(now: number, before: number): string {
   const value = Math.round(((now - before) / before) * 100);
   if (value === 0) return '=';
   return `${value < 0 ? '−' : '+'} ${Math.abs(value)} %`;
+}
+
+/** How a statement is named wherever it is listed: the month it covers and
+ *  the card it is for. */
+export function statementTitle(statement: Pick<Statement, 'format' | 'closed_on'>): string {
+  return `${monthTitle(yearMonthOf(statement.closed_on))} · ${FORMAT_LABELS[statement.format]}`;
 }
 
 /** A yyyy-mm (or a date in it) as its month and year: "Agosto 2026". */

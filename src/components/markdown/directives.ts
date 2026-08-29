@@ -2,7 +2,7 @@ import { SKIP, visit } from 'unist-util-visit';
 import type { ListItem, Root } from 'mdast';
 
 /** Name of the container directive whose list becomes a tickable ingredient list. */
-export const INGREDIENTS_DIRECTIVE = 'ingredients';
+const INGREDIENTS_DIRECTIVE = 'ingredients';
 
 /** The plain text of a node — every text-bearing descendant concatenated, with
  *  inline markup dropped and whitespace collapsed. */

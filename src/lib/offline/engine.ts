@@ -18,11 +18,22 @@
 // SQLocal's `sql(query, ...params)` is variadic, so param arrays are spread.
 // =============================================================================
 import { SQLocal } from 'sqlocal';
-import { LOCAL_DB_PATH } from '../../types';
-import { ALL_SPECS, ATTACHMENTS_SPEC, type ColumnSpec, type TableSpec } from './specs';
+import type { SyncedRow } from '../../types';
+import {
+  ALL_SPECS,
+  columnNames,
+  columnsOf,
+  type ColumnSpec,
+  type RowInput,
+  type TableSpec,
+} from './specs';
+import { LOCAL_SPECS } from './localTables';
 import { checkDbOwnership, MultiTabError } from './singleTab';
 
-type Row = Record<string, unknown>;
+/** Filename of the local OPFS-backed SQLite database used for offline data. */
+const LOCAL_DB_PATH = 'daico-local.sqlite3';
+
+type DbRow = Record<string, unknown>;
 
 // Lazily created so the worker/OPFS only spin up once an offline table is
 // actually used (never for non-members, who never reach this code).
@@ -51,8 +62,7 @@ function db(): Promise<SQLocal> {
           // was written there, and a sign-out is supposed to leave nothing.
           sql('PRAGMA secure_delete = ON'),
           ...ALL_SPECS.map((spec) => sql(createTableSql(spec))),
-          sql(IMAGE_CACHE_SQL),
-          sql(ATTACHMENT_FILES_SQL),
+          ...LOCAL_SPECS.map((spec) => sql(spec.ddl)),
         ],
       });
       return migrateColumns(c).then(() => c);
@@ -65,16 +75,18 @@ async function migrateColumns(c: SQLocal): Promise<void> {
   for (const spec of ALL_SPECS) {
     const existing = await c.sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
     const present = new Set(existing.map((col) => col.name));
-    for (const col of spec.columns) {
-      if (!present.has(col.name)) {
-        await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${col.name} ${col.ddl}`);
+    for (const [name, col] of columnsOf(spec)) {
+      if (!present.has(name)) {
+        await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${name} ${col.ddl}`);
       }
     }
   }
 }
 
 function createTableSql(spec: TableSpec): string {
-  const appColumns = spec.columns.map((c) => `${c.name} ${c.ddl}`).join(', ');
+  const appColumns = columnsOf(spec)
+    .map(([name, col]) => `${name} ${col.ddl}`)
+    .join(', ');
   return `CREATE TABLE IF NOT EXISTS ${spec.table} (
     id TEXT PRIMARY KEY,
     ${appColumns},
@@ -84,32 +96,6 @@ function createTableSql(spec: TableSpec): string {
     synced INTEGER NOT NULL DEFAULT 0
   )`;
 }
-
-// Guide images are too large to pull wholesale like the spec tables, so they
-// are fetched one at a time on first use and kept here (local-only, never
-// synced) so chapters keep rendering offline. Contents stay base64 text, the
-// form they arrive in, which also avoids binding blobs across the worker.
-const IMAGE_CACHE_TABLE = 'guide_image_cache';
-const IMAGE_CACHE_SQL = `CREATE TABLE IF NOT EXISTS ${IMAGE_CACHE_TABLE} (
-    key TEXT PRIMARY KEY,
-    mime TEXT NOT NULL,
-    data TEXT NOT NULL
-  )`;
-
-// Attachment files (encrypted, as stored in the bucket) are kept beside their
-// rows but never pulled wholesale: one file can be megabytes. A file added on
-// this device waits here until its upload goes through; one opened here is
-// kept so it shows again with no connection. Local-only, never synced.
-//   - uploaded: 0 | 1 — whether the bucket has this file.
-//   - upload_error: set when the bucket refused it for good (too large, wrong
-//     type): such a file is not retried, only shown as failed.
-export const ATTACHMENT_FILES_TABLE = 'attachment_files';
-const ATTACHMENT_FILES_SQL = `CREATE TABLE IF NOT EXISTS ${ATTACHMENT_FILES_TABLE} (
-    id TEXT PRIMARY KEY,
-    data BLOB NOT NULL,
-    uploaded INTEGER NOT NULL DEFAULT 0,
-    upload_error TEXT
-  )`;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -128,14 +114,14 @@ function fromDb(col: ColumnSpec, value: unknown): unknown {
 }
 
 /** A raw local row → the app-facing object (no bookkeeping columns). */
-function toObject<T>(spec: TableSpec, row: Row): T {
-  const obj: Row = {
+function toObject<Row>(spec: TableSpec, row: DbRow): Row {
+  const obj: DbRow = {
     id: row.id,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
-  for (const col of spec.columns) obj[col.name] = fromDb(col, row[col.name]);
-  return obj as T;
+  for (const [name, col] of columnsOf(spec)) obj[name] = fromDb(col, row[name]);
+  return obj as Row;
 }
 
 // ─── Change events ───────────────────────────────────────────────────────────
@@ -158,40 +144,64 @@ export function subscribe(table: string, listener: () => void): () => void {
   };
 }
 
+/** Tell whoever watches `table` that its rows changed. */
 function emit(table: string): void {
   listeners.get(table)?.forEach((listener) => listener());
+}
+
+// ─── Local-only tables ───────────────────────────────────────────────────────
+
+// The synced tables are read and written through the spec API below; a
+// local-only table (localTables.ts) is read and written by its owner, whose
+// statements are as static as a spec's.
+
+/** Rows of a local-only table. */
+export async function localQuery<T extends Record<string, unknown>>(
+  sql: string,
+  ...params: unknown[]
+): Promise<T[]> {
+  const c = await db();
+  return c.sql<T>(sql, ...params);
+}
+
+/** A write to a local-only table, reported to whoever watches `table`. */
+export async function localWrite(table: string, sql: string, ...params: unknown[]): Promise<void> {
+  const c = await db();
+  await c.sql(sql, ...params);
+  emit(table);
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 /** The visible rows (hides items queued for deletion), in the spec's order. */
-export async function listVisible<T>(spec: TableSpec): Promise<T[]> {
+export async function listVisible<Row extends SyncedRow>(spec: TableSpec<Row>): Promise<Row[]> {
   const c = await db();
-  const rows = await c.sql<Row>(
+  const rows = await c.sql<DbRow>(
     `SELECT * FROM ${spec.table} WHERE pending_op IS NOT 'delete' ORDER BY ${spec.orderBy}`,
   );
-  return rows.map((r) => toObject<T>(spec, r));
+  return rows.map((r) => toObject<Row>(spec, r));
 }
 
 // ─── Local mutations (instant, offline-safe) ─────────────────────────────────
 
 /** Insert a new row with a client-generated id (or the one given, for a row
  *  whose id something else already refers to), queued for upsert; returns the id. */
-export async function insert(
-  spec: TableSpec,
-  values: Row,
+export async function insert<Row extends SyncedRow>(
+  spec: TableSpec<Row>,
+  values: RowInput<Row>,
   id: string = crypto.randomUUID(),
 ): Promise<string> {
   const ts = nowIso();
-  const cols = [
-    'id',
-    ...spec.columns.map((c) => c.name),
-    'created_at',
-    'updated_at',
-    'pending_op',
-    'synced',
+  const cols = ['id', ...columnNames(spec), 'created_at', 'updated_at', 'pending_op', 'synced'];
+  const given = values as DbRow;
+  const params = [
+    id,
+    ...columnsOf(spec).map(([name, col]) => toDb(col, given[name])),
+    ts,
+    ts,
+    'upsert',
+    0,
   ];
-  const params = [id, ...spec.columns.map((c) => toDb(c, values[c.name])), ts, ts, 'upsert', 0];
   const placeholders = cols.map(() => '?').join(', ');
   const c = await db();
   await c.sql(`INSERT INTO ${spec.table} (${cols.join(', ')}) VALUES (${placeholders})`, ...params);
@@ -200,10 +210,15 @@ export async function insert(
 }
 
 /** Patch app columns of a row and queue the change. */
-export async function update(spec: TableSpec, id: string, patch: Row): Promise<void> {
-  const patched = spec.columns.filter((c) => c.name in patch);
-  const sets = patched.map((c) => `${c.name} = ?`);
-  const params: unknown[] = patched.map((c) => toDb(c, patch[c.name]));
+export async function update<Row extends SyncedRow>(
+  spec: TableSpec<Row>,
+  id: string,
+  patch: Partial<RowInput<Row>>,
+): Promise<void> {
+  const given = patch as DbRow;
+  const patched = columnsOf(spec).filter(([name]) => name in given);
+  const sets = patched.map(([name]) => `${name} = ?`);
+  const params: unknown[] = patched.map(([name, col]) => toDb(col, given[name]));
   sets.push('updated_at = ?');
   params.push(nowIso());
   sets.push("pending_op = 'upsert'");
@@ -238,159 +253,19 @@ export async function clearAll(): Promise<void> {
   for (const spec of ALL_SPECS) {
     await c.sql(`DELETE FROM ${spec.table}`);
   }
-  await c.sql(`DELETE FROM ${IMAGE_CACHE_TABLE}`);
-  await c.sql(`DELETE FROM ${ATTACHMENT_FILES_TABLE}`);
-  for (const spec of ALL_SPECS) emit(spec.table);
-  emit(ATTACHMENT_FILES_TABLE);
-}
-
-// ─── Local-only image cache ──────────────────────────────────────────────────
-
-/** An image's MIME type and base64-encoded contents. */
-export interface CachedImage {
-  mime: string;
-  data: string;
-}
-
-/** The locally cached image for a key, or null if it has never been fetched. */
-export async function getCachedImage(key: string): Promise<CachedImage | null> {
-  const c = await db();
-  const rows = await c.sql<CachedImage>(
-    `SELECT mime, data FROM ${IMAGE_CACHE_TABLE} WHERE key = ?`,
-    key,
-  );
-  return rows[0] ?? null;
-}
-
-/** Keep an image locally so later reads need no connection. */
-export async function putCachedImage(key: string, image: CachedImage): Promise<void> {
-  const c = await db();
-  await c.sql(
-    `INSERT OR REPLACE INTO ${IMAGE_CACHE_TABLE} (key, mime, data) VALUES (?, ?, ?)`,
-    key,
-    image.mime,
-    image.data,
-  );
-}
-
-// ─── Local-only attachment files ─────────────────────────────────────────────
-
-/** Where the local copy of an attachment's file stands with the bucket. */
-export type AttachmentUploadState = 'uploaded' | 'pending' | 'failed';
-
-type AttachmentFileRow = {
-  id: string;
-  data: Uint8Array<ArrayBuffer>;
-  uploaded: number;
-  upload_error: string | null;
-};
-
-function uploadState(row: {
-  uploaded: number;
-  upload_error: string | null;
-}): AttachmentUploadState {
-  if (row.uploaded) return 'uploaded';
-  return row.upload_error === null ? 'pending' : 'failed';
-}
-
-/** The locally held file (encrypted) for an attachment, or null if it was never
- *  added or opened on this device. */
-export async function getAttachmentFile(id: string): Promise<Uint8Array<ArrayBuffer> | null> {
-  const c = await db();
-  const rows = await c.sql<Pick<AttachmentFileRow, 'data'>>(
-    `SELECT data FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`,
-    id,
-  );
-  return rows[0]?.data ?? null;
-}
-
-/** Where an attachment's file stands with the bucket, or null when this device
- *  holds no copy (then the bucket is the only place it may be). */
-export async function getAttachmentUploadState(id: string): Promise<AttachmentUploadState | null> {
-  const c = await db();
-  const rows = await c.sql<Pick<AttachmentFileRow, 'uploaded' | 'upload_error'>>(
-    `SELECT uploaded, upload_error FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`,
-    id,
-  );
-  return rows[0] ? uploadState(rows[0]) : null;
-}
-
-/** The ids of every attachment whose file this device holds. */
-export async function listAttachmentFileIds(): Promise<string[]> {
-  const c = await db();
-  const rows = await c.sql<Pick<AttachmentFileRow, 'id'>>(
-    `SELECT id FROM ${ATTACHMENT_FILES_TABLE}`,
-  );
-  return rows.map((row) => row.id);
-}
-
-/** Keep an attachment's file locally: one just added here (`uploaded` false,
- *  queued for upload) or one fetched from the bucket (`uploaded` true). */
-export async function putAttachmentFile(
-  id: string,
-  data: Uint8Array,
-  uploaded: boolean,
-): Promise<void> {
-  const c = await db();
-  await c.sql(
-    `INSERT OR REPLACE INTO ${ATTACHMENT_FILES_TABLE} (id, data, uploaded, upload_error) VALUES (?, ?, ?, NULL)`,
-    id,
-    data,
-    uploaded ? 1 : 0,
-  );
-  emit(ATTACHMENT_FILES_TABLE);
-}
-
-/** Files still waiting to reach the bucket (not the ones it refused for good). */
-export async function listPendingUploads(): Promise<
-  { id: string; data: Uint8Array<ArrayBuffer> }[]
-> {
-  const c = await db();
-  return c.sql<Pick<AttachmentFileRow, 'id' | 'data'>>(
-    `SELECT id, data FROM ${ATTACHMENT_FILES_TABLE} WHERE uploaded = 0 AND upload_error IS NULL`,
-  );
-}
-
-export async function markAttachmentUploaded(id: string): Promise<void> {
-  const c = await db();
-  await c.sql(
-    `UPDATE ${ATTACHMENT_FILES_TABLE} SET uploaded = 1, upload_error = NULL WHERE id = ?`,
-    id,
-  );
-  emit(ATTACHMENT_FILES_TABLE);
-}
-
-/** Record that the bucket refused this file for good, so it is not retried. */
-export async function markAttachmentUploadFailed(id: string, error: string): Promise<void> {
-  const c = await db();
-  await c.sql(`UPDATE ${ATTACHMENT_FILES_TABLE} SET upload_error = ? WHERE id = ?`, error, id);
-  emit(ATTACHMENT_FILES_TABLE);
-}
-
-export async function deleteAttachmentFile(id: string): Promise<void> {
-  const c = await db();
-  await c.sql(`DELETE FROM ${ATTACHMENT_FILES_TABLE} WHERE id = ?`, id);
-  emit(ATTACHMENT_FILES_TABLE);
-}
-
-/** Drop the files of attachments that no longer exist here (deleted, on this
- *  device or elsewhere), pending uploads included: with the row gone there is
- *  nothing to upload for. */
-export async function pruneAttachmentFiles(): Promise<void> {
-  const c = await db();
-  await c.sql(
-    `DELETE FROM ${ATTACHMENT_FILES_TABLE} WHERE id NOT IN (SELECT id FROM ${ATTACHMENTS_SPEC.table})`,
-  );
-  emit(ATTACHMENT_FILES_TABLE);
+  for (const spec of LOCAL_SPECS) await c.sql(`DELETE FROM ${spec.table}`);
+  for (const spec of [...ALL_SPECS, ...LOCAL_SPECS]) emit(spec.table);
 }
 
 // ─── Sync support (used by sync.ts) ──────────────────────────────────────────
 
 /** Rows with a queued create/update, as full server-shaped objects to push. */
-export async function getPendingUpserts<T>(spec: TableSpec): Promise<T[]> {
+export async function getPendingUpserts<Row extends SyncedRow>(
+  spec: TableSpec<Row>,
+): Promise<Row[]> {
   const c = await db();
-  const rows = await c.sql<Row>(`SELECT * FROM ${spec.table} WHERE pending_op = 'upsert'`);
-  return rows.map((r) => toObject<T>(spec, r));
+  const rows = await c.sql<DbRow>(`SELECT * FROM ${spec.table} WHERE pending_op = 'upsert'`);
+  return rows.map((r) => toObject<Row>(spec, r));
 }
 
 /** Ids of rows whose deletion still needs to be pushed. */
@@ -434,10 +309,10 @@ export async function markDeleted(spec: TableSpec, id: string): Promise<void> {
  * a pull. Comparisons parse epoch millis to stay correct across timestamp
  * formats ("...Z" vs "...+00:00").
  */
-export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
+export async function reconcile(spec: TableSpec, remote: DbRow[]): Promise<void> {
   const insertCols = [
     'id',
-    ...spec.columns.map((c) => c.name),
+    ...columnNames(spec),
     'created_at',
     'updated_at',
     'pending_op',
@@ -452,14 +327,14 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
     for (const r of remote) {
       const id = r.id as string;
       remoteIds.add(id);
-      const existing = await tx.sql<Row>(`SELECT * FROM ${spec.table} WHERE id = ?`, id);
+      const existing = await tx.sql<DbRow>(`SELECT * FROM ${spec.table} WHERE id = ?`, id);
       const local = existing[0];
 
       if (!local) {
         await tx.sql(
           `INSERT INTO ${spec.table} (${insertCols.join(', ')}) VALUES (${insertPlaceholders})`,
           id,
-          ...spec.columns.map((c) => toDb(c, r[c.name])),
+          ...columnsOf(spec).map(([name, col]) => toDb(col, r[name])),
           r.created_at,
           r.updated_at,
           null,
@@ -468,11 +343,11 @@ export async function reconcile(spec: TableSpec, remote: Row[]): Promise<void> {
         changed = true;
       } else if (local.pending_op === null) {
         if (Date.parse(r.updated_at as string) > Date.parse(local.updated_at as string)) {
-          const setCols = [...spec.columns.map((c) => c.name), 'created_at', 'updated_at'];
+          const setCols = [...columnNames(spec), 'created_at', 'updated_at'];
           const sets = setCols.map((c) => `${c} = ?`).concat('synced = 1');
           await tx.sql(
             `UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ?`,
-            ...spec.columns.map((c) => toDb(c, r[c.name])),
+            ...columnsOf(spec).map(([name, col]) => toDb(col, r[name])),
             r.created_at,
             r.updated_at,
             id,

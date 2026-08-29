@@ -1,7 +1,5 @@
 import { useCallback } from 'react';
-import type { Chore } from '../../types';
 import { CHORES_SPEC } from '../../lib/offline/specs';
-import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
@@ -17,38 +15,20 @@ export interface ChoreInput {
 /** Local-first chores: add / edit / complete / delete, syncing in the
  *  background. Every action is instant and works offline. */
 export function useChores() {
-  const { items, loading, error, mutate } = useOfflineTable<Chore>(CHORES_SPEC);
+  const { items, loading, error, insert, update, remove } = useOfflineTable(CHORES_SPEC);
 
   const add = useCallback(
     (title: string, dueOn: string | null) => {
       const value = lowercaseTrimmed(title);
-      if (!value) return Promise.resolve();
-      return mutate(() =>
-        engine.insert(CHORES_SPEC, {
-          title: value,
-          notes: null,
-          done: false,
-          due_on: dueOn || null,
-        }),
-      );
+      if (!value) return Promise.resolve(undefined);
+      return insert({ title: value, notes: null, done: false, due_on: dueOn || null });
     },
-    [mutate],
+    [insert],
   );
 
-  const save = useCallback(
-    (id: string, patch: Partial<ChoreInput>) => mutate(() => engine.update(CHORES_SPEC, id, patch)),
-    [mutate],
-  );
+  const save = useCallback((id: string, patch: Partial<ChoreInput>) => update(id, patch), [update]);
 
-  const setDone = useCallback(
-    (id: string, done: boolean) => mutate(() => engine.update(CHORES_SPEC, id, { done })),
-    [mutate],
-  );
-
-  const remove = useCallback(
-    (chore: Chore) => mutate(() => engine.remove(CHORES_SPEC, chore.id)),
-    [mutate],
-  );
+  const setDone = useCallback((id: string, done: boolean) => update(id, { done }), [update]);
 
   return { items, loading, error, add, save, setDone, remove };
 }

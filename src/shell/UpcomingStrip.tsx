@@ -1,18 +1,21 @@
 import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
-import { UPCOMING_MAX_ROWS } from '../types';
 import { todayIso } from '../utils/dateUtils';
 import SectionLabel from '../components/SectionLabel';
 import SkeletonRows from '../components/SkeletonRows';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
 
+/** Most upcoming entries the home screen shows before offering the full list. */
+const UPCOMING_MAX_ROWS = 4;
+
+/** Rows the strip holds its place with while the apps are still reading. */
+const PENDING_ROWS = 3;
+
 /** The "Próximo" list on the home screen: the first few of every app's
  *  upcoming entries, soonest first, with a link to the full list when there
  *  are more. Holds its place while the apps' tables are read, so the tiles
  *  under it don't move; hidden once it is known there is nothing to show. */
-const PENDING_ROWS = 3;
-
 export default function UpcomingStrip() {
   const today = todayIso();
 

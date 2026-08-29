@@ -1,164 +1,390 @@
 // =============================================================================
-// Declarative specs for the offline-synced tables. Each spec drives the generic
-// engine (engine.ts) — local schema, CRUD, and sync — so adding another
-// offline table is just another entry here, no new sync code.
+// The offline-synced tables, one place each: the row as the app sees it, the
+// values its enumerated columns may take, and the spec that drives the generic
+// engine (engine.ts) — local schema, CRUD, and sync. Adding another offline
+// table is another entry here, no new sync code.
 //
-// Every synced table is assumed to have the standard columns the engine manages
-// itself: `id` (a client-generated UUID text), `created_at`, and `updated_at`
-// (the last-write-wins key). `columns` below lists only the app-specific ones.
+// Every row carries the standard columns the engine manages itself (SyncedRow:
+// `id`, `created_at`, `updated_at`); `columns` declares exactly the rest, so a
+// column missing from either the row type or the spec fails to compile.
 // =============================================================================
-import { DATE_NOTICE_DAYS_DEFAULT, DOCUMENT_NOTICE_DAYS_DEFAULT } from '../../types';
+import type { AttachmentOwnerKind, SyncedRow } from '../../types';
 
+/** How a column is declared in SQLite, and how its values cross to the app. */
 export interface ColumnSpec {
-  name: string;
   /** SQLite column type + constraints, e.g. 'TEXT NOT NULL'. */
   ddl: string;
   /** Stored as 0/1 in SQLite but exposed to the app as a JS boolean. */
   boolean?: boolean;
 }
 
-export interface TableSpec {
+/** A table's own columns, in the order they are declared in SQL (an object
+ *  keeps its keys in insertion order). */
+export type ColumnSpecs<Row extends SyncedRow> = Record<
+  Exclude<keyof Row, keyof SyncedRow>,
+  ColumnSpec
+>;
+
+export interface TableSpec<Row extends SyncedRow = SyncedRow> {
   /** Table name — identical in local SQLite and in Postgres. */
   table: string;
-  /** App-specific columns (everything except id/created_at/updated_at). */
-  columns: ColumnSpec[];
+  /** Everything except the columns the engine manages. */
+  columns: ColumnSpecs<Row>;
   /** ORDER BY clause (SQL) for the visible list. */
   orderBy: string;
 }
 
-export const SHOPPING_SPEC: TableSpec = {
+/** What a row is made of, minus what the engine fills in: the values a caller
+ *  gives when it creates one. */
+export type RowInput<Row extends SyncedRow> = Omit<Row, keyof SyncedRow>;
+
+/** A spec's own columns as name/spec pairs, in DDL order. */
+export function columnsOf(spec: TableSpec): [string, ColumnSpec][] {
+  return Object.entries(spec.columns as Record<string, ColumnSpec>);
+}
+
+/** A spec's own column names, in DDL order. */
+export function columnNames(spec: TableSpec): string[] {
+  return Object.keys(spec.columns as Record<string, ColumnSpec>);
+}
+
+// ─── The shell's tables, and the ones several apps share ─────────────────────
+
+/**
+ * The household's master key, wrapped under a key derived from the phrase the
+ * members hold on paper, with the derivation parameters. One row per
+ * household; synced so a device can unlock offline once it has pulled it.
+ */
+export interface HouseholdKey extends SyncedRow {
+  kdf: 'pbkdf2-sha256';
+  /** Base64. */
+  salt: string;
+  iterations: number;
+  /** Base64: the AES-KW wrap of the master key. */
+  wrapped_master_key: string;
+}
+
+export const HOUSEHOLD_KEY_SPEC: TableSpec<HouseholdKey> = {
+  table: 'household_key',
+  columns: {
+    kdf: { ddl: 'TEXT NOT NULL' },
+    salt: { ddl: 'TEXT NOT NULL' },
+    iterations: { ddl: 'INTEGER NOT NULL' },
+    wrapped_master_key: { ddl: 'TEXT NOT NULL' },
+  },
+  orderBy: 'created_at ASC',
+};
+
+/**
+ * A picture attached to an entry. Only this metadata is a synced row; the
+ * picture itself lives encrypted in the attachments bucket under the row's
+ * id, and only ever changes by being replaced with a new attachment.
+ */
+export interface Attachment extends SyncedRow {
+  owner_kind: AttachmentOwnerKind;
+  owner_id: string;
+  /** What the user called it; empty for an attachment left unnamed. */
+  name: string;
+  mime: string;
+  /** Of the file itself, before encryption, in bytes. */
+  size: number;
+  /** Base64: the file's own key, wrapped under the household's master key. */
+  wrapped_file_key: string;
+}
+
+export const ATTACHMENTS_SPEC: TableSpec<Attachment> = {
+  table: 'attachments',
+  columns: {
+    owner_kind: { ddl: 'TEXT NOT NULL' },
+    owner_id: { ddl: 'TEXT NOT NULL' },
+    name: { ddl: "TEXT NOT NULL DEFAULT ''" },
+    mime: { ddl: 'TEXT NOT NULL' },
+    size: { ddl: 'INTEGER NOT NULL' },
+    wrapped_file_key: { ddl: 'TEXT NOT NULL' },
+  },
+  orderBy: 'created_at ASC',
+};
+
+// ─── Tareas ──────────────────────────────────────────────────────────────────
+
+/** A chore / task to be done. */
+export interface Chore extends SyncedRow {
+  title: string;
+  notes: string | null;
+  done: boolean;
+  /** Optional due date as an ISO date string (yyyy-mm-dd). */
+  due_on: string | null;
+}
+
+export const CHORES_SPEC: TableSpec<Chore> = {
+  table: 'chores',
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    notes: { ddl: 'TEXT' },
+    done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    // Due date as a yyyy-mm-dd string (date-only, no timezone).
+    due_on: { ddl: 'TEXT' },
+  },
+  orderBy: 'done ASC, due_on ASC NULLS LAST, created_at ASC',
+};
+
+// ─── Compras ─────────────────────────────────────────────────────────────────
+
+/** An item on the shared shopping list. */
+export interface ShoppingItem extends SyncedRow {
+  name: string;
+  checked: boolean;
+  /**
+   * Client-owned fractional-index sort key (base-62) for manual ordering.
+   * Reordering writes only this column on the moved row. Null sorts last (e.g.
+   * a row inserted manually via SQL); the client sets it on every insert.
+   */
+  position: string | null;
+}
+
+export const SHOPPING_SPEC: TableSpec<ShoppingItem> = {
   table: 'shopping_items',
-  columns: [
-    { name: 'name', ddl: 'TEXT NOT NULL' },
-    { name: 'checked', ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
-    // Client-owned fractional-index key for manual drag ordering (see ordering.ts).
-    { name: 'position', ddl: 'TEXT' },
-  ],
+  columns: {
+    name: { ddl: 'TEXT NOT NULL' },
+    checked: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    position: { ddl: 'TEXT' },
+  },
   // A struck (bought) item keeps its place in the list, so the order ignores `checked`.
   orderBy: 'position ASC NULLS LAST, created_at ASC',
 };
 
-export const CHORES_SPEC: TableSpec = {
-  table: 'chores',
-  columns: [
-    { name: 'title', ddl: 'TEXT NOT NULL' },
-    { name: 'notes', ddl: 'TEXT' },
-    { name: 'done', ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
-    // Due date as a yyyy-mm-dd string (date-only, no timezone).
-    { name: 'due_on', ddl: 'TEXT' },
-  ],
-  orderBy: 'done ASC, due_on ASC NULLS LAST, created_at ASC',
-};
+// ─── Guías ───────────────────────────────────────────────────────────────────
 
-export const GUIDES_SPEC: TableSpec = {
+/** An imported reference document. Read-only in the app — rows come from an
+ *  import script — but offline-synced like every other table. */
+export interface Guide extends SyncedRow {
+  title: string;
+  description: string | null;
+}
+
+export const GUIDES_SPEC: TableSpec<Guide> = {
   table: 'guides',
-  columns: [
-    { name: 'title', ddl: 'TEXT NOT NULL' },
-    { name: 'description', ddl: 'TEXT' },
-  ],
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    description: { ddl: 'TEXT' },
+  },
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
-export const GUIDE_CHAPTERS_SPEC: TableSpec = {
+/**
+ * One readable page of a guide. Chapters are grouped into sections and ordered
+ * by `section_position` then `position`. `body` is markdown (CommonMark plus
+ * the app's directives for images, videos and spoilers); images are referenced
+ * by key and fetched separately.
+ */
+export interface GuideChapter extends SyncedRow {
+  guide_id: string;
+  section_title: string;
+  section_position: number;
+  position: number;
+  title: string;
+  body: string;
+}
+
+export const GUIDE_CHAPTERS_SPEC: TableSpec<GuideChapter> = {
   table: 'guide_chapters',
-  columns: [
-    { name: 'guide_id', ddl: 'TEXT NOT NULL' },
-    { name: 'section_title', ddl: 'TEXT NOT NULL' },
-    { name: 'section_position', ddl: 'INTEGER NOT NULL' },
-    { name: 'position', ddl: 'INTEGER NOT NULL' },
-    { name: 'title', ddl: 'TEXT NOT NULL' },
-    { name: 'body', ddl: 'TEXT NOT NULL' },
-  ],
+  columns: {
+    guide_id: { ddl: 'TEXT NOT NULL' },
+    section_title: { ddl: 'TEXT NOT NULL' },
+    section_position: { ddl: 'INTEGER NOT NULL' },
+    position: { ddl: 'INTEGER NOT NULL' },
+    title: { ddl: 'TEXT NOT NULL' },
+    body: { ddl: 'TEXT NOT NULL' },
+  },
   orderBy: 'guide_id ASC, section_position ASC, position ASC',
 };
 
-export const DATES_SPEC: TableSpec = {
+// ─── Fechas ──────────────────────────────────────────────────────────────────
+
+/** How a date repeats: never, every year, or every `repeat_months` months. */
+export const REPEAT_KINDS = ['none', 'yearly', 'months'] as const;
+export type RepeatKind = (typeof REPEAT_KINDS)[number];
+
+/**
+ * A calendar entry — a birthday, an appointment, a renewal. Not a task: nothing
+ * is ever done, and the app never rewrites a row on its own. `occurs_on` is the
+ * anchor the user entered; a recurring entry's next occurrence is computed from
+ * it on read, so it rolls over by itself.
+ */
+export interface DateEntry extends SyncedRow {
+  title: string;
+  /** The anchor: the ISO date (yyyy-mm-dd) entered by the user, never moved by the app. */
+  occurs_on: string;
+  repeat: RepeatKind;
+  /** Interval in months when `repeat` is 'months'; null otherwise. */
+  repeat_months: number | null;
+  /** How many days ahead the entry shows on the home screen (0 = only on the day). */
+  notice_days: number;
+  notes: string | null;
+}
+
+/** Notice window (days ahead) a new date gets unless the user picks another. */
+export const DATE_NOTICE_DAYS_DEFAULT = 7;
+
+export const DATES_SPEC: TableSpec<DateEntry> = {
   table: 'dates',
-  columns: [
-    { name: 'title', ddl: 'TEXT NOT NULL' },
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
     // yyyy-mm-dd, like chores.due_on.
-    { name: 'occurs_on', ddl: 'TEXT NOT NULL' },
-    { name: 'repeat', ddl: "TEXT NOT NULL DEFAULT 'none'" },
-    { name: 'repeat_months', ddl: 'INTEGER' },
-    { name: 'notice_days', ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
-    { name: 'notes', ddl: 'TEXT' },
-  ],
+    occurs_on: { ddl: 'TEXT NOT NULL' },
+    repeat: { ddl: "TEXT NOT NULL DEFAULT 'none'" },
+    repeat_months: { ddl: 'INTEGER' },
+    notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
+    notes: { ddl: 'TEXT' },
+  },
   orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
 };
 
-export const RECIPES_SPEC: TableSpec = {
+// ─── Recetas ─────────────────────────────────────────────────────────────────
+
+/** A recipe: a title and a markdown body in the app's dialect (an
+ *  `:::ingredients` block renders as a tickable list). Created with only a
+ *  title and written afterwards, so an empty body is normal. */
+export interface Recipe extends SyncedRow {
+  title: string;
+  body: string;
+  /** Total time in minutes, when known. */
+  minutes: number | null;
+  /** How many portions it yields, when known. */
+  servings: number | null;
+}
+
+export const RECIPES_SPEC: TableSpec<Recipe> = {
   table: 'recipes',
-  columns: [
-    { name: 'title', ddl: 'TEXT NOT NULL' },
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
     // Markdown in the app's dialect; empty until the recipe is written.
-    { name: 'body', ddl: "TEXT NOT NULL DEFAULT ''" },
-    { name: 'minutes', ddl: 'INTEGER' },
-    { name: 'servings', ddl: 'INTEGER' },
-  ],
+    body: { ddl: "TEXT NOT NULL DEFAULT ''" },
+    minutes: { ddl: 'INTEGER' },
+    servings: { ddl: 'INTEGER' },
+  },
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
-export const DOCUMENTS_SPEC: TableSpec = {
+// ─── Documentos ──────────────────────────────────────────────────────────────
+
+/**
+ * A document — a passport, an ID, a policy — whose content is its attachments:
+ * the pictures of it. The row holds only what lists it and announces its
+ * expiry; anything sensitive (a number, a date of birth) stays inside the
+ * encrypted files.
+ */
+export interface DocumentEntry extends SyncedRow {
+  title: string;
+  /** When it stops being valid (yyyy-mm-dd), if it ever does. */
+  expires_on: string | null;
+  /** How many days ahead of its expiry the document shows on the home screen. */
+  notice_days: number;
+}
+
+/** Notice window (days ahead of its expiry) a new document gets. */
+export const DOCUMENT_NOTICE_DAYS_DEFAULT = 30;
+
+export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
   table: 'documents',
-  columns: [
-    { name: 'title', ddl: 'TEXT NOT NULL' },
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
     // yyyy-mm-dd, like dates.occurs_on; null for a document that never expires.
-    { name: 'expires_on', ddl: 'TEXT' },
-    { name: 'notice_days', ddl: `INTEGER NOT NULL DEFAULT ${DOCUMENT_NOTICE_DAYS_DEFAULT}` },
-  ],
+    expires_on: { ddl: 'TEXT' },
+    notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DOCUMENT_NOTICE_DAYS_DEFAULT}` },
+  },
   orderBy: 'title COLLATE NOCASE ASC',
 };
 
-export const STATEMENTS_SPEC: TableSpec = {
+// ─── Gastos ──────────────────────────────────────────────────────────────────
+
+/** The credit-card statement layouts the app can read. */
+export const STATEMENT_FORMATS = ['galicia-visa', 'galicia-mastercard'] as const;
+export type StatementFormat = (typeof STATEMENT_FORMATS)[number];
+
+/** What a purchase is filed under. A fixed set: a merchant rule names one. */
+export const SPENDING_CATEGORIES = [
+  'salidas',
+  'supermercado',
+  'salud',
+  'auto',
+  'hogar',
+  'suscripciones',
+  'entretenimiento',
+  'compras',
+  'viajes',
+  'mascotas',
+  'transporte',
+  'impuestos',
+  'otros',
+] as const;
+export type SpendingCategory = (typeof SPENDING_CATEGORIES)[number];
+
+/**
+ * One credit-card statement, read on the device from the bank's PDF. The row
+ * keeps in the clear only what lists it and announces its due date; the
+ * statement itself — every purchase, the installments to come — is `payload`,
+ * compressed and encrypted under a key of its own wrapped under the
+ * household's master key, like an attachment's file.
+ */
+export interface Statement extends SyncedRow {
+  format: StatementFormat;
+  /** The day the bank closed it (yyyy-mm-dd). */
+  closed_on: string;
+  /** The day it is debited (yyyy-mm-dd). */
+  due_on: string;
+  total_ars_cents: number;
+  total_usd_cents: number;
+  /** Marked by a member once the card was paid; until then the statement is
+   *  coming up, however far off its due date. */
+  paid: boolean;
+  /** Base64: the payload's own key, wrapped under the household's master key. */
+  wrapped_key: string;
+  /** Base64: the statement's contents, compressed then encrypted. */
+  payload: string;
+}
+
+export const STATEMENTS_SPEC: TableSpec<Statement> = {
   table: 'statements',
-  columns: [
-    { name: 'format', ddl: 'TEXT NOT NULL' },
+  columns: {
+    format: { ddl: 'TEXT NOT NULL' },
     // yyyy-mm-dd, like dates.occurs_on.
-    { name: 'closed_on', ddl: 'TEXT NOT NULL' },
-    { name: 'due_on', ddl: 'TEXT NOT NULL' },
-    { name: 'total_ars_cents', ddl: 'INTEGER NOT NULL' },
-    { name: 'total_usd_cents', ddl: 'INTEGER NOT NULL' },
-    { name: 'paid', ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
-    { name: 'wrapped_key', ddl: 'TEXT NOT NULL' },
+    closed_on: { ddl: 'TEXT NOT NULL' },
+    due_on: { ddl: 'TEXT NOT NULL' },
+    total_ars_cents: { ddl: 'INTEGER NOT NULL' },
+    total_usd_cents: { ddl: 'INTEGER NOT NULL' },
+    paid: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    wrapped_key: { ddl: 'TEXT NOT NULL' },
     // Base64 of the encrypted contents: a few KB, small enough to travel with the row.
-    { name: 'payload', ddl: 'TEXT NOT NULL' },
-  ],
+    payload: { ddl: 'TEXT NOT NULL' },
+  },
   orderBy: 'closed_on DESC, format ASC',
 };
 
-export const MERCHANT_RULES_SPEC: TableSpec = {
+/**
+ * Files every purchase whose merchant contains `pattern` under `category`, in
+ * every statement. The pattern names where the household shops, so it is
+ * encrypted like a statement's contents; the category alone says nothing.
+ */
+export interface MerchantRule extends SyncedRow {
+  /** Base64: the pattern's own key, wrapped under the household's master key. */
+  wrapped_key: string;
+  /** Base64: the pattern, encrypted. */
+  pattern: string;
+  category: SpendingCategory;
+}
+
+export const MERCHANT_RULES_SPEC: TableSpec<MerchantRule> = {
   table: 'merchant_rules',
-  columns: [
-    { name: 'wrapped_key', ddl: 'TEXT NOT NULL' },
-    { name: 'pattern', ddl: 'TEXT NOT NULL' },
-    { name: 'category', ddl: 'TEXT NOT NULL' },
-  ],
+  columns: {
+    wrapped_key: { ddl: 'TEXT NOT NULL' },
+    pattern: { ddl: 'TEXT NOT NULL' },
+    category: { ddl: 'TEXT NOT NULL' },
+  },
   orderBy: 'created_at ASC',
 };
 
-export const HOUSEHOLD_KEY_SPEC: TableSpec = {
-  table: 'household_key',
-  columns: [
-    { name: 'kdf', ddl: 'TEXT NOT NULL' },
-    { name: 'salt', ddl: 'TEXT NOT NULL' },
-    { name: 'iterations', ddl: 'INTEGER NOT NULL' },
-    { name: 'wrapped_master_key', ddl: 'TEXT NOT NULL' },
-  ],
-  orderBy: 'created_at ASC',
-};
-
-export const ATTACHMENTS_SPEC: TableSpec = {
-  table: 'attachments',
-  columns: [
-    { name: 'owner_kind', ddl: 'TEXT NOT NULL' },
-    { name: 'owner_id', ddl: 'TEXT NOT NULL' },
-    { name: 'name', ddl: "TEXT NOT NULL DEFAULT ''" },
-    { name: 'mime', ddl: 'TEXT NOT NULL' },
-    { name: 'size', ddl: 'INTEGER NOT NULL' },
-    { name: 'wrapped_file_key', ddl: 'TEXT NOT NULL' },
-  ],
-  orderBy: 'created_at ASC',
-};
+// ─── Sync order ──────────────────────────────────────────────────────────────
 
 /** Tables no single app owns — the shell's own, and the ones several apps
  *  share — synced before any app's. */

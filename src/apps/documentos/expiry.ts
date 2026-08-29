@@ -1,10 +1,5 @@
-import type { DocumentEntry } from '../../types';
-import { daysUntil, formatDateShort } from '../../utils/dateUtils';
-
-/** Whether a document's expiry (yyyy-mm-dd) has gone by on `today`. */
-export function hasExpired(expiresOn: string, today: string): boolean {
-  return expiresOn < today;
-}
+import type { DocumentEntry } from '../../lib/offline/specs';
+import { daysUntil, dueWord, formatDateShort } from '../../utils/dateUtils';
 
 /**
  * Whether a document's expiry is close enough to announce on `today`: inside
@@ -17,5 +12,5 @@ export function isExpiring(entry: DocumentEntry, today: string): boolean {
 
 /** "vence dd/mm/yyyy", or "venció" once the day has gone by. */
 export function expiryLabel(expiresOn: string, today: string): string {
-  return `${hasExpired(expiresOn, today) ? 'venció' : 'vence'} ${formatDateShort(expiresOn)}`;
+  return `${dueWord(expiresOn, today)} ${formatDateShort(expiresOn)}`;
 }

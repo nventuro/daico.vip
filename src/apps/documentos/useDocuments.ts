@@ -1,7 +1,5 @@
 import { useCallback } from 'react';
-import { DOCUMENT_NOTICE_DAYS_DEFAULT, type DocumentEntry } from '../../types';
-import { DOCUMENTS_SPEC } from '../../lib/offline/specs';
-import * as engine from '../../lib/offline/engine';
+import { DOCUMENTS_SPEC, DOCUMENT_NOTICE_DAYS_DEFAULT } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
@@ -17,7 +15,7 @@ export interface DocumentInput {
 /** Local-first documents: add / edit / delete, syncing in the background.
  *  Every action is instant and works offline. */
 export function useDocuments() {
-  const { items, loading, error, mutate } = useOfflineTable<DocumentEntry>(DOCUMENTS_SPEC);
+  const { items, loading, error, insert, update, remove } = useOfflineTable(DOCUMENTS_SPEC);
 
   /** Creates a document with just its title, resolving the new id so the
    *  caller can open it to attach its files; undefined for a blank title or a
@@ -26,26 +24,18 @@ export function useDocuments() {
     (title: string): Promise<string | undefined> => {
       const value = lowercaseTrimmed(title);
       if (!value) return Promise.resolve(undefined);
-      return mutate(() =>
-        engine.insert(DOCUMENTS_SPEC, {
-          title: value,
-          expires_on: null,
-          notice_days: DOCUMENT_NOTICE_DAYS_DEFAULT,
-        }),
-      );
+      return insert({
+        title: value,
+        expires_on: null,
+        notice_days: DOCUMENT_NOTICE_DAYS_DEFAULT,
+      });
     },
-    [mutate],
+    [insert],
   );
 
   const save = useCallback(
-    (id: string, patch: Partial<DocumentInput>) =>
-      mutate(() => engine.update(DOCUMENTS_SPEC, id, patch)),
-    [mutate],
-  );
-
-  const remove = useCallback(
-    (entry: DocumentEntry) => mutate(() => engine.remove(DOCUMENTS_SPEC, entry.id)),
-    [mutate],
+    (id: string, patch: Partial<DocumentInput>) => update(id, patch),
+    [update],
   );
 
   return { items, loading, error, add, save, remove };

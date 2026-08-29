@@ -11,7 +11,6 @@ const DocumentEditPage = lazy(() => import('./DocumentEditPage'));
 const documentos: AppModule = {
   id: 'documentos',
   name: 'Documentos',
-  hue: 'app-documentos',
   icon: IconId,
   specs: [DOCUMENTS_SPEC],
   routes: [

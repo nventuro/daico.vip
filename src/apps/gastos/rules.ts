@@ -6,10 +6,13 @@
 // the household's own: where it shops is private, so nothing here knows a
 // merchant. The bank's own charges are always taxes.
 // =============================================================================
-import { MERCHANT_PATTERN_MAX, SPENDING_CATEGORIES, type SpendingCategory } from '../../types';
-import { normalize } from '../../lib/search';
+import { SPENDING_CATEGORIES, type SpendingCategory } from '../../lib/offline/specs';
+import { normalize } from '../../utils/textUtils';
 import { CATEGORY_LABELS } from './labels';
 import type { StatementLine } from './statement';
+
+/** Longest merchant pattern a rule takes (input guard). */
+export const MERCHANT_PATTERN_MAX = 60;
 
 /** A merchant rule as the app works with it: the pattern in the clear. */
 export interface Rule {

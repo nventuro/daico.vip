@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
-import type { Statement } from '../../types';
-import { STATEMENTS_SPEC } from '../../lib/offline/specs';
+import { STATEMENTS_SPEC, type Statement } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { sealContents } from './payload';
@@ -24,9 +23,12 @@ function columns(
 
 /** Local-first statements, newest first. Adding or replacing one seals its
  *  contents under `masterKey` on the device; the server only ever sees the
- *  sealed payload. Every action is instant and works offline. */
+ *  sealed payload. Sealing is part of the write, so it happens inside `mutate`
+ *  like the write itself: what it fails at is reported on the screen, never
+ *  thrown at the caller, which has nowhere to say it. Every action is instant
+ *  and works offline. */
 export function useStatements() {
-  const { items, loading, error, mutate } = useOfflineTable<Statement>(STATEMENTS_SPEC);
+  const { items, loading, error, mutate, update, remove } = useOfflineTable(STATEMENTS_SPEC);
 
   /** Keeps a statement just read; resolves to its id, or undefined when it
    *  could not be written. */
@@ -54,15 +56,7 @@ export function useStatements() {
     [mutate],
   );
 
-  const setPaid = useCallback(
-    (id: string, paid: boolean) => mutate(() => engine.update(STATEMENTS_SPEC, id, { paid })),
-    [mutate],
-  );
-
-  const remove = useCallback(
-    (statement: Statement) => mutate(() => engine.remove(STATEMENTS_SPEC, statement.id)),
-    [mutate],
-  );
+  const setPaid = useCallback((id: string, paid: boolean) => update(id, { paid }), [update]);
 
   return { items, loading, error, add, replace, setPaid, remove };
 }

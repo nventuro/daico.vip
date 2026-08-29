@@ -11,7 +11,6 @@ const GuideChapterPage = lazy(() => import('./GuideChapterPage'));
 const guias: AppModule = {
   id: 'guias',
   name: 'Guías',
-  hue: 'app-guias',
   icon: IconBook,
   specs: [GUIDES_SPEC, GUIDE_CHAPTERS_SPEC],
   routes: [

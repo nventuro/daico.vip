@@ -1,9 +1,10 @@
 import { type FormEvent, useMemo, useState } from 'react';
-import { SPENDING_CATEGORIES } from '../../types';
+import { SPENDING_CATEGORIES } from '../../lib/offline/specs';
 import ModalDialog from '../../components/ModalDialog';
 import FormField from '../../components/FormField';
 import TextArea from '../../components/TextArea';
-import Button from '../../components/Button';
+import { CONTROL_CLASS } from '../../components/controlClasses';
+import DialogFooter from '../../components/DialogFooter';
 import { CATEGORY_LABELS } from './labels';
 import { parseRulesText, type ParsedRules } from './rules';
 
@@ -41,10 +42,7 @@ export default function RulesImportDialog({ onSave, onClose }: RulesImportDialog
   }
 
   return (
-    <ModalDialog
-      onClose={onClose}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto bg-surface p-0 text-on-surface backdrop:bg-on-surface/50 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:w-full sm:max-w-lg sm:border sm:border-border"
-    >
+    <ModalDialog onClose={onClose} layout="sheet">
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">Pegar reglas</span>
 
@@ -57,7 +55,7 @@ export default function RulesImportDialog({ onSave, onClose }: RulesImportDialog
             autoFocus
             spellCheck={false}
             placeholder={'MERPAGO KIOSCOS supermercado\nCAFE ORBITA salidas'}
-            className="font-mono text-sm"
+            className={`${CONTROL_CLASS} font-mono text-sm`}
           />
           <span className="text-xs text-muted">
             Una por línea: el texto del comercio y, al final, la categoría (
@@ -79,13 +77,16 @@ export default function RulesImportDialog({ onSave, onClose }: RulesImportDialog
           </ul>
         )}
 
-        <div className="mt-auto flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button type="submit" className="flex-1" disabled={!canSave}>
-            {parsed.rules.length > 0 ? `Guardar ${parsed.rules.length} reglas` : 'Guardar'}
-          </Button>
+        <div className="mt-auto">
+          <DialogFooter
+            onCancel={onClose}
+            cancelDisabled={saving}
+            confirmLabel={
+              parsed.rules.length > 0 ? `Guardar ${parsed.rules.length} reglas` : 'Guardar'
+            }
+            confirmDisabled={!canSave}
+            submit
+          />
         </div>
       </form>
     </ModalDialog>

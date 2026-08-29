@@ -1,4 +1,4 @@
-import { CONTROL_CLASS } from './controlClasses';
+import { CONTROL_CLASS } from '../components/controlClasses';
 
 interface PhraseWordsProps {
   /** One entry per word of the phrase. */

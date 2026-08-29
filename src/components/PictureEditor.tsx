@@ -2,8 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import ReactCrop, { type PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { IconRotate, IconRotateClockwise } from '@tabler/icons-react';
-import { ATTACHMENT_JPEG_QUALITY, ATTACHMENT_PREVIEW_MAX_PX } from '../types';
-import { attachmentProblem, attachmentType } from '../hooks/useAttachments';
+import { attachmentProblem, attachmentType } from '../lib/attachmentFiles';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import {
   WHOLE_IMAGE,
@@ -15,9 +14,17 @@ import {
   type Rotation,
 } from '../utils/imageUtils';
 import Button from './Button';
+import ErrorLine from './ErrorLine';
 import FormField from './FormField';
 import TextInput from './TextInput';
 import LoadingLine from './LoadingLine';
+
+/** JPEG quality a picture is encoded at once it has been cropped or rotated. */
+const ATTACHMENT_JPEG_QUALITY = 0.9;
+
+/** Longest side, in pixels, of the copy a picture is cropped on: enough to
+ *  place a crop, small enough for a phone to redraw at once on each turn. */
+const ATTACHMENT_PREVIEW_MAX_PX = 1600;
 
 const PREVIEW = {
   type: 'image/jpeg',
@@ -206,7 +213,7 @@ export default function PictureEditor({
         />
       </FormField>
 
-      {previewUrl && problem && <p className="text-sm text-error">{problem}</p>}
+      {previewUrl && <ErrorLine problem={problem} />}
 
       <div className="mt-2 flex items-center justify-between gap-3">
         <Button variant="outline" onClick={onSkip} disabled={busy}>

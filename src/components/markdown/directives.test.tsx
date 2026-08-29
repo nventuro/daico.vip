@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
-import { directivesToElements } from './markdownDirectives';
+import { directivesToElements } from './directives';
 
 // Stub components that echo their props, to prove directives reach the
 // renderer as elements with the expected props.

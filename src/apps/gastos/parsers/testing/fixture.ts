@@ -1,6 +1,6 @@
 // Builders for synthetic statement pages, placed where the bank's layouts
 // put each column. Nothing here comes from a real statement.
-import type { PageLine, PositionedWord } from '../statement';
+import type { PageLine, PositionedWord } from '../../statement';
 
 /** A word between two page x coordinates. */
 export const w = (text: string, x0: number, x1: number): PositionedWord => ({ text, x0, x1 });

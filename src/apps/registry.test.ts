@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { apps } from './registry';
+import { appHue, appPath, entryPath } from './types';
 import { ALL_SPECS, SHELL_SPECS } from '../lib/offline/specs';
 
 describe('apps registry', () => {
@@ -16,6 +17,13 @@ describe('apps registry', () => {
       for (const route of app.routes) {
         if (route.path != null) expect(route.path.startsWith('/')).toBe(false);
       }
+    }
+  });
+
+  it('hands out the paths the shell mounts it at', () => {
+    for (const app of apps) {
+      expect(appPath(app.id)).toBe(`/${app.id}`);
+      expect(entryPath(app.id, 'an-id')).toBe(`/${app.id}/an-id`);
     }
   });
 
@@ -41,6 +49,6 @@ describe('apps registry', () => {
 
   it('has a colour token for every hue', () => {
     const css = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
-    for (const app of apps) expect(css).toContain(`--color-${app.hue}:`);
+    for (const app of apps) expect(css).toContain(`--color-${appHue(app.id)}:`);
   });
 });

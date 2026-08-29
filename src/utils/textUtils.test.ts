@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countLabel, lowercaseTrimmed } from './textUtils';
+import { countLabel, lowercaseTrimmed, normalize } from './textUtils';
 
 describe('countLabel', () => {
   it('picks the singular for exactly one', () => {
@@ -23,5 +23,21 @@ describe('lowercaseTrimmed', () => {
 
   it('is empty for blank input', () => {
     expect(lowercaseTrimmed('   ')).toBe('');
+  });
+});
+
+describe('normalize', () => {
+  it('lower-cases and strips accents', () => {
+    expect(normalize('Árbol')).toBe('arbol');
+    expect(normalize('ÑOQUIS')).toBe('noquis');
+    expect(normalize('café con leche')).toBe('cafe con leche');
+  });
+
+  it('leaves digits and punctuation alone', () => {
+    expect(normalize('29/03, ¡hola! #1')).toBe('29/03, ¡hola! #1');
+  });
+
+  it('handles the empty string', () => {
+    expect(normalize('')).toBe('');
   });
 });

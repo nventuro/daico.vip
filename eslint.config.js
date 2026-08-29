@@ -32,6 +32,20 @@ const browserLocale = {
   message: "toLocaleString() with no locale follows the browser's language: pass 'es-AR'.",
 };
 
+// One direction only, from the bottom up: utils (pure) ← lib (infrastructure)
+// ← components (shared UI) ← apps (the features) ← shell (what mounts them).
+// A layer may use everything under it and nothing over it, so a piece of one
+// app can never end up wired into another's screens through a shared file.
+// `src/apps/types.ts` is the exception: it is the contract the shell mounts an
+// app by, so anything may name it.
+const layer = (paths, message) => ({
+  'no-restricted-imports': ['error', { patterns: [{ group: paths, message }] }],
+});
+const APPS = ['**/apps/**', '!**/apps/types'];
+const COMPONENTS = ['**/components/**'];
+const HOOKS = ['**/hooks/**'];
+const SHELL = ['**/shell/**'];
+
 export default defineConfig([
   globalIgnores(['dist']),
   {
@@ -57,5 +71,38 @@ export default defineConfig([
   {
     files: ['src/utils/dateUtils.ts'],
     rules: { 'no-restricted-syntax': ['error', nativeDateInput, browserLocale] },
+  },
+  {
+    files: ['src/utils/**'],
+    rules: layer(
+      ['**/lib/**', ...COMPONENTS, ...HOOKS, ...APPS, ...SHELL],
+      'src/utils holds pure helpers: it may import src/types.ts and its own siblings, nothing else.',
+    ),
+  },
+  {
+    files: ['src/lib/**'],
+    rules: layer(
+      [...COMPONENTS, ...HOOKS, ...APPS, ...SHELL],
+      'src/lib is below the UI: it may import src/utils and src/types.ts (and src/apps/types.ts, the module contract), never a component, a hook, an app or the shell.',
+    ),
+  },
+  {
+    files: ['src/components/**', 'src/hooks/**'],
+    rules: layer(
+      [...APPS, ...SHELL],
+      'A shared component or hook may not reach into an app or the shell — take what it needs as a prop or an argument.',
+    ),
+  },
+  {
+    files: ['src/apps/**'],
+    rules: layer(
+      [...SHELL, '**/registry'],
+      'An app knows nothing of the shell that mounts it, nor of the registry it is listed in.',
+    ),
+  },
+  {
+    // The registry's own test is what checks the registry.
+    files: ['src/apps/registry.test.ts'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 ]);

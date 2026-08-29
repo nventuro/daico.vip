@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { cachedVerdict, rememberVerdict } from '../lib/membershipCache';
+import { installSyncTriggers } from '../lib/offline/sync';
 import { AppContext } from './appContext';
 
 export function AppProvider({
@@ -75,6 +76,15 @@ export function AppProvider({
   // installed app; Firefox asks once.
   useEffect(() => {
     if (isMember) void navigator.storage?.persist?.().catch(() => {});
+  }, [isMember]);
+
+  // What asks for a sync, for the whole app: the connection coming back, and
+  // the app returning to the foreground. Only while a member is in — there is
+  // nothing to sync for anyone else, and a run after a sign-out would build
+  // the local store again right after the sign-out wiped it.
+  useEffect(() => {
+    if (!isMember) return;
+    return installSyncTriggers();
   }, [isMember]);
 
   const signIn = useCallback(() => {

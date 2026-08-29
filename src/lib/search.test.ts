@@ -1,21 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { excerpt, matches, normalize } from './search';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { excerpt, matches, searchTable } from './search';
+import * as engine from './offline/engine';
+import { ATTACHMENTS_SPEC, CHORES_SPEC } from './offline/specs';
 
-describe('normalize', () => {
-  it('lower-cases and strips accents', () => {
-    expect(normalize('Árbol')).toBe('arbol');
-    expect(normalize('ÑOQUIS')).toBe('noquis');
-    expect(normalize('café con leche')).toBe('cafe con leche');
-  });
-
-  it('leaves digits and punctuation alone', () => {
-    expect(normalize('29/03, ¡hola! #1')).toBe('29/03, ¡hola! #1');
-  });
-
-  it('handles the empty string', () => {
-    expect(normalize('')).toBe('');
-  });
-});
+vi.mock('sqlocal', () => import('./offline/testing/sqlocalInMemory'));
 
 describe('matches', () => {
   it('ignores case and accents', () => {
@@ -55,5 +43,84 @@ describe('excerpt', () => {
   it('adds no ellipsis when nothing is cut', () => {
     expect(excerpt('hola mundo', 'mundo', 10)).toBe('hola mundo');
     expect(excerpt('hola', 'xyz', 3)).toBe('hola');
+  });
+});
+
+describe('searchTable', () => {
+  beforeEach(async () => {
+    await engine.clearAll();
+  });
+
+  const add = (title: string, notes: string | null = null) =>
+    engine.insert(CHORES_SPEC, { title, notes, done: false, due_on: null });
+
+  const hits = (query: string) =>
+    searchTable(CHORES_SPEC, query, {
+      fields: ['title', 'notes'],
+      hit: (chore, matched) => ({
+        title: chore.title,
+        subtitle: matched,
+        to: `/tareas/${chore.id}`,
+      }),
+    });
+
+  it('finds a row by any of the fields it is told to read', async () => {
+    await add('regar las plantas');
+    await add('llamar al plomero', 'el del baño');
+    expect((await hits('plant')).map((h) => h.title)).toEqual(['regar las plantas']);
+    expect((await hits('baño')).map((h) => h.title)).toEqual(['llamar al plomero']);
+  });
+
+  it('says which field matched, so a hit can quote the right one', async () => {
+    await add('comprar pan', 'de la panadería');
+    expect((await hits('pan'))[0].subtitle).toBe('title');
+    expect((await hits('panadería'))[0].subtitle).toBe('notes');
+  });
+
+  it('finds nothing in a row whose fields are empty', async () => {
+    await add('regar');
+    expect(await hits('nada')).toEqual([]);
+  });
+
+  it("caps nothing: how many results an app gives is the shell's to say", async () => {
+    for (let i = 0; i < 25; i++) await add(`tarea ${i}`);
+    expect(await hits('tarea')).toHaveLength(25);
+  });
+
+  it('lists an attachment named like the query under the entry it belongs to', async () => {
+    const id = await add('pasaporte');
+    const picture = await engine.insert(ATTACHMENTS_SPEC, {
+      owner_kind: 'chore',
+      owner_id: id,
+      name: 'foto del recibo',
+      mime: 'image/png',
+      size: 1,
+      wrapped_file_key: 'k',
+    });
+    const found = await searchTable(CHORES_SPEC, 'recibo', {
+      fields: ['title'],
+      attachments: 'chore',
+      hit: (chore) => ({ title: chore.title, to: `/tareas/${chore.id}` }),
+    });
+    expect(found).toEqual([
+      { title: 'foto del recibo', subtitle: 'pasaporte', to: `/tareas/${id}/${picture}` },
+    ]);
+  });
+
+  it('leaves out an attachment of an entry the search never listed', async () => {
+    await engine.insert(ATTACHMENTS_SPEC, {
+      owner_kind: 'chore',
+      owner_id: 'gone',
+      name: 'foto',
+      mime: 'image/png',
+      size: 1,
+      wrapped_file_key: 'k',
+    });
+    const found = await searchTable(CHORES_SPEC, 'foto', {
+      fields: ['title'],
+      attachments: 'chore',
+      hit: (chore) => ({ title: chore.title, to: `/tareas/${chore.id}` }),
+    });
+    expect(found).toEqual([]);
   });
 });

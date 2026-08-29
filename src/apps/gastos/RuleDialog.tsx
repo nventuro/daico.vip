@@ -1,13 +1,13 @@
 import { type FormEvent, useState } from 'react';
-import { MERCHANT_PATTERN_MAX, SPENDING_CATEGORIES, type SpendingCategory } from '../../types';
+import { MERCHANT_PATTERN_MAX, merchantKey, type Rule } from './rules';
+import { SPENDING_CATEGORIES, type SpendingCategory } from '../../lib/offline/specs';
 import ModalDialog from '../../components/ModalDialog';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import Chip from '../../components/Chip';
-import Button from '../../components/Button';
+import DialogFooter from '../../components/DialogFooter';
 import LineRow from './LineRow';
 import { CATEGORY_LABELS } from './labels';
-import { merchantKey, type Rule } from './rules';
 import type { StatementLine } from './statement';
 
 /** A rule to write or rewrite for the line's merchant. */
@@ -64,10 +64,7 @@ export default function RuleDialog({
   }
 
   return (
-    <ModalDialog
-      onClose={onClose}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto bg-surface p-0 text-on-surface backdrop:bg-on-surface/50 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:w-full sm:max-w-lg sm:border sm:border-border"
-    >
+    <ModalDialog onClose={onClose} layout="sheet">
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">{line.charge ? 'Percepción' : 'Categoría'}</span>
         <ul className="border-y border-border">
@@ -107,13 +104,13 @@ export default function RuleDialog({
           </>
         )}
 
-        <div className="mt-auto flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" className="flex-1" disabled={change === null}>
-            Guardar
-          </Button>
+        <div className="mt-auto">
+          <DialogFooter
+            onCancel={onClose}
+            confirmLabel="Guardar"
+            confirmDisabled={change === null}
+            submit
+          />
         </div>
       </form>
     </ModalDialog>

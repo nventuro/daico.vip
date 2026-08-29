@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { useRoutes, type RouteObject } from 'react-router-dom';
 import App from '../App';
 import { apps } from '../apps/registry';
+import { appHue } from '../apps/types';
 import AppFrame from './AppFrame';
 import HomePage from './HomePage';
 
@@ -25,7 +26,7 @@ const routes: RouteObject[] = [
       },
       ...apps.map((app) => ({
         path: app.id,
-        element: <AppFrame name={app.name} hue={app.hue} icon={app.icon} />,
+        element: <AppFrame name={app.name} hue={appHue(app.id)} icon={app.icon} />,
         children: app.routes,
       })),
     ],

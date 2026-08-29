@@ -7,7 +7,12 @@
 // failing. It deliberately depends on nothing from the engine (no SQLocal), so
 // the app shell can gate on ownership without pulling the store into its bundle.
 // =============================================================================
-import { DB_OWNER_LOCK } from '../../types';
+/**
+ * Web Locks name held for a tab's lifetime by whichever tab owns the local
+ * database. The SAH-pool VFS allows only one connection per origin, so a second
+ * tab must not open it; it shows the "already open elsewhere" notice instead.
+ */
+export const DB_OWNER_LOCK = 'daico-db-owner';
 
 /**
  * Thrown when the local database can't be opened because another tab already

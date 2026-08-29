@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconGripVertical } from '@tabler/icons-react';
-import type { ShoppingItem } from '../../types';
+import type { ShoppingItem } from '../../lib/offline/specs';
 import ChecklistItem from '../../components/ChecklistItem';
 
 interface SortableShoppingItemProps {

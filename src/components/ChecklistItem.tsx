@@ -10,6 +10,9 @@ interface ChecklistItemProps {
   label: string;
   /** Optional secondary line under the label (e.g. a due date). */
   subtitle?: ReactNode;
+  /** Whether the subtitle is about something already past, which is said in
+   *  the error colour. */
+  overdue?: boolean;
   onToggle: () => void;
   /** Accessible label/title for the toggle button. */
   toggleLabel: string;
@@ -49,6 +52,7 @@ export default function ChecklistItem({
   checked,
   label,
   subtitle,
+  overdue = false,
   onToggle,
   toggleLabel,
   to,
@@ -64,7 +68,11 @@ export default function ChecklistItem({
       <span className={`truncate ${checked ? 'text-muted line-through' : 'text-on-surface'}`}>
         {label}
       </span>
-      {subtitle}
+      {subtitle !== undefined && (
+        <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
+          {subtitle}
+        </span>
+      )}
     </span>
   );
 

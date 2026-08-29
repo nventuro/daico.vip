@@ -14,20 +14,20 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { UNDO_MS, type ShoppingItem } from '../../types';
+import type { ShoppingItem } from '../../lib/offline/specs';
 import { useShoppingList } from './useShoppingList';
-import { keyForMove } from '../../lib/ordering';
-import { useUndo } from '../../hooks/useUndo';
-import OfflineBanner from '../../components/OfflineBanner';
+import { keyForMove } from './ordering';
+import { UNDO_MS, useUndo } from '../../hooks/useUndo';
 import SortableShoppingItem from './SortableShoppingItem';
 import AddBar from '../../components/AddBar';
 import Button from '../../components/Button';
 import UndoBar from '../../components/UndoBar';
+import EmptyState from '../../components/EmptyState';
+import ListPage from '../../components/ListPage';
 import SkeletonRows from '../../components/SkeletonRows';
 
 export default function ShoppingPage() {
   const { items, loading, error, add, toggle, removeChecked, restore, move } = useShoppingList();
-  const [name, setName] = useState('');
   const undo = useUndo<ShoppingItem[]>(UNDO_MS);
 
   // Optimistic ordering: a drag reorder is reflected here synchronously so the
@@ -48,13 +48,6 @@ export default function ShoppingPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-
-  function submit() {
-    const value = name.trim();
-    if (!value) return;
-    setName(''); // keep focus so several items can be added in a row
-    void add(value);
-  }
 
   function handleDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
@@ -80,55 +73,44 @@ export default function ShoppingPage() {
   const justCleared = undo.value;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex-1">
-        <OfflineBanner />
-
-        {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
-
-        {loading ? (
-          <SkeletonRows leading="check" />
-        ) : view.length === 0 ? (
-          <p className="py-10 text-center text-muted">
-            La lista está vacía. Agregá lo que necesites comprar.
-          </p>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-              <ul>
-                {view.map((item) => (
-                  <SortableShoppingItem
-                    key={item.id}
-                    item={item}
-                    onToggle={() => void toggle(item)}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
-        )}
-      </div>
-
-      <AddBar
-        value={name}
-        onChange={setName}
-        onSubmit={submit}
-        placeholder="Agregar producto..."
-        inputLabel="Nuevo producto"
-        notice={
-          justCleared ? (
-            <UndoBar message="Tachados borrados" onAction={() => undoClear(justCleared)} />
-          ) : hasStruck ? (
-            <Button variant="dangerOutline" size="sm" onClick={() => void clearStruck()}>
-              Borrar tachados
-            </Button>
-          ) : undefined
-        }
-      />
-    </div>
+    <ListPage
+      loading={loading}
+      error={error}
+      skeleton={<SkeletonRows leading="check" />}
+      bar={
+        <AddBar
+          onAdd={(name) => void add(name)}
+          placeholder="Agregar producto..."
+          inputLabel="Nuevo producto"
+          notice={
+            justCleared ? (
+              <UndoBar message="Tachados borrados" onAction={() => undoClear(justCleared)} />
+            ) : hasStruck ? (
+              <Button variant="dangerOutline" size="sm" onClick={() => void clearStruck()}>
+                Borrar tachados
+              </Button>
+            ) : undefined
+          }
+        />
+      }
+    >
+      {view.length === 0 ? (
+        <EmptyState>La lista está vacía. Agregá lo que necesites comprar.</EmptyState>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            <ul>
+              {view.map((item) => (
+                <SortableShoppingItem
+                  key={item.id}
+                  item={item}
+                  onToggle={() => void toggle(item)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+    </ListPage>
   );
 }

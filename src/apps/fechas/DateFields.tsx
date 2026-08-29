@@ -1,13 +1,6 @@
 import type { ReactNode } from 'react';
 import { IconBell, IconCalendarEvent, IconRepeat } from '@tabler/icons-react';
-import {
-  DATE_NOTICE_DAYS_OPTIONS,
-  DATE_REPEAT_MONTHS_DEFAULT,
-  DATE_REPEAT_MONTHS_MAX,
-  DATE_REPEAT_MONTHS_MIN,
-  REPEAT_KINDS,
-  type RepeatKind,
-} from '../../types';
+import { REPEAT_KINDS, type RepeatKind } from '../../lib/offline/specs';
 import {
   CHIP_BASE_CLASS,
   CHIP_IDLE_CLASS,
@@ -15,9 +8,21 @@ import {
   FIELD_CLASS,
 } from '../../components/controlClasses';
 import DatePicker from '../../components/DatePicker';
-import { noticeLabel } from '../../utils/dateUtils';
+import NoticeDaysSelect from '../../components/NoticeDaysSelect';
+import Select from '../../components/Select';
+import TextInput from '../../components/TextInput';
 import type { DateInput } from './useDates';
 import { repeatLabel } from './labels';
+
+/** Notice windows (days ahead) offered when adding or editing a date. */
+const DATE_NOTICE_DAYS_OPTIONS = [0, 1, 3, 7, 14, 30] as const;
+
+/** Interval a date gets when switched to repeating every N months. */
+const DATE_REPEAT_MONTHS_DEFAULT = 3;
+
+/** Bounds for a date's every-N-months interval (input guard). */
+const DATE_REPEAT_MONTHS_MIN = 1;
+const DATE_REPEAT_MONTHS_MAX = 24;
 
 /** The scheduling half of a date: when, how it repeats, and the notice window. */
 export type DateFieldsValue = Pick<
@@ -87,7 +92,7 @@ export default function DateFields({
       {field(
         'Repetición',
         <IconRepeat size={18} stroke={1.5} />,
-        <select
+        <Select
           value={repeat}
           onChange={(e) => changeRepeat(e.target.value)}
           aria-label="Repetición"
@@ -98,14 +103,14 @@ export default function DateFields({
               {repeatLabel(kind, repeatMonths ?? DATE_REPEAT_MONTHS_DEFAULT)}
             </option>
           ))}
-        </select>,
+        </Select>,
       )}
       {repeat === 'months' &&
         field(
           'Cada cuántos meses',
           <span>Cada</span>,
           <span className="flex items-center gap-1.5">
-            <input
+            <TextInput
               type="number"
               inputMode="numeric"
               min={DATE_REPEAT_MONTHS_MIN}
@@ -125,18 +130,12 @@ export default function DateFields({
       {field(
         'Aviso',
         <IconBell size={18} stroke={1.5} />,
-        <select
+        <NoticeDaysSelect
           value={noticeDays}
-          onChange={(e) => onChange({ notice_days: Number(e.target.value) })}
-          aria-label="Aviso"
+          onChange={(days) => onChange({ notice_days: days })}
+          options={DATE_NOTICE_DAYS_OPTIONS}
           className={control}
-        >
-          {DATE_NOTICE_DAYS_OPTIONS.map((days) => (
-            <option key={days} value={days}>
-              {noticeLabel(days)}
-            </option>
-          ))}
-        </select>,
+        />,
       )}
     </>
   );

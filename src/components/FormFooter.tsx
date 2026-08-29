@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import Button from './Button';
+import DialogFooter from './DialogFooter';
 
 interface FormFooterProps {
   /** The destructive action as first offered, e.g. "Eliminar tarea". */
@@ -36,14 +37,12 @@ export default function FormFooter({
       <div className="flex flex-col gap-2">
         <p className="font-medium text-on-surface">{confirmQuestion}</p>
         <p className="text-sm text-muted">No se puede deshacer.</p>
-        <div className="mt-1 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => setConfirming(false)}>
-            Cancelar
-          </Button>
-          <Button variant="danger" className="flex-1" onClick={onRemove}>
-            Eliminar
-          </Button>
-        </div>
+        <DialogFooter
+          onCancel={() => setConfirming(false)}
+          onConfirm={onRemove}
+          confirmLabel="Eliminar"
+          confirmVariant="danger"
+        />
       </div>
     );
   }

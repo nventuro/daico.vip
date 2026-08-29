@@ -17,7 +17,14 @@
 // protocol, transactions, the local-only bookkeeping — is unchanged SQLocal.
 // =============================================================================
 import { SQLiteMemoryDriver, SQLocalProcessor } from 'sqlocal';
-import { LOCAL_DB_VFS_NAME } from '../../types';
+
+/**
+ * Name of the OPFS SAH-pool VFS the local database is opened through. This VFS
+ * persists to OPFS without needing `SharedArrayBuffer` (and therefore no
+ * COOP/COEP headers, which the static host can't set), at the cost of a single
+ * connection per origin — hence the single-tab lock.
+ */
+const LOCAL_DB_VFS_NAME = 'daico-opfs-sahpool';
 
 type InitConfig = Parameters<SQLiteMemoryDriver['init']>[0];
 

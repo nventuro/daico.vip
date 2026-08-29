@@ -6,7 +6,7 @@
 // kept. An installment is a "3/6" beside the merchant, and a "07/26" beside
 // one is a period.
 // =============================================================================
-import { STATEMENT_CONTENTS_SCHEMA } from '../../../types';
+import { STATEMENT_CONTENTS_SCHEMA } from '../statement';
 import {
   StatementError,
   UnknownLayout,
@@ -22,6 +22,7 @@ import {
   minimumPayment,
   reconcile,
   statementNumber,
+  sum,
   text,
   usdRate,
 } from './common';
@@ -139,8 +140,4 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
     usd_rate: usdRate(charges, total.usd),
     lines: all,
   };
-}
-
-function sum(lines: StatementLine[], key: 'ars_cents' | 'usd_cents'): number {
-  return lines.reduce((acc, line) => acc + line[key], 0);
 }

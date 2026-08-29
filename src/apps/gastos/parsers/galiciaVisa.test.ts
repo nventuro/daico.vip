@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { PageLine } from '../statement';
-import { StatementError } from '../statement';
+import { StatementError, type PageLine } from '../statement';
 import { parseStatement } from './index';
 import { parseGaliciaVisa } from './galiciaVisa';
-import { ars, date, header, usd, w, words } from './fixture';
+import { ars, date, header, usd, w, words } from './testing/fixture';
 
 const flag = w('*', 74, 78);
 const desc = (text: string) => words(text, 86);

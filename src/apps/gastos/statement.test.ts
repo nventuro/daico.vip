@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { STATEMENT_CONTENTS_SCHEMA } from '../../types';
-import { withOneOff, type StatementContents, type StatementLine } from './statement';
+import {
+  STATEMENT_CONTENTS_SCHEMA,
+  withOneOff,
+  type StatementContents,
+  type StatementLine,
+} from './statement';
 
 const line = (description: string, one_off = false): StatementLine => ({
   on: '2026-08-01',

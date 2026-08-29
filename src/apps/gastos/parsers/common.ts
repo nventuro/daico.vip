@@ -3,13 +3,17 @@
 // the amount columns at the right edge of the page and the header every page
 // carries.
 // =============================================================================
-import { INSTALLMENTS_MAX } from '../../../types';
-import { StatementError, type PageLine, type PositionedWord } from '../statement';
+import {
+  StatementError,
+  type PageLine,
+  type PositionedWord,
+  type StatementLine,
+} from '../statement';
 
 /** An amount whose right edge is from here on sits in the pesos column… */
-export const ARS_COLUMN_MIN_X1 = 480;
+const ARS_COLUMN_MIN_X1 = 480;
 /** …and from here on in the dollars column. */
-export const USD_COLUMN_MIN_X1 = 540;
+const USD_COLUMN_MIN_X1 = 540;
 
 const AMOUNT = /^-?\d{1,3}(\.\d{3})*,\d\d$|^-?\d+,\d\d$/;
 
@@ -32,7 +36,7 @@ const MONTH_BY_PREFIX: Record<string, number> = {
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** The month (1-12) a Spanish name or abbreviation stands for, or null. */
-export function monthNumber(name: string): number | null {
+function monthNumber(name: string): number | null {
   return MONTH_BY_PREFIX[name.toLowerCase().slice(0, 3)] ?? null;
 }
 
@@ -80,6 +84,15 @@ export function amounts(line: PageLine): {
     else rest.push(word);
   }
   return { ars, usd, rest };
+}
+
+/** The most installments a purchase is ever split into. A statement marks an
+ *  installment "3/6"; a "07/26" past this count is a period, not one. */
+const INSTALLMENTS_MAX = 24;
+
+/** What a column of the lines comes to. */
+export function sum(lines: StatementLine[], key: 'ars_cents' | 'usd_cents'): number {
+  return lines.reduce((acc, line) => acc + line[key], 0);
 }
 
 /** Which installment of how many a "3/6" token says, or null when the token

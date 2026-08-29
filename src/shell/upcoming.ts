@@ -1,6 +1,12 @@
 import type { Upcoming } from '../apps/types';
-import { RELATIVE_DAY_LIMIT } from '../types';
-import { daysUntil, formatWeekdayDay, monthLabel } from '../utils/dateUtils';
+import {
+  RELATIVE_DAY_LIMIT,
+  daysUntil,
+  formatWeekdayDay,
+  monthLabel,
+  yearMonthOf,
+} from '../utils/dateUtils';
+import { groupRuns } from '../utils/listUtils';
 
 /** Soonest first; same-day entries by title. Does not modify the input. */
 export function sortUpcoming(items: Upcoming[]): Upcoming[] {
@@ -58,12 +64,12 @@ export interface UpcomingGroup {
 function dayHeading(date: string, today: string, currentYear: number): Omit<UpcomingGroup, 'rows'> {
   const days = daysUntil(today, date);
   if (days < 0) return { key: 'past', label: 'Vencidas', overdue: true };
-  const withMonth = date.slice(0, 7) !== today.slice(0, 7);
+  const withMonth = yearMonthOf(date) !== yearMonthOf(today);
   const day = formatWeekdayDay(date, withMonth);
   if (days === 0) return { key: date, label: `Hoy · ${day}`, overdue: false };
   if (days === 1) return { key: date, label: `Mañana · ${day}`, overdue: false };
   if (days <= RELATIVE_DAY_LIMIT) return { key: date, label: day, overdue: false };
-  const yearMonth = date.slice(0, 7);
+  const yearMonth = yearMonthOf(date);
   return { key: yearMonth, label: monthLabel(yearMonth, currentYear), overdue: false };
 }
 
@@ -75,12 +81,8 @@ function dayHeading(date: string, today: string, currentYear: number): Omit<Upco
  */
 export function groupByDay(rows: Upcoming[], today: string): UpcomingGroup[] {
   const currentYear = Number(today.slice(0, 4));
-  const groups: UpcomingGroup[] = [];
-  for (const row of rows) {
-    const heading = dayHeading(row.on, today, currentYear);
-    const last = groups[groups.length - 1];
-    if (last?.key === heading.key) last.rows.push(row);
-    else groups.push({ ...heading, rows: [row] });
-  }
-  return groups;
+  return groupRuns(rows, (row) => dayHeading(row.on, today, currentYear).key).map(({ items }) => ({
+    ...dayHeading(items[0].on, today, currentYear),
+    rows: items,
+  }));
 }

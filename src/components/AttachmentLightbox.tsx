@@ -9,7 +9,7 @@ import {
   IconShare,
   IconX,
 } from '@tabler/icons-react';
-import { LIGHTBOX_FROM_ENTRY_PAGE, LIGHTBOX_SWIPE_MIN_PX, type Attachment } from '../types';
+import type { Attachment } from '../lib/offline/specs';
 import { useOnline } from '../hooks/useOnline';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
@@ -18,6 +18,13 @@ import Button from './Button';
 import FormFooter from './FormFooter';
 import ModalDialog from './ModalDialog';
 import LoadingLine from './LoadingLine';
+
+/** How far a finger must travel across the lightbox to change picture, in pixels. */
+const LIGHTBOX_SWIPE_MIN_PX = 50;
+
+/** Navigation state a link into the lightbox carries when it is followed from
+ *  the entry's own page, so that closing can simply go back to it. */
+export const LIGHTBOX_FROM_ENTRY_PAGE = { fromEntryPage: true } as const;
 
 function isFromEntryPage(state: unknown): boolean {
   return (
@@ -144,10 +151,7 @@ export default function AttachmentLightbox({
   }
 
   return (
-    <ModalDialog
-      onClose={close}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-surface-inverse p-0 text-on-surface-inverse backdrop:bg-transparent"
-    >
+    <ModalDialog onClose={close} layout="full">
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center justify-between px-2 py-2">
           <button

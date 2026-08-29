@@ -11,14 +11,19 @@
 // The tables are tiny, so a full pull every sync is simpler than tracking a
 // server-side watermark and is plenty fast.
 // =============================================================================
-import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from '../../types';
 import { supabase } from '../supabase';
 import { isPermanentRowError } from '../refusals';
-import { ALL_SPECS, type TableSpec } from './specs';
+import { ALL_SPECS, columnNames, type TableSpec } from './specs';
 import * as engine from './engine';
 
-/** A synced row always carries at least these; app columns vary by table. */
-type SyncedRow = { id: string; updated_at: string } & Record<string, unknown>;
+/** How recently (ms) a sync run must have ended for a screen that opens not
+ *  to ask for another: moving around the app must not sync at every tap. */
+export const SYNC_FRESH_MS = 60_000;
+
+/** How many rows a sync asks the server for at a time. PostgREST answers a
+ *  plain select with at most 1000 rows and says nothing about the rest, so a
+ *  table is read page by page until one comes back short. */
+export const SYNC_PULL_PAGE = 1000;
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +195,26 @@ export async function syncAll(): Promise<void> {
   }
 }
 
+/**
+ * Ask for a run whenever the device is likely to want one: the connection is
+ * back, or the app is in front again after being away (you reopen it once
+ * signal is back). Installed once for the whole app, so that N screens
+ * watching N tables do not each ask for their own run; returns the way to take
+ * them down again, for when there is no longer a member to sync for.
+ */
+export function installSyncTriggers(): () => void {
+  const onOnline = () => void syncAll();
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') void syncAll();
+  };
+  window.addEventListener('online', onOnline);
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    window.removeEventListener('online', onOnline);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
+
 /** Sync unless a run is going on or one ended within SYNC_FRESH_MS. For a
  *  screen that opens: it wants what is on the server, but moving around the
  *  app must not sync at every tap. Reconnecting, coming back to the app and
@@ -229,7 +254,7 @@ function refusedForGood(table: string, error: { code?: string; message?: string 
 async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
   // The table name is dynamic, so supabase-js can't infer a row type — cast
   // the plain rows we asked for.
-  const columns = ['id', ...spec.columns.map((c) => c.name), 'created_at', 'updated_at'].join(', ');
+  const columns = ['id', ...columnNames(spec), 'created_at', 'updated_at'].join(', ');
   const rows: Record<string, unknown>[] = [];
   for (let from = 0; ; from += SYNC_PULL_PAGE) {
     const { data, error } = await supabase
@@ -246,7 +271,7 @@ async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
 
 async function syncTable(spec: TableSpec): Promise<void> {
   // 1. Queued creates/updates — the objects are already in server shape.
-  for (const row of await engine.getPendingUpserts<SyncedRow>(spec)) {
+  for (const row of await engine.getPendingUpserts(spec)) {
     const { error } = await supabase.from(spec.table).upsert(row);
     if (error) {
       if (!refusedForGood(spec.table, error)) throw error;

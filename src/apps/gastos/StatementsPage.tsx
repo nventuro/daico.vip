@@ -1,27 +1,35 @@
-import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { IconChevronRight, IconPlus, IconTags, IconTrendingUp } from '@tabler/icons-react';
-import { STATEMENT_PDF_MAX_BYTES, type Statement } from '../../types';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { IconPlus, IconTags, IconTrendingUp } from '@tabler/icons-react';
+import type { Statement } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { relativeDay, todayIso } from '../../utils/dateUtils';
-import { formatBytes } from '../../utils/textUtils';
-import OfflineBanner from '../../components/OfflineBanner';
-import SkeletonRows from '../../components/SkeletonRows';
-import SectionLabel from '../../components/SectionLabel';
-import Button from '../../components/Button';
-import ModalDialog from '../../components/ModalDialog';
+import { dueWord, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { tooLargeMessage } from '../../utils/textUtils';
+import DialogFooter from '../../components/DialogFooter';
+import EmptyState from '../../components/EmptyState';
+import ErrorLine from '../../components/ErrorLine';
+import HiddenFileInput from '../../components/HiddenFileInput';
+import LinkRow from '../../components/LinkRow';
+import ListPage from '../../components/ListPage';
 import LoadingLine from '../../components/LoadingLine';
+import ModalDialog from '../../components/ModalDialog';
+import SectionLabel from '../../components/SectionLabel';
+import SkeletonRows from '../../components/SkeletonRows';
 import {
   ADD_BAR_BUTTON_CLASS,
   ADD_BAR_CLASS,
   ADD_BAR_INPUT_CLASS,
 } from '../../components/controlClasses';
+import { appPath, entryPath } from '../types';
 import { useStatements } from './useStatements';
 import { openStatement, useStatementsContents } from './useStatementContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
-import { monthOf, toPayCents } from './breakdown';
-import { FORMAT_LABELS, formatArs, monthTitle, periodLabel } from './labels';
+import { toPayCents } from './breakdown';
+import { FORMAT_LABELS, formatArs, periodLabel, statementTitle } from './labels';
+
+/** Largest PDF taken as a statement, in bytes (input guard). */
+const STATEMENT_PDF_MAX_BYTES = 5 * 1024 * 1024;
 
 /** A statement just read that is already here: the user decides whether it
  *  takes the place of the one imported before. */
@@ -37,7 +45,6 @@ export default function StatementsPage() {
   const { contents, error: openError } = useStatementsContents(items);
   const masterKey = useMasterKey();
   const navigate = useNavigate();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
@@ -48,19 +55,17 @@ export default function StatementsPage() {
     if (existing) {
       const previous = await openStatement(existing, masterKey.key);
       await replace(existing.id, withOneOffsFrom(contents, previous), masterKey.key);
-      navigate(`/gastos/${existing.id}`);
+      navigate(entryPath('gastos', existing.id));
       return;
     }
     const id = await add(contents, masterKey.key);
-    if (id) navigate(`/gastos/${id}`);
+    if (id) navigate(entryPath('gastos', id));
   }
 
   async function importFile(file: File) {
     setProblem(null);
     if (file.size > STATEMENT_PDF_MAX_BYTES) {
-      setProblem(
-        `El archivo pesa ${formatBytes(file.size)}; el máximo es ${formatBytes(STATEMENT_PDF_MAX_BYTES)}.`,
-      );
+      setProblem(tooLargeMessage(file.size, STATEMENT_PDF_MAX_BYTES));
       return;
     }
     setReading(true);
@@ -81,156 +86,120 @@ export default function StatementsPage() {
     }
   }
 
-  function pick() {
-    const input = inputRef.current;
-    if (!input) return;
-    input.value = '';
-    input.click();
-  }
-
   const busy = reading || masterKey.status !== 'unlocked';
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex-1">
-        <OfflineBanner />
-
-        {(error || openError) && (
-          <p className="mb-4 text-sm text-error">Error: {error ?? openError}</p>
-        )}
-
-        {loading || (!openError && contents?.length !== items.length) ? (
-          <SkeletonRows subtitle />
-        ) : items.length === 0 ? (
-          <p className="py-10 text-center text-muted">
-            Todavía no hay resúmenes. Importá el PDF que manda el banco.
-          </p>
+    <>
+      <ListPage
+        loading={loading || (!openError && contents?.length !== items.length)}
+        error={error ?? openError}
+        skeleton={<SkeletonRows subtitle />}
+        bar={
+          /* The add bar every list ends in, with the file picker where the text
+           would go: a statement is added by picking its PDF, not by typing. */
+          <div className={ADD_BAR_CLASS}>
+            <ErrorLine problem={problem} className="mb-3" />
+            {reading && (
+              <div className="mb-3">
+                <LoadingLine />
+              </div>
+            )}
+            <HiddenFileInput
+              accept="application/pdf"
+              label="Resumen en PDF"
+              onPick={(files) => void importFile(files[0])}
+            >
+              {(pick) => (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={pick}
+                    disabled={busy}
+                    className={`${ADD_BAR_INPUT_CLASS} text-left text-muted disabled:text-disabled`}
+                  >
+                    Agregar un resumen...
+                  </button>
+                  <button
+                    type="button"
+                    onClick={pick}
+                    disabled={busy}
+                    aria-label="Agregar resumen"
+                    title="Agregar resumen"
+                    className={ADD_BAR_BUTTON_CLASS}
+                  >
+                    <IconPlus size={22} stroke={2} />
+                  </button>
+                </div>
+              )}
+            </HiddenFileInput>
+          </div>
+        }
+      >
+        {items.length === 0 ? (
+          <EmptyState>Todavía no hay resúmenes. Importá el PDF que manda el banco.</EmptyState>
         ) : (
           <>
-            <Link
-              to="/gastos/tendencias"
-              className="flex items-center gap-3 border-b border-border py-3 transition-colors hover:bg-border-subtle"
-            >
-              <IconTrendingUp size={20} stroke={1.75} className="shrink-0 text-(--app)" />
-              <span className="flex-1 font-medium">Tendencias</span>
-              <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
-            </Link>
-            <Link
-              to="/gastos/categorizacion"
-              className="flex items-center gap-3 border-b border-border py-3 transition-colors hover:bg-border-subtle"
-            >
-              <IconTags size={20} stroke={1.75} className="shrink-0 text-(--app)" />
-              <span className="flex-1 font-medium">Categorización</span>
-              <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
-            </Link>
+            <ul>
+              <LinkRow
+                to={`${appPath('gastos')}/tendencias`}
+                title="Tendencias"
+                leading={
+                  <IconTrendingUp size={20} stroke={1.75} className="shrink-0 text-(--app)" />
+                }
+                chevron
+              />
+              <LinkRow
+                to={`${appPath('gastos')}/categorizacion`}
+                title="Categorización"
+                leading={<IconTags size={20} stroke={1.75} className="shrink-0 text-(--app)" />}
+                chevron
+              />
+            </ul>
             <div className="mt-5">
               <SectionLabel>Resúmenes</SectionLabel>
               <ul>
                 {items.map((statement, i) => {
-                  const overdue = !statement.paid && statement.due_on < today;
+                  const overdue = !statement.paid && isPast(statement.due_on, today);
                   const usdRate = contents?.[i]?.usd_rate ?? null;
+                  const due = `${dueWord(statement.due_on, today)} ${relativeDay(today, statement.due_on)}`;
                   return (
-                    <li key={statement.id} className="border-b border-border">
-                      <Link
-                        to={`/gastos/${statement.id}`}
-                        className="flex items-center gap-2 py-3 transition-colors hover:bg-border-subtle"
-                      >
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate text-on-surface">
-                            {monthTitle(monthOf(statement))} · {FORMAT_LABELS[statement.format]}
-                          </span>
-                          <span
-                            className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}
-                          >
-                            {!statement.paid &&
-                              `${overdue ? 'venció' : 'vence'} ${relativeDay(today, statement.due_on)} · `}
-                            {formatArs(toPayCents({ ...statement, usd_rate: usdRate }))}
-                          </span>
-                        </span>
-                        <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />
-                      </Link>
-                    </li>
+                    <LinkRow
+                      key={statement.id}
+                      to={entryPath('gastos', statement.id)}
+                      title={statementTitle(statement)}
+                      subtitle={`${statement.paid ? '' : `${due} · `}${formatArs(
+                        toPayCents({ ...statement, usd_rate: usdRate }),
+                      )}`}
+                      overdue={overdue}
+                      chevron
+                    />
                   );
                 })}
               </ul>
             </div>
           </>
         )}
-      </div>
-
-      {/* The add bar every list ends in, with the file picker where the text
-          would go: a statement is added by picking its PDF, not by typing. */}
-      <div className={ADD_BAR_CLASS}>
-        {problem && <p className="mb-3 text-sm text-error">{problem}</p>}
-        {reading && (
-          <div className="mb-3">
-            <LoadingLine />
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={pick}
-            disabled={busy}
-            className={`${ADD_BAR_INPUT_CLASS} text-left text-muted disabled:text-disabled`}
-          >
-            Agregar un resumen...
-          </button>
-          <button
-            type="button"
-            onClick={pick}
-            disabled={busy}
-            aria-label="Agregar resumen"
-            title="Agregar resumen"
-            className={ADD_BAR_BUTTON_CLASS}
-          >
-            <IconPlus size={22} stroke={2} />
-          </button>
-        </div>
-        {/* The buttons are the visible control; this input only carries the file picker. */}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void importFile(file);
-          }}
-          aria-label="Resumen en PDF"
-          tabIndex={-1}
-          className="sr-only"
-        />
-      </div>
-
+      </ListPage>
       {duplicate && (
-        <ModalDialog
-          onClose={() => setDuplicate(null)}
-          className="m-auto w-[calc(100%-2rem)] max-w-sm border border-border bg-surface p-4 text-on-surface backdrop:bg-on-surface/50"
-        >
+        <ModalDialog onClose={() => setDuplicate(null)} layout="confirm">
           <div className="flex flex-col gap-2">
             <p className="font-medium text-on-surface">
               Ya está el resumen {FORMAT_LABELS[duplicate.contents.format]}{' '}
               {periodLabel(duplicate.contents)}. ¿Reemplazarlo?
             </p>
             <p className="text-sm text-muted">Lo que marcaste como puntual se conserva.</p>
-            <div className="mt-1 flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setDuplicate(null)}>
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => {
-                  const { contents, existing } = duplicate;
-                  setDuplicate(null);
-                  void keep(contents, existing);
-                }}
-              >
-                Reemplazar
-              </Button>
-            </div>
+            <DialogFooter
+              onCancel={() => setDuplicate(null)}
+              confirmLabel="Reemplazar"
+              onConfirm={() => {
+                const { contents, existing } = duplicate;
+                setDuplicate(null);
+                void keep(contents, existing);
+              }}
+            />
           </div>
         </ModalDialog>
       )}
-    </div>
+    </>
   );
 }

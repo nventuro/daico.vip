@@ -1,5 +1,6 @@
-import { groupByDay } from '../lib/upcoming';
+import { groupByDay } from './upcoming';
 import { todayIso } from '../utils/dateUtils';
+import EmptyState from '../components/EmptyState';
 import SectionLabel from '../components/SectionLabel';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
@@ -14,7 +15,7 @@ export default function ProximoPage() {
       {(rows, ready) => {
         if (!ready) return <SkeletonRows leading="square" trailing />;
         if (rows.length === 0) {
-          return <p className="py-10 text-center text-muted">No hay nada por delante.</p>;
+          return <EmptyState>No hay nada por delante.</EmptyState>;
         }
         return groupByDay(rows, today).map((group) => (
           <section key={group.key} className="mb-6">

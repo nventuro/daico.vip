@@ -9,7 +9,6 @@ const ShoppingPage = lazy(() => import('./ShoppingPage'));
 const compras: AppModule = {
   id: 'compras',
   name: 'Compras',
-  hue: 'app-compras',
   icon: IconShoppingCart,
   specs: [SHOPPING_SPEC],
   routes: [{ index: true, Component: ShoppingPage }],

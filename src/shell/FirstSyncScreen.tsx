@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { IconCheck, IconCloudDownload } from '@tabler/icons-react';
 import { apps } from '../apps/registry';
-import type { AppHue, AppModule } from '../apps/types';
+import { appHue, type AppHue, type AppModule } from '../apps/types';
 import { syncAll, type SyncStatus, type TableSyncState } from '../lib/offline/sync';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { useOnline } from '../hooks/useOnline';
-import Gate from '../components/Gate';
+import Button from '../components/Button';
+import Gate from './Gate';
 import LoadingLine from '../components/LoadingLine';
-import { hueStyle } from './hue';
+import { hueStyle } from '../components/hue';
 
 /** Where an app stands in the run: done once every table of its own is. */
 function appState(app: AppModule, tables: SyncStatus['tables']): TableSyncState {
@@ -69,13 +70,9 @@ export default function FirstSyncScreen({ onEnter }: { onEnter: () => void }) {
   const { tables, files } = useSyncStatus();
   const online = useOnline();
 
-  // No table's hook is mounted here to ask for a run, so this screen does —
-  // now, and whenever the connection comes back.
+  // No table's hook is mounted here to ask for a run, so this screen does.
   useEffect(() => {
     void syncAll();
-    const onOnline = () => void syncAll();
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
   }, []);
 
   return (
@@ -86,18 +83,19 @@ export default function FirstSyncScreen({ onEnter }: { onEnter: () => void }) {
     >
       <ul className="mt-7 w-full">
         {apps.map((app) => (
-          <PullRow key={app.id} label={app.name} hue={app.hue} state={appState(app, tables)} />
+          <PullRow
+            key={app.id}
+            label={app.name}
+            hue={appHue(app.id)}
+            state={appState(app, tables)}
+          />
         ))}
         <PullRow label="Archivos de los documentos" {...filesState(files)} />
       </ul>
       {!online && <p className="mt-4 text-sm text-muted">Sin conexión: sigue cuando vuelva.</p>}
-      <button
-        type="button"
-        onClick={onEnter}
-        className="mt-6 text-muted underline transition-colors hover:text-muted-strong"
-      >
+      <Button variant="link" className="mt-6" onClick={onEnter}>
         Entrar mientras tanto
-      </button>
+      </Button>
     </Gate>
   );
 }

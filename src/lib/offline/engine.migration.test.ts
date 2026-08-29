@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import type { Chore } from '../../types';
-import { CHORES_SPEC } from './specs';
+import { CHORES_SPEC, type Chore } from './specs';
 import { localDb, seedSql } from './testing/sqlocalInMemory';
 import * as engine from './engine';
 

@@ -1,5 +1,13 @@
-import { MONTHS_PER_YEAR, type DateEntry, type RepeatKind } from '../../types';
-import { addMonths, daysUntil, monthLabel } from '../../utils/dateUtils';
+import {
+  MONTHS_PER_YEAR,
+  addMonths,
+  daysUntil,
+  isPast,
+  monthLabel,
+  yearMonthOf,
+} from '../../utils/dateUtils';
+import type { DateEntry, RepeatKind } from '../../lib/offline/specs';
+import { groupRuns } from '../../utils/listUtils';
 
 /** Whole months from the month of `from` to the month of `to` (days ignored). */
 function monthsApart(from: string, to: string): number {
@@ -68,10 +76,10 @@ export function splitByToday(
   const shown = new Map(entries.map((entry) => [entry.id, displayDate(entry, today)]));
   const dateOf = (entry: DateEntry) => shown.get(entry.id) ?? entry.occurs_on;
   const upcoming = entries
-    .filter((entry) => dateOf(entry) >= today)
+    .filter((entry) => !isPast(dateOf(entry), today))
     .sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || byTitle(a, b));
   const past = entries
-    .filter((entry) => dateOf(entry) < today)
+    .filter((entry) => isPast(dateOf(entry), today))
     .sort((a, b) => dateOf(b).localeCompare(dateOf(a)) || byTitle(a, b));
   return { upcoming, past };
 }
@@ -90,12 +98,7 @@ export interface MonthGroup {
  */
 export function groupByMonth(entries: DateEntry[], today: string): MonthGroup[] {
   const currentYear = Number(today.slice(0, 4));
-  const groups: MonthGroup[] = [];
-  for (const entry of entries) {
-    const key = displayDate(entry, today).slice(0, 7);
-    const last = groups[groups.length - 1];
-    if (last?.key === key) last.entries.push(entry);
-    else groups.push({ key, label: monthLabel(key, currentYear), entries: [entry] });
-  }
-  return groups;
+  return groupRuns(entries, (entry) => yearMonthOf(displayDate(entry, today))).map(
+    ({ key, items }) => ({ key, label: monthLabel(key, currentYear), entries: items }),
+  );
 }

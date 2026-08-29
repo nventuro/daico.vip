@@ -12,7 +12,6 @@ const RulesPage = lazy(() => import('./RulesPage'));
 const gastos: AppModule = {
   id: 'gastos',
   name: 'Gastos',
-  hue: 'app-gastos',
   icon: IconCreditCard,
   specs: [STATEMENTS_SPEC, MERCHANT_RULES_SPEC],
   routes: [
@@ -22,6 +21,9 @@ const gastos: AppModule = {
     { path: ':id', Component: StatementPage },
   ],
   useUpcoming: useStatementsUpcoming,
+  // No `search`: a statement's merchants and amounts are sealed in its payload,
+  // and search reads the local tables as they are stored. Looking through them
+  // would mean unsealing every statement on every keystroke.
 };
 
 export default gastos;

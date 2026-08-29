@@ -11,7 +11,6 @@ const RecipeEditPage = lazy(() => import('./RecipeEditPage'));
 const recetas: AppModule = {
   id: 'recetas',
   name: 'Recetas',
-  hue: 'app-recetas',
   icon: IconChefHat,
   specs: [RECIPES_SPEC],
   routes: [

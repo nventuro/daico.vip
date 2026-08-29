@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DocumentEntry } from '../../types';
+import type { DocumentEntry } from '../../lib/offline/specs';
 import { expiryLabel, isExpiring } from './expiry';
 
 const TODAY = '2026-08-27';

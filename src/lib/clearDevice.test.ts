@@ -4,12 +4,13 @@ import * as engine from './offline/engine';
 import { getSyncStatus, syncAll } from './offline/sync';
 import { cachedVerdict, rememberVerdict } from './membershipCache';
 import { clearDevice } from './clearDevice';
+import { localAttachmentFile, putAttachmentFile } from './attachmentFiles';
 
 vi.mock('sqlocal', () => import('./offline/testing/sqlocalInMemory'));
 vi.mock('./supabase', () => import('./offline/testing/fakeSupabase'));
 
 const cleared = vi.fn(async () => {});
-vi.mock('../hooks/useMasterKey', () => ({ clearMasterKey: () => cleared() }));
+vi.mock('./masterKeyStore', () => ({ clearMasterKey: () => cleared() }));
 
 // Node has no Web Storage; the verdict is kept in one for the length of a test.
 const stored = new Map<string, string>();
@@ -31,7 +32,7 @@ beforeEach(async () => {
 describe('clearDevice', () => {
   it('leaves the device holding nothing of the household', async () => {
     await engine.insert(CHORES_SPEC, { title: 'Regar', notes: null, done: false, due_on: null });
-    await engine.putAttachmentFile('a', new TextEncoder().encode('abc'), true);
+    await putAttachmentFile('a', new TextEncoder().encode('abc'), true);
     rememberVerdict('u1', true);
     await syncAll();
     expect(getSyncStatus().completedAt).not.toBeNull();
@@ -39,7 +40,7 @@ describe('clearDevice', () => {
     await clearDevice('u1');
 
     expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
-    expect(await engine.getAttachmentFile('a')).toBeNull();
+    expect(await localAttachmentFile('a')).toBeNull();
     expect(cachedVerdict('u1')).toBeNull();
     expect(cleared).toHaveBeenCalled();
     expect(getSyncStatus().completedAt).toBeNull();

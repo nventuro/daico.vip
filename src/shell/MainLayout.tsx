@@ -1,18 +1,19 @@
 import { lazy, Suspense, useState } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { IconLogout, IconSearch } from '@tabler/icons-react';
-import { useAppContext } from '../context/appContext';
+import IconButton from '../components/IconButton';
+import { useAppContext } from './appContext';
 import { useOnline } from '../hooks/useOnline';
 import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
 import { useSyncStatus } from '../hooks/useSyncStatus';
-import LoginScreen from '../components/LoginScreen';
-import NoAccess from '../components/NoAccess';
-import UnlockScreen from '../components/UnlockScreen';
+import LoginScreen from './LoginScreen';
+import NoAccess from './NoAccess';
+import UnlockScreen from './UnlockScreen';
 import FirstSyncScreen from './FirstSyncScreen';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
-const TabConflict = lazy(() => import('../components/TabConflict'));
+const TabConflict = lazy(() => import('./TabConflict'));
 
 export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
@@ -56,23 +57,22 @@ export default function MainLayout() {
             )}
           </span>
           <div className="flex items-center gap-1">
-            <Link
+            <IconButton
+              label="Buscar"
+              icon={IconSearch}
               to="/buscar"
-              aria-label="Buscar"
-              title="Buscar"
-              className="flex items-center px-2 py-1 text-on-surface transition-opacity hover:opacity-70"
-            >
-              <IconSearch size={20} stroke={1.75} />
-            </Link>
-            <button
+              tone="band"
+              className="px-2 py-1"
+            />
+            <IconButton
+              label="Cerrar sesión"
+              title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
+              icon={IconLogout}
+              tone="band"
+              className="px-2 py-1 disabled:cursor-not-allowed disabled:text-disabled disabled:hover:opacity-100"
               onClick={signOut}
               disabled={!online}
-              aria-label="Cerrar sesión"
-              title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
-              className="flex items-center px-2 py-1 text-on-surface transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:text-disabled disabled:hover:opacity-100"
-            >
-              <IconLogout size={20} stroke={1.75} />
-            </button>
+            />
           </div>
         </div>
       </header>

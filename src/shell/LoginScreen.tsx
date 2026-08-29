@@ -1,6 +1,7 @@
 import { IconBrandGoogleFilled } from '@tabler/icons-react';
-import { useAppContext } from '../context/appContext';
+import { useAppContext } from './appContext';
 import { useOnline } from '../hooks/useOnline';
+import Button from '../components/Button';
 import Footer from './Footer';
 import Logo from './Logo';
 
@@ -19,14 +20,14 @@ export default function LoginScreen() {
           <p className="mb-10 text-muted">Todo en orden, en un solo lugar.</p>
 
           {/* Sign-in is a Google OAuth redirect — it can't work offline. */}
-          <button
+          <Button
             onClick={signIn}
             disabled={!online}
-            className="flex w-full items-center justify-center gap-3 bg-primary px-5 py-3 font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:hover:bg-disabled"
+            className="flex w-full items-center justify-center gap-3 px-5 py-3"
           >
             <IconBrandGoogleFilled size={20} stroke={1.5} />
             Ingresá con Google
-          </button>
+          </Button>
           {!online && <p className="mt-4 text-sm text-muted">Necesitás conexión para ingresar.</p>}
         </div>
         <Footer className="mt-auto py-8" />

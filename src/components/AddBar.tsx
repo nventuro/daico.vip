@@ -1,12 +1,10 @@
-import { type FormEvent, type ReactNode, useRef } from 'react';
+import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { IconPlus } from '@tabler/icons-react';
 import { ADD_BAR_BUTTON_CLASS, ADD_BAR_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
 
 interface AddBarProps {
-  value: string;
-  onChange: (value: string) => void;
-  /** Called on submit; the page reads its own state to build the new item. */
-  onSubmit: () => void;
+  /** Called with what was typed, never blank; the bar clears itself. */
+  onAdd: (text: string) => void;
   placeholder: string;
   /** Accessible label for the text input. */
   inputLabel: string;
@@ -16,24 +14,21 @@ interface AddBarProps {
   notice?: ReactNode;
 }
 
-/** Bottom-anchored add bar — within thumb reach for one-handed use. Shared by the
- *  chores and shopping lists; pages pass extra controls (like a date picker) as
+/** Bottom-anchored add bar — within thumb reach for one-handed use. The bar
+ *  holds what is being typed; pages pass extra controls (like a date picker) as
  *  children and what goes above the input (an undo bar, a list-level action) as
  *  `notice`, so both stay pinned with the bar. */
-export default function AddBar({
-  value,
-  onChange,
-  onSubmit,
-  placeholder,
-  inputLabel,
-  children,
-  notice,
-}: AddBarProps) {
+export default function AddBar({ onAdd, placeholder, inputLabel, children, notice }: AddBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState('');
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit();
+    const text = value.trim();
+    if (text) {
+      setValue('');
+      onAdd(text);
+    }
     // Keep focus so several items can be added in a row without re-tapping the
     // input — on mobile this also keeps the keyboard open between adds.
     inputRef.current?.focus();
@@ -48,7 +43,7 @@ export default function AddBar({
             ref={inputRef}
             type="text"
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
             aria-label={inputLabel}
             enterKeyHint="done"

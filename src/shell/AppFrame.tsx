@@ -2,9 +2,8 @@ import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 import type { AppHue } from '../apps/types';
-import { HueContext } from '../context/hueContext';
 import AppHeader from './AppHeader';
-import { hueStyle } from './hue';
+import { HueContext, hueStyle } from '../components/hue';
 import SkeletonRows from '../components/SkeletonRows';
 
 interface AppFrameProps {

@@ -1,13 +1,18 @@
-import { type FormEvent, useState } from 'react';
-import { RECIPE_QUANTITY_MIN, type Recipe } from '../../types';
+import { useState } from 'react';
+import type { Recipe } from '../../lib/offline/specs';
 import FormField from '../../components/FormField';
 import TextInput from '../../components/TextInput';
 import TextArea from '../../components/TextArea';
+import TitleField from '../../components/TitleField';
+import { CONTROL_CLASS } from '../../components/controlClasses';
 import Button from '../../components/Button';
 import FormFooter from '../../components/FormFooter';
-import { hasChanges } from '../../utils/formUtils';
+import { entryForm } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import type { RecipeInput } from './useRecipes';
+
+/** Smallest value accepted for a recipe's minutes or servings (input guard). */
+const RECIPE_QUANTITY_MIN = 1;
 
 interface RecipeFormProps {
   recipe: Recipe;
@@ -38,13 +43,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
     minutes: parseQuantity(minutes),
     servings: parseQuantity(servings),
   };
-  const canSave = input.title !== '' && hasChanges(input, recipe);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canSave) return;
-    onSave(input);
-  }
+  const { canSave, onSubmit } = entryForm(input, recipe, onSave, input.title !== '');
 
   function insertIngredients() {
     setBody((current) =>
@@ -53,17 +52,8 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <FormField label="Título">
-        <TextInput
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label="Título"
-          autoCapitalize="none"
-          required
-        />
-      </FormField>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <TitleField value={title} onChange={setTitle} />
 
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Minutos">
@@ -94,7 +84,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
           onChange={(e) => setBody(e.target.value)}
           aria-label="Receta (Markdown)"
           rows={14}
-          className="font-mono"
+          className={`${CONTROL_CLASS} font-mono`}
         />
       </FormField>
 

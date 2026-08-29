@@ -1,13 +1,14 @@
-import { type FormEvent, useState } from 'react';
-import type { Chore } from '../../types';
+import { useState } from 'react';
+import type { Chore } from '../../lib/offline/specs';
 import { todayIso } from '../../utils/dateUtils';
-import { hasChanges } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
+import { entryForm } from '../../utils/formUtils';
 import FormField from '../../components/FormField';
-import TextInput from '../../components/TextInput';
-import TextArea from '../../components/TextArea';
+import TitleField from '../../components/TitleField';
+import NotesField from '../../components/NotesField';
 import FormFooter from '../../components/FormFooter';
 import AttachmentGrid from '../../components/AttachmentGrid';
+import { entryPath } from '../types';
 import type { ChoreInput } from './useChores';
 import DueDateChips from './DueDateChips';
 
@@ -30,42 +31,23 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
     due_on: dueOn,
     notes: notes.trim() || null,
   };
-  const canSave = input.title !== '' && hasChanges(input, chore);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canSave) return;
-    onSave(input);
-  }
+  const { canSave, onSubmit } = entryForm(input, chore, onSave, input.title !== '');
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <FormField label="Título">
-        <TextInput
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label="Título"
-          autoCapitalize="none"
-          required
-        />
-      </FormField>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <TitleField value={title} onChange={setTitle} />
 
       <FormField label="Fecha" group>
         <DueDateChips value={dueOn} onChange={setDueOn} today={today} />
       </FormField>
 
-      <FormField label="Notas">
-        <TextArea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          aria-label="Notas"
-          rows={5}
-        />
-      </FormField>
+      <NotesField value={notes} onChange={setNotes} />
 
       <FormField label="Adjuntos" group>
-        <AttachmentGrid owner={{ kind: 'chore', id: chore.id }} ownerPath={`/tareas/${chore.id}`} />
+        <AttachmentGrid
+          owner={{ kind: 'chore', id: chore.id }}
+          ownerPath={entryPath('tareas', chore.id)}
+        />
       </FormField>
 
       <FormFooter

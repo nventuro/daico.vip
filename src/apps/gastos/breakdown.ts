@@ -3,13 +3,14 @@
 // one-off, and month by month across statements. All in pesos, a dollar line
 // valued at its own statement's rate.
 // =============================================================================
-import { ONE_OFF_CATEGORIES, type SpendingCategory, type StatementFormat } from '../../types';
+import type { SpendingCategory, StatementFormat } from '../../lib/offline/specs';
+import { yearMonthOf } from '../../utils/dateUtils';
 import { categoryOf, type Rule } from './rules';
 import type { StatementContents, StatementLine } from './statement';
 
 /** Pesos and dollars as pesos, the dollars valued at `usdRate`; dollars
  *  count for nothing when the rate is unknown. */
-export function inPesos(arsCents: number, usdCents: number, usdRate: number | null): number {
+function inPesos(arsCents: number, usdCents: number, usdRate: number | null): number {
   return arsCents + (usdRate === null ? 0 : Math.round(usdCents * usdRate));
 }
 
@@ -59,6 +60,10 @@ export function byCategory(contents: StatementContents, rules: Rule[]): Category
   return [...shares.values()].sort((a, b) => b.cents - a.cents);
 }
 
+/** The categories whose movements are one-offs on their own: a trip is never
+ *  part of a month's usual spending, so it needs no mark of its own. */
+const ONE_OFF_CATEGORIES: readonly SpendingCategory[] = ['viajes'];
+
 /** Whether every movement a category holds is a one-off. */
 export function isOneOffCategory(category: SpendingCategory | null): boolean {
   return category !== null && ONE_OFF_CATEGORIES.includes(category);
@@ -92,7 +97,7 @@ export function percent(part: number, whole: number): number {
 
 /** The yyyy-mm a statement belongs to: the month it closed. */
 export function monthOf(contents: Pick<StatementContents, 'closed_on'>): string {
-  return contents.closed_on.slice(0, 7);
+  return yearMonthOf(contents.closed_on);
 }
 
 /** What to sum month by month: everything, the usual spending alone, or one category. */

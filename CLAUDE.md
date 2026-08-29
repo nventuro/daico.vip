@@ -85,15 +85,32 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   newer one on push and devices converge. `db:verify` checks every table with
   `updated_at` has it. The standard table/RLS/grant rules above still apply in
   the same migration.
+- **A synced table is described in one place: `src/lib/offline/specs.ts`** — its
+  row type (extending `SyncedRow`, which carries `id` / `created_at` /
+  `updated_at`), the values any enumerated column may take, and its `TableSpec`.
+  `TableSpec<Row>`'s `columns` is keyed by column name, so a column missing from
+  either the row type or the spec fails to compile; a column's DDL default lives
+  there too (`DATE_NOTICE_DAYS_DEFAULT`).
 - **To add an offline table:** write the migration (uuid PK + `updated_at` + the
-  usual RLS/policy/grants + the `last_write_wins` trigger), add a `TableSpec` to
-  `src/lib/offline/specs.ts` and to `ALL_SPECS`, list it in the owning module's
-  `specs` (`src/apps/<id>/index.ts`) — or in `SHELL_SPECS` when no single app
-  owns it, as with `attachments` —
-  then add a thin typed hook over `useOfflineTable` (see `useShoppingList` /
-  `useChores`). Do **not** hand-write sync or SQL — the generic
+  usual RLS/policy/grants + the `last_write_wins` trigger), add the row type and
+  its `TableSpec` to `src/lib/offline/specs.ts` and to `ALL_SPECS`, list it in
+  the owning module's `specs` (`src/apps/<id>/index.ts`) — or in `SHELL_SPECS`
+  when no single app owns it, as with `attachments` — then add a thin hook over
+  `useOfflineTable` (see `useShoppingList` / `useChores`), which gives it typed
+  `insert` / `update` / `remove`. Do **not** hand-write sync or SQL — the generic
   `engine.ts` handles CRUD, the local-only `pending_op`/`synced` bookkeeping, and
   the LWW reconcile. Conflict policy is last-write-wins with "delete wins".
+- **A table that never leaves the device** (a blob cache) is a `LocalTableSpec`
+  in `src/lib/offline/localTables.ts`, created and wiped with the rest; its rows
+  are read and written by whoever owns them, over the engine's `localQuery` /
+  `localWrite`. Nothing generic reads them, and they are never in `ALL_SPECS`.
+- **What asks for a sync is installed once** (`installSyncTriggers`, from the
+  shell's `AppProvider`, while a member is in): the connection coming back, and
+  the app returning to the foreground. A table's hook only subscribes to its
+  table and asks for a run when its screen opens (`syncIfStale`) — never its own
+  listeners. Nothing syncs before the member is in: there is nothing to sync
+  for anyone else, and a run after a sign-out would build the local store again
+  right after the sign-out wiped it.
 - **The engine and sync are tested against real SQLite** (`src/lib/offline/*.test.ts`,
   run by `npm test`, so also in CI). `testing/sqlocalInMemory.ts` replaces `sqlocal`
   with the real client running in-process on an in-memory database (no Worker, no
@@ -105,7 +122,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   only; rows come from `npm run guides:import`). `guide_images` is deliberately
   **not** in `ALL_SPECS`: the sync engine pulls whole tables on every sync, and
   images would make that pull megabytes. They are fetched on demand through
-  `src/lib/guideImages.ts` into a local-only cache table in the engine. Keep any
+  `src/apps/guias/guideImages.ts` into a local-only table (`localTables.ts`). Keep any
   large blob table out of `ALL_SPECS` the same way. Chapter bodies use the
   markdown + directive dialect described in the README; source-site specifics
   (token syntax, section names) belong in `scripts/import-guides/`, never in the
@@ -165,7 +182,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   (`clearMasterKey`) along with the local data. Losing the phrase is accepted as
   losing the documents.
 - **Files travel outside the tables**, through `src/lib/attachmentFiles.ts`
-  only: a local-only `attachment_files` table (engine) holds a file added here
+  only: the local-only `attachment_files` table holds a file added here
   until its upload goes through (`pending` / `uploaded` / `failed` — a 4xx other
   than auth/throttling is final and never retried) and keeps a file opened here
   for offline reading; `afterSync` (registered in `src/App.tsx`) runs uploads,
@@ -198,7 +215,11 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `householdKey.ts` — never other crypto) and opened on the device with the
   master key. A merchant rule's `pattern` is sealed the same way. Keep it so:
   never add a column that names a merchant or an amount of a line, and never
-  log or persist opened contents outside the in-memory caches the hooks keep.
+  log or persist opened contents outside `openOnce`'s in-memory cache, which
+  opens a row once per version of it. **Gastos contributes nothing to search**
+  for the same reason: search reads the local tables as they are stored, and
+  looking through statements would mean unsealing every one on every
+  keystroke.
   **Who made a purchase is not kept at all**, not even sealed: a parser checks
   the per-card totals the bank prints and drops the names.
 - **The payload is pulled with the table**, so it must stay a few KB: keep
@@ -211,7 +232,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   reconcile with the printed totals; an import that fails saves nothing.
   Column positions are named constants at the top of each parser.
 - **Never commit a real statement**, nor a fixture derived from one: the
-  parser tests build synthetic pages with `parsers/fixture.ts` and invented
+  parser tests build synthetic pages with `parsers/testing/fixture.ts` and invented
   holders. The privacy rule below applies to test data too.
 - **Categories are the fixed `SPENDING_CATEGORIES`**; a new one is a new
   member plus its label in `labels.ts`. Filing is done on display by
@@ -244,23 +265,45 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   and interactions work well on small screens.
 - **Components**: functional components with hooks, one component per file. Shared
   components live in `src/components/`, app-specific ones in `src/apps/<id>/`, and
-  the shell (layout, home screen, app frame) in `src/shell/`.
-- **Types**: shared types in `src/types.ts`.
-- **No magic numbers**: domain constants must be named in `src/types.ts`, never hardcoded.
+  the shell (layout, the screens that gate it, home screen, app frame) in
+  `src/shell/`.
+- **One direction only** — `utils` (pure) ← `lib` (infrastructure) ← `components`
+  and `hooks` (shared UI) ← `apps` (the features) ← `shell` (what mounts them).
+  A layer may use everything under it and nothing over it, so a piece of one app
+  can never end up wired into another's screens through a shared file.
+  `src/apps/types.ts`, the contract the shell mounts an app by, is the one file
+  anything may name. ESLint enforces this (`no-restricted-imports` per directory
+  in `eslint.config.js`).
+- **Types**: `src/types.ts` holds only what more than one part of the app agrees
+  on (`SyncedRow`, `EntryMark`, `AttachmentOwner`). A synced row's type lives
+  with its spec; everything else lives with whoever owns it.
+- **No magic numbers**: a domain constant is named, never hardcoded, and lives with
+  whoever owns it — an app's tuning in `src/apps/<id>/`, the shell's in
+  `src/shell/`, a table's column default with its spec, an outside address in
+  `src/config.ts`. Never a shared bag of constants.
 - **Date format**: always dd/mm order, never mm/dd. Use `formatDate` (long locale) or
   `formatDateShort` (dd/mm/yyyy) from `src/utils/dateUtils.ts`. A date is picked with
   `DatePicker` (or `NativeDatePicker` behind a control of your own): a native
   `<input type="date">` prints in the browser's language. ESLint enforces both
   (`no-restricted-syntax` in `eslint.config.js`).
 - **Icon-only controls**: must have an accessible label (`aria-label` + `title`).
-- **Forms and buttons are built from the shared primitives in `src/components/`**:
-  `FormField`, `TextInput`, `TextArea`, `Chip` (one of a row of choices), `Button`
-  (variants `primary` / `outline` / `danger` / `dangerOutline`), `FormFooter` (an
-  edit form's delete-with-confirm + submit row), `UndoBar` and `ModalDialog` (a
-  modal `<dialog>`, rendered outside whatever form its caller sits in). Never hand-write
-  control or button classes in a page; a control with no component of its own
-  takes its classes from `src/components/controlClasses.ts`. This is what keeps
-  every app looking like one app.
+- **Screens are built from the shared pieces in `src/components/`**, never
+  hand-assembled: `ListPage` (the offline notice, the error, the skeleton and
+  the bar pinned at the bottom) and `EntryPage` (holds its place, says when the
+  entry is not there) are the two shapes every screen takes; `LinkRow` and
+  `ChecklistItem` are the rows a list is made of; `EmptyState`, `ErrorLine`,
+  `SkeletonRows`, `SectionLabel`, `Heading`, `IconButton`, `CheckRow`,
+  `LoadingLine` and `UndoBar` are what goes on them. A form is `TitleField`,
+  `NotesField`, `FormField` + `TextInput` / `TextArea` / `Select` /
+  `DatePicker` / `NoticeDaysSelect` / `Chip`, with `entryForm` for the draft
+  and `FormFooter` for the last row; a dialog is `ModalDialog` (`layout`:
+  `sheet` / `confirm` / `full`) ending in `DialogFooter`; a list that grows ends
+  in `AddBar`, which holds what is being typed; a file is picked through
+  `HiddenFileInput`. `Button`'s variants are `primary` / `outline` / `danger` /
+  `dangerOutline` / `link`. Never hand-write control or button classes in a page;
+  a control with no component of its own takes its classes from
+  `src/components/controlClasses.ts`. This is what keeps every app looking like
+  one app.
 - **Rows, not cards**: a list is plain rows separated by hairlines — on each row
   `border-b border-border`, or on the list `divide-y divide-border` — never a
   bordered box. A group of rows is headed by `SectionLabel`; a done/undone mark
@@ -299,15 +342,20 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
 - Module routes are relative to `/<id>`; in-app links are absolute
   (`/guias/...`). A module never imports `registry.ts`.
 - Per-app colour comes from the `--app` CSS variable the shell sets via
-  `hueStyle`; utilities read it as `bg-(--app)` / `text-(--app)`. Hue tokens live
-  in the `@theme static` block of `src/index.css` (`static` so Tailwind keeps
-  tokens only referenced at runtime). Never build a class name from data
-  (no `bg-${hue}`).
+  `hueStyle`; utilities read it as `bg-(--app)` / `text-(--app)`. An app's hue is
+  its id (`appHue`), so a new app is a new `--color-app-<id>` token in the
+  `@theme static` block of `src/index.css` (`static` so Tailwind keeps tokens
+  only referenced at runtime) and nothing else. Never build a class name from
+  data (no `bg-${hue}`).
 - Pages don't render the app's title or a back link — the shell's app frame does.
 - `useUpcoming` and `search` on a module are optional adapters; a module without
-  them simply doesn't contribute to the Próximo page or search.
-  `search(query)` is a plain async function (not a hook) over the module's local
-  store (`engine.listVisible`), never a network call, so search works offline.
+  them simply doesn't contribute to the Próximo page or search (say why in the
+  module when it is deliberate). `search(query)` is a plain async function (not a
+  hook) over the module's local store — `searchTable(spec, query, …)`, which also
+  finds the entries' attachments — never a network call, so search works offline;
+  how many results an app contributes is capped once, in the shell. An entry's
+  URL is `entryPath(appId, id)`, never a hand-typed string, and `useUpcoming`
+  builds its list with `upcomingFrom`.
 
 ## Git
 
@@ -329,6 +377,14 @@ Requires `.env` with `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD`. The
 password bypasses every policy, so the scripts only talk to a server whose
 certificate verifies against Supabase's root (`supabase/ca.crt`, a public
 certificate kept in the repo) — never with verification off.
+
+Conventions: a migration is named `<utc stamp>_<what_it_does>.sql`
+(`20260827040000_last_write_wins.sql`) — `npm run db:migration:new <name>`
+stamps it to the second, and rounding the stamp by hand is fine as long as it
+sorts after the last one. A policy is named for who it lets in and what they may
+do: "Members have full access to <table>", or "Members can read <table>" for a
+table the app never writes. Applied migrations are never edited: fix forward
+with another one.
 
 - `npm run db:link` — link local project to remote Supabase (run once)
 - `npm run db:push` — push pending migrations to remote database, then verify invariants

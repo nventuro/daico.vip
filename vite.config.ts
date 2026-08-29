@@ -2,8 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { SUPABASE_URL } from './src/config';
-import { YOUTUBE_EMBED_URL } from './src/types';
+import { SUPABASE_URL, YOUTUBE_EMBED_URL } from './src/config';
 
 // The page's Content-Security-Policy, carried as a <meta> tag because the static
 // host can't set response headers. The point is `script-src`: no inline and no

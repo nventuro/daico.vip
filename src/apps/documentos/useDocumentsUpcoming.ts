@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { Upcoming } from '../types';
 import { todayIso } from '../../utils/dateUtils';
+import { entryPath, upcomingFrom, type Upcoming } from '../types';
 import { useDocuments } from './useDocuments';
 import { isExpiring } from './expiry';
 
@@ -11,14 +11,12 @@ export function useDocumentsUpcoming(): Upcoming[] | undefined {
   const today = todayIso();
   return useMemo(
     () =>
-      loading
-        ? undefined
-        : items.flatMap((entry): Upcoming[] => {
-            const on = entry.expires_on;
-            return on !== null && isExpiring(entry, today)
-              ? [{ title: entry.title, on, to: `/documentos/${entry.id}`, appId: 'documentos' }]
-              : [];
-          }),
+      upcomingFrom({ items, loading }, (entry) => {
+        const on = entry.expires_on;
+        return on !== null && isExpiring(entry, today)
+          ? { title: entry.title, on, to: entryPath('documentos', entry.id), appId: 'documentos' }
+          : null;
+      }),
     [items, loading, today],
   );
 }

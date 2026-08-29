@@ -33,10 +33,7 @@ export default function AttachmentAddDialog({ files, onSave, onClose }: Attachme
   }
 
   return (
-    <ModalDialog
-      onClose={onClose}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto bg-surface p-0 text-on-surface backdrop:bg-on-surface/50 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:w-full sm:max-w-lg sm:border sm:border-border"
-    >
+    <ModalDialog onClose={onClose} layout="sheet">
       <div className="flex flex-col gap-4 p-4">
         <span className="font-medium">
           {files.length === 1 ? 'Nueva foto' : `Foto ${index + 1} de ${files.length}`}

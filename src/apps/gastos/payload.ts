@@ -4,9 +4,9 @@
 // own like an attachment's file, then base64 for the text column — and a
 // merchant rule's pattern, the same way without the compression.
 // =============================================================================
-import { STATEMENT_CONTENTS_SCHEMA, type MerchantRule, type Statement } from '../../types';
+import { STATEMENT_CONTENTS_SCHEMA, type StatementContents, type StatementLine } from './statement';
+import type { MerchantRule, Statement } from '../../lib/offline/specs';
 import { decryptFile, encryptFile, fromBase64, toBase64 } from '../../lib/householdKey';
-import type { StatementContents, StatementLine } from './statement';
 
 async function through(bytes: Uint8Array<ArrayBuffer>, stream: GenericTransformStream) {
   const piped = new Blob([bytes]).stream().pipeThrough(stream);

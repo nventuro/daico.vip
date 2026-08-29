@@ -9,7 +9,7 @@
 // pending balance is printed: it is what the previous balance and the
 // movements against it come to.
 // =============================================================================
-import { STATEMENT_CONTENTS_SCHEMA } from '../../../types';
+import { STATEMENT_CONTENTS_SCHEMA } from '../statement';
 import {
   StatementError,
   UnknownLayout,
@@ -26,6 +26,7 @@ import {
   minimumPayment,
   reconcile,
   statementNumber,
+  sum,
   text,
   usdRate,
 } from './common';
@@ -142,8 +143,4 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     usd_rate: usdRate(charges, total.usd),
     lines: all,
   };
-}
-
-function sum(lines: StatementLine[], key: 'ars_cents' | 'usd_cents'): number {
-  return lines.reduce((acc, line) => acc + line[key], 0);
 }

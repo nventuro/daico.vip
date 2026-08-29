@@ -1,7 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import type { AppId, Upcoming } from '../apps/types';
 import { apps } from '../apps/registry';
-import { sortUpcoming, withReport } from '../lib/upcoming';
+import { sortUpcoming, withReport } from './upcoming';
 import UpcomingSource from './UpcomingSource';
 
 interface UpcomingRowsProps {

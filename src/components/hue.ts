@@ -1,5 +1,9 @@
-import type { CSSProperties } from 'react';
+import { createContext, type CSSProperties } from 'react';
 import type { AppHue } from '../apps/types';
+
+/** The hue of the app whose screen is showing, for anything rendered outside
+ *  its frame (a modal at the end of the document) to be painted in it too. */
+export const HueContext = createContext<AppHue | 'primary'>('primary');
 
 /** Inline style that sets the `--app` custom property the hue-aware utilities
  *  (`bg-(--app)`, `text-(--app)`) read, so a subtree is painted in one app's

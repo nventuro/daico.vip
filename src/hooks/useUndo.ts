@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
+/** How long (ms) an undo bar stays up after a reversible action. */
+export const UNDO_MS = 5000;
+
 /**
  * Holds the one thing that can currently be undone, for `ms` after it is
  * offered. `offer` replaces any earlier offer (only the latest action is

@@ -3,10 +3,9 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import { Link } from 'react-router-dom';
-import { directivesToElements } from '../lib/markdownDirectives';
-import GuideVideo from './GuideVideo';
+import { directivesToElements } from './directives';
+import Video from './Video';
 import Spoiler from './Spoiler';
-import Ingredients from './Ingredients';
 
 const remarkPlugins = [remarkGfm, remarkDirective, directivesToElements];
 
@@ -32,10 +31,12 @@ const baseComponents = {
   // else the directive renders nothing rather than a broken figure.
   image: () => null,
   youtube: ({ id, start }: { id: string; start?: string }) => (
-    <GuideVideo id={id} start={Number(start) || 0} />
+    <Video id={id} start={Number(start) || 0} />
   ),
   spoiler: ({ children }: { children?: ReactNode }) => <Spoiler>{children}</Spoiler>,
-  ingredients: ({ items }: { items?: string }) => <Ingredients items={items ?? ''} />,
+  // Only a screen that can offer to add what is missing renders the list;
+  // anywhere else the directive renders nothing rather than a dead checklist.
+  ingredients: () => null,
   h1: ({ children }: { children?: ReactNode }) => (
     <h2 className="mt-8 mb-3 font-display text-2xl font-black">{children}</h2>
   ),

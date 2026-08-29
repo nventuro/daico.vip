@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import type { Recipe } from '../../types';
-import OfflineBanner from '../../components/OfflineBanner';
+import { useNavigate } from 'react-router-dom';
+import type { Recipe } from '../../lib/offline/specs';
 import AddBar from '../../components/AddBar';
+import EmptyState from '../../components/EmptyState';
+import LinkRow from '../../components/LinkRow';
+import ListPage from '../../components/ListPage';
+import SkeletonRows from '../../components/SkeletonRows';
+import { entryPath } from '../types';
 import { useRecipes } from './useRecipes';
 import { minutesLabel, servingsLabel } from './labels';
-import SkeletonRows from '../../components/SkeletonRows';
 
 /** "N min · N porciones", with only the parts that are set. */
 function metaLine(recipe: Recipe): string {
@@ -18,52 +20,40 @@ function metaLine(recipe: Recipe): string {
 export default function RecipesPage() {
   const { items, loading, error, add } = useRecipes();
   const navigate = useNavigate();
-  const [newTitle, setNewTitle] = useState('');
 
-  async function addRecipe() {
-    const title = newTitle.trim();
-    if (!title) return;
-    setNewTitle('');
+  async function addRecipe(title: string) {
     const id = await add(title);
     // A new recipe is just a title: go straight to writing it.
-    if (id) navigate(`/recetas/${id}/editar`);
+    if (id) navigate(`${entryPath('recetas', id)}/editar`);
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex-1">
-        <OfflineBanner />
-
-        {error && <p className="mb-4 text-sm text-error">Error: {error}</p>}
-
-        {loading ? (
-          <SkeletonRows subtitle />
-        ) : items.length === 0 ? (
-          <p className="py-10 text-center text-muted">Todavía no hay recetas.</p>
-        ) : (
-          <ul>
-            {items.map((recipe) => {
-              const meta = metaLine(recipe);
-              return (
-                <li key={recipe.id} className="border-b border-border">
-                  <Link to={`/recetas/${recipe.id}`} className="flex flex-col py-2.5">
-                    <span className="truncate text-on-surface">{recipe.title}</span>
-                    {meta && <span className="mt-0.5 text-xs text-muted">{meta}</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      <AddBar
-        value={newTitle}
-        onChange={setNewTitle}
-        onSubmit={() => void addRecipe()}
-        placeholder="Agregar una receta..."
-        inputLabel="Nueva receta"
-      />
-    </div>
+    <ListPage
+      loading={loading}
+      error={error}
+      skeleton={<SkeletonRows subtitle />}
+      bar={
+        <AddBar
+          onAdd={(title) => void addRecipe(title)}
+          placeholder="Agregar una receta..."
+          inputLabel="Nueva receta"
+        />
+      }
+    >
+      {items.length === 0 ? (
+        <EmptyState>Todavía no hay recetas.</EmptyState>
+      ) : (
+        <ul>
+          {items.map((recipe) => (
+            <LinkRow
+              key={recipe.id}
+              to={entryPath('recetas', recipe.id)}
+              title={recipe.title}
+              subtitle={metaLine(recipe) || undefined}
+            />
+          ))}
+        </ul>
+      )}
+    </ListPage>
   );
 }

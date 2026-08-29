@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Upcoming } from '../types';
+import { entryPath, type Upcoming } from '../types';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementContents';
 import { toPayCents } from './breakdown';
@@ -20,7 +20,7 @@ export function useStatementsUpcoming(): Upcoming[] | undefined {
         toPayCents({ ...statement, usd_rate: contents[i].usd_rate }),
       )}`,
       on: statement.due_on,
-      to: `/gastos/${statement.id}`,
+      to: entryPath('gastos', statement.id),
       appId: 'gastos',
     }));
   }, [loading, contents, unpaid]);
