@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from './sync';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
-import { localDb } from './testing/sqlocalInMemory';
 import { server } from './testing/fakeSupabase';
+import { T0, T1, T2, at, network } from './testing/clock';
+import { bookkeeping, newChore, serverChore } from './testing/rows';
 import * as engine from './engine';
 import {
   afterSync,
@@ -16,52 +17,20 @@ import {
 vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 vi.mock('../supabase', () => import('./testing/fakeSupabase'));
 
-// Node's navigator has no `onLine`; the sync engine bails out without it.
-let online = true;
-Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => online });
-
-const T0 = '2026-08-27T10:00:00.000Z';
-const T1 = '2026-08-27T10:00:01.000Z';
-const T2 = '2026-08-27T10:00:02.000Z';
-
-function at(iso: string): void {
-  vi.setSystemTime(new Date(iso));
-}
-
-/** `Chore` as a plain record, the shape the fake server takes rows in. */
-type ChoreRow = { [K in keyof Chore]: Chore[K] };
-
-function serverChore(id: string, updatedAt: string, patch: Partial<Chore> = {}): ChoreRow {
-  return {
-    id,
-    title: `Chore ${id}`,
-    notes: null,
-    done: false,
-    due_on: null,
-    created_at: T0,
-    updated_at: updatedAt,
-    ...patch,
-  };
-}
-
-const newChore = { title: 'Regar', notes: null, done: false, due_on: null };
-
-async function bookkeeping(table: string, id: string) {
-  const rows = await localDb().sql<{ pending_op: string | null; synced: number }>(
-    `SELECT pending_op, synced FROM ${table} WHERE id = ?`,
-    id,
-  );
-  return rows[0] ?? null;
-}
-
 const callLog = () => server.calls.map((c) => `${c.op}:${c.table}`);
+
+/** The calls a whole run makes: every table pulled, in spec order, each one
+ *  after whatever it had queued to push. */
+function runCalls(pushes: Record<string, string[]>): string[] {
+  return ALL_SPECS.flatMap((spec) => [...(pushes[spec.table] ?? []), `select:${spec.table}`]);
+}
 
 let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   at(T0);
-  online = true;
+  network.online = true;
   server.reset();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   await engine.clearAll();
@@ -75,7 +44,7 @@ afterEach(() => {
 
 describe('syncAll', () => {
   it('does nothing while offline', async () => {
-    online = false;
+    network.online = false;
     const id = await engine.insert(CHORES_SPEC, newChore);
     await syncAll();
     expect(server.calls).toEqual([]);
@@ -118,16 +87,12 @@ describe('syncAll', () => {
     await engine.remove(SHOPPING_SPEC, 's');
     await syncAll();
 
-    expect(callLog()).toEqual([
-      'select:household_key',
-      'select:attachments',
-      'upsert:chores',
-      'upsert:chores',
-      'select:chores',
-      'delete:shopping_items',
-      'select:shopping_items',
-      ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),
-    ]);
+    expect(callLog()).toEqual(
+      runCalls({
+        chores: ['upsert:chores', 'upsert:chores'],
+        shopping_items: ['delete:shopping_items'],
+      }),
+    );
   });
 
   it('pulls server rows, then applies edits and deletes made elsewhere', async () => {
@@ -242,14 +207,7 @@ describe('syncAll', () => {
     await syncAll();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);
-    expect(callLog()).toEqual([
-      'select:household_key',
-      'select:attachments',
-      'select:chores',
-      'upsert:shopping_items',
-      'select:shopping_items',
-      ...ALL_SPECS.slice(4).map((spec) => `select:${spec.table}`),
-    ]);
+    expect(callLog()).toEqual(runCalls({ shopping_items: ['upsert:shopping_items'] }));
   });
 
   it('coalesces overlapping calls into one extra run that picks up later changes', async () => {
@@ -271,7 +229,7 @@ describe('syncAll', () => {
     const first = syncAll();
     await pull.started;
     const second = syncAll();
-    online = false;
+    network.online = false;
     pull.release();
     await Promise.all([first, second]);
     expect(callLog().filter((c) => c === 'select:chores')).toHaveLength(1);

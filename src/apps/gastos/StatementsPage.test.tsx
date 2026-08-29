@@ -3,30 +3,21 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import type { Statement } from '../../lib/offline/specs';
 import type { StatementContents } from './statement';
+import { statement } from './testing/contents';
 
-// Invented statements: nothing here comes from a real one.
+/** A statement is only its card, the days it covers and its total here. */
 function contentsOf(
-  format: 'galicia-visa' | 'galicia-mastercard',
+  format: StatementContents['format'],
   previousClosedOn: string | null,
   closedOn: string,
 ): StatementContents {
-  return {
-    schema: 2,
+  return statement({
     format,
-    number: '1',
     previous_closed_on: previousClosedOn,
     closed_on: closedOn,
     due_on: closedOn,
-    previous_ars_cents: 0,
-    previous_usd_cents: 0,
-    pending_ars_cents: 0,
-    pending_usd_cents: 0,
-    minimum_ars_cents: null,
     total_ars_cents: 100_000,
-    total_usd_cents: 0,
-    usd_rate: null,
-    lines: [],
-  };
+  });
 }
 
 function rowOf(id: string, contents: StatementContents): Statement {

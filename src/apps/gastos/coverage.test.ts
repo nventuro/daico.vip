@@ -1,41 +1,33 @@
 import { describe, it, expect } from 'vitest';
 import { cardCloses, coverageByCard, coveredMonths, monthCoverage } from './coverage';
 import type { StatementContents } from './statement';
+import { statement } from './testing/contents';
 
 /** A statement is only its card and the days it covers here. */
-const statement = (
+const covering = (
   format: StatementContents['format'],
   previousClosedOn: string | null,
   closedOn: string,
-): StatementContents => ({
-  schema: 2,
-  format,
-  number: closedOn,
-  previous_closed_on: previousClosedOn,
-  closed_on: closedOn,
-  due_on: closedOn,
-  previous_ars_cents: 0,
-  previous_usd_cents: 0,
-  pending_ars_cents: 0,
-  pending_usd_cents: 0,
-  minimum_ars_cents: null,
-  total_ars_cents: 0,
-  total_usd_cents: 0,
-  usd_rate: null,
-  lines: [],
-});
+): StatementContents =>
+  statement({
+    format,
+    number: closedOn,
+    previous_closed_on: previousClosedOn,
+    closed_on: closedOn,
+    due_on: closedOn,
+  });
 
 // One card closing around the 20th and another around the 28th, which is what
 // leaves a calendar month with only one of them.
 const VISA = [
-  statement('galicia-visa', '2026-03-19', '2026-04-23'),
-  statement('galicia-visa', '2026-04-23', '2026-05-21'),
-  statement('galicia-visa', '2026-05-21', '2026-06-25'),
+  covering('galicia-visa', '2026-03-19', '2026-04-23'),
+  covering('galicia-visa', '2026-04-23', '2026-05-21'),
+  covering('galicia-visa', '2026-05-21', '2026-06-25'),
 ];
 const MASTERCARD = [
-  statement('galicia-mastercard', '2026-03-26', '2026-04-30'),
-  statement('galicia-mastercard', '2026-04-30', '2026-05-28'),
-  statement('galicia-mastercard', '2026-05-28', '2026-07-02'),
+  covering('galicia-mastercard', '2026-03-26', '2026-04-30'),
+  covering('galicia-mastercard', '2026-04-30', '2026-05-28'),
+  covering('galicia-mastercard', '2026-05-28', '2026-07-02'),
 ];
 
 describe('cardCloses', () => {

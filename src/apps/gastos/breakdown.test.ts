@@ -11,37 +11,8 @@ import {
   totalCents,
 } from './breakdown';
 import type { Rule } from './rules';
-import { withOneOffsFrom, type StatementContents, type StatementLine } from './statement';
-
-const line = (over: Partial<StatementLine>): StatementLine => ({
-  on: '2026-08-10',
-  description: 'X',
-  installment: null,
-  ars_cents: 0,
-  usd_cents: 0,
-  charge: false,
-  one_off: false,
-  ...over,
-});
-
-const statement = (over: Partial<StatementContents>): StatementContents => ({
-  schema: 2,
-  format: 'galicia-visa',
-  number: '1',
-  previous_closed_on: '2026-07-23',
-  closed_on: '2026-08-20',
-  due_on: '2026-09-01',
-  previous_ars_cents: 0,
-  previous_usd_cents: 0,
-  pending_ars_cents: 0,
-  pending_usd_cents: 0,
-  minimum_ars_cents: null,
-  total_ars_cents: 0,
-  total_usd_cents: 0,
-  usd_rate: 1500,
-  lines: [],
-  ...over,
-});
+import type { StatementContents } from './statement';
+import { line, statement } from './testing/contents';
 
 const RULES: Rule[] = [
   { id: 'r', pattern: 'TIENDA SOL', category: 'supermercado' },
@@ -231,26 +202,6 @@ describe('byMonth', () => {
   it('follows one category', () => {
     expect(byMonth([july, august], RULES, 'supermercado').map((m) => m.cents)).toEqual([
       10_000, 7_000,
-    ]);
-  });
-});
-
-describe('withOneOffsFrom', () => {
-  it('keeps the marks of the same movements when a statement is read again', () => {
-    const before = statement({
-      lines: [line({ description: 'A', ars_cents: 1, one_off: true }), line({ description: 'B' })],
-    });
-    const again = statement({
-      lines: [
-        line({ description: 'B' }),
-        line({ description: 'A', ars_cents: 1 }),
-        line({ description: 'C' }),
-      ],
-    });
-    expect(withOneOffsFrom(again, before).lines.map((l) => l.one_off)).toEqual([
-      false,
-      true,
-      false,
     ]);
   });
 });

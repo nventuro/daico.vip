@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ATTACHMENT_ORPHAN_MIN_AGE_MS, ATTACHMENTS_BUCKET } from './attachmentFiles';
 import { ATTACHMENTS_SPEC } from './offline/specs';
 import { server } from './offline/testing/fakeSupabase';
+import { T0, at, network } from './offline/testing/clock';
 import * as engine from './offline/engine';
 import { afterSync, syncAll } from './offline/sync';
 import {
@@ -16,11 +17,6 @@ import {
 vi.mock('sqlocal', () => import('./offline/testing/sqlocalInMemory'));
 vi.mock('./supabase', () => import('./offline/testing/fakeSupabase'));
 
-// Node's navigator has no `onLine`; the sync engine bails out without it.
-let online = true;
-Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => online });
-
-const T0 = '2026-08-27T10:00:00.000Z';
 const bytes = (text: string) => new TextEncoder().encode(text);
 const row = {
   owner_kind: 'chore' as const,
@@ -47,8 +43,8 @@ let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(T0));
-  online = true;
+  at(T0);
+  network.online = true;
   server.reset();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   await engine.clearAll();
@@ -104,7 +100,7 @@ describe('uploadPending', () => {
     expect(await attachmentUploadState('a')).toBe('uploaded');
   });
 
-  it('gives up on a file the bucket refuses for good, and only on that one', async () => {
+  it('gives up on a file the bucket refuses for good and never sends it again', async () => {
     await added('big');
     await added('fine');
     server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
@@ -157,14 +153,14 @@ describe('fetchAttachmentFile', () => {
     server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
     expect(await fetchAttachmentFile('a')).toEqual(bytes('abc'));
     expect(await attachmentUploadState('a')).toBe('uploaded');
-    online = false;
+    network.online = false;
     expect(await fetchAttachmentFile('a')).toEqual(bytes('abc'));
     expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
   });
 
   it('is null for a file the bucket does not have yet, or with no connection', async () => {
     expect(await fetchAttachmentFile('a')).toBeNull();
-    online = false;
+    network.online = false;
     expect(await fetchAttachmentFile('b')).toBeNull();
     expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
   });

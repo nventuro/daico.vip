@@ -17,7 +17,7 @@ describe('matches', () => {
     expect(matches('', 'a')).toBe(false);
   });
 
-  it('is false when the query is absent', () => {
+  it('is false when the text does not hold the query', () => {
     expect(matches('abc', 'd')).toBe(false);
   });
 });

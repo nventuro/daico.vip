@@ -1,16 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { categoryOf, merchantKey, parseRulesText, type Rule } from './rules';
-import type { StatementLine } from './statement';
-
-const line = (description: string, charge = false): StatementLine => ({
-  on: '2026-08-01',
-  description,
-  installment: null,
-  ars_cents: 100,
-  usd_cents: 0,
-  charge,
-  one_off: false,
-});
+import { line } from './testing/contents';
 
 const rule = (pattern: string, category: Rule['category'], id = pattern): Rule => ({
   id,
@@ -46,7 +36,11 @@ describe('merchantKey', () => {
 
 describe('categoryOf', () => {
   it("files the bank's charges as taxes, whatever the rules", () => {
-    expect(categoryOf(line('PERCEP.AFIP RG 4815 30%', true), [rule('PERCEP', 'otros')])).toEqual({
+    expect(
+      categoryOf(line({ description: 'PERCEP.AFIP RG 4815 30%', charge: true }), [
+        rule('PERCEP', 'otros'),
+      ]),
+    ).toEqual({
       category: 'impuestos',
       rule: null,
     });
@@ -54,7 +48,7 @@ describe('categoryOf', () => {
 
   it('files by the household rule the key contains, ignoring case and accents', () => {
     const rules = [rule('café', 'salidas')];
-    expect(categoryOf(line('PROPINA*CAFE ORBITA'), rules)).toEqual({
+    expect(categoryOf(line({ description: 'PROPINA*CAFE ORBITA' }), rules)).toEqual({
       category: 'salidas',
       rule: rules[0],
     });
@@ -62,12 +56,17 @@ describe('categoryOf', () => {
 
   it('lets the longest household rule win', () => {
     const rules = [rule('ZANDOR', 'compras'), rule('ZANDOR PRIME', 'suscripciones')];
-    expect(categoryOf(line('Zandor Prime*QK2 7hzRt3bPwGBP 8,99'), rules).rule).toBe(rules[1]);
-    expect(categoryOf(line('ZANDOR UK* K71QZ4D20'), rules).rule).toBe(rules[0]);
+    expect(
+      categoryOf(line({ description: 'Zandor Prime*QK2 7hzRt3bPwGBP 8,99' }), rules).rule,
+    ).toBe(rules[1]);
+    expect(categoryOf(line({ description: 'ZANDOR UK* K71QZ4D20' }), rules).rule).toBe(rules[0]);
   });
 
   it('files nothing no rule places, however telling the name', () => {
-    expect(categoryOf(line('PIZZERIA SATURNO'), [])).toEqual({ category: null, rule: null });
+    expect(categoryOf(line({ description: 'PIZZERIA SATURNO' }), [])).toEqual({
+      category: null,
+      rule: null,
+    });
   });
 });
 

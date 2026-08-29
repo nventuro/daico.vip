@@ -1,39 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import {
-  STATEMENT_CONTENTS_SCHEMA,
-  purchaseKey,
-  withOneOff,
-  type StatementContents,
-  type StatementLine,
-} from './statement';
+import { purchaseKey, withOneOff, withOneOffsFrom, type StatementLine } from './statement';
+import { line, statement } from './testing/contents';
 
-const line = (description: string, one_off = false): StatementLine => ({
-  on: '2026-08-01',
-  description,
-  ars_cents: 1000,
-  usd_cents: 0,
-  installment: null,
-  charge: false,
-  one_off,
-});
-
-const contents: StatementContents = {
-  schema: STATEMENT_CONTENTS_SCHEMA,
-  format: 'galicia-visa',
-  number: '1',
-  previous_closed_on: '2026-07-20',
-  closed_on: '2026-08-20',
-  due_on: '2026-08-30',
-  previous_ars_cents: 0,
-  previous_usd_cents: 0,
-  pending_ars_cents: 0,
-  pending_usd_cents: 0,
-  minimum_ars_cents: null,
+const contents = statement({
   total_ars_cents: 3000,
-  total_usd_cents: 0,
-  usd_rate: null,
-  lines: [line('A'), line('B'), line('C', true)],
-};
+  lines: [
+    line({ description: 'A', ars_cents: 1000 }),
+    line({ description: 'B', ars_cents: 1000 }),
+    line({ description: 'C', ars_cents: 1000, one_off: true }),
+  ],
+});
 
 describe('withOneOff', () => {
   it('marks the line it names and leaves every other one alone', () => {
@@ -53,11 +29,8 @@ describe('withOneOff', () => {
 });
 
 describe('purchaseKey', () => {
-  const installment = (number: number, ars_cents: number): StatementLine => ({
-    ...line('MUEBLERIA NORTE'),
-    ars_cents,
-    installment: { number, of: 6 },
-  });
+  const installment = (number: number, ars_cents: number): StatementLine =>
+    line({ description: 'MUEBLERIA NORTE', ars_cents, installment: { number, of: 6 } });
 
   it('is the same for every installment of one purchase, the first rounded', () => {
     // The bank puts the odd cents of the division on the first installment.
@@ -71,5 +44,25 @@ describe('purchaseKey', () => {
   it('tells apart two plans of a different length', () => {
     const short = { ...installment(1, 988_985), installment: { number: 1, of: 3 } };
     expect(purchaseKey(short)).not.toBe(purchaseKey(installment(1, 988_985)));
+  });
+});
+
+describe('withOneOffsFrom', () => {
+  it('keeps the marks of the same movements when a statement is read again', () => {
+    const before = statement({
+      lines: [line({ description: 'A', ars_cents: 1, one_off: true }), line({ description: 'B' })],
+    });
+    const again = statement({
+      lines: [
+        line({ description: 'B' }),
+        line({ description: 'A', ars_cents: 1 }),
+        line({ description: 'C' }),
+      ],
+    });
+    expect(withOneOffsFrom(again, before).lines.map((l) => l.one_off)).toEqual([
+      false,
+      true,
+      false,
+    ]);
   });
 });

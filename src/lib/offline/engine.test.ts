@@ -9,57 +9,16 @@ import {
 } from './specs';
 import { GUIDE_IMAGE_CACHE, LOCAL_SPECS } from './localTables';
 import { localDb } from './testing/sqlocalInMemory';
+import { T0, T1, T2, at } from './testing/clock';
+import { bookkeeping, newChore, serverChore, type ChoreRow } from './testing/rows';
 import * as engine from './engine';
 
 vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
-
-const T0 = '2026-08-27T10:00:00.000Z';
-const T1 = '2026-08-27T10:00:01.000Z';
-const T2 = '2026-08-27T10:00:02.000Z';
-
-/** Pin the clock the store stamps `created_at` / `updated_at` with. */
-function at(iso: string): void {
-  vi.setSystemTime(new Date(iso));
-}
-
-type Bookkeeping = { pending_op: string | null; synced: number };
-
-/** The local-only sync columns of a row, or null when the row is gone. */
-async function bookkeeping(table: string, id: string): Promise<Bookkeeping | null> {
-  const rows = await localDb().sql<Bookkeeping>(
-    `SELECT pending_op, synced FROM ${table} WHERE id = ?`,
-    id,
-  );
-  return rows[0] ?? null;
-}
-
-/** `Chore` as a plain record, the shape the store takes rows in. */
-type ChoreRow = { [K in keyof Chore]: Chore[K] };
-
-/** A row as the server would send it, with every column present. */
-function serverChore(
-  id: string,
-  updatedAt: string,
-  patch: Partial<Omit<Chore, 'id' | 'updated_at'>> = {},
-): ChoreRow {
-  return {
-    id,
-    title: `Chore ${id}`,
-    notes: null,
-    done: false,
-    due_on: null,
-    created_at: T0,
-    updated_at: updatedAt,
-    ...patch,
-  };
-}
 
 /** A clean, synced local copy of `chore` (as if pulled from the server). */
 async function pulled(chore: ChoreRow): Promise<void> {
   await engine.reconcile(CHORES_SPEC, [chore]);
 }
-
-const newChore = { title: 'Regar', notes: null, done: false, due_on: null };
 
 /** A row of a local-only table, written the way its owner would. */
 async function cacheImage(key: string, data: string): Promise<void> {

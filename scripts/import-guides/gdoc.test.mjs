@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { gdocHtmlToMarkdown } from './gdoc.mjs';
-import { decklistToMarkdown } from './decklist.mjs';
 
 const doc = (style, body) =>
   `<html><head><style>${style}</style></head><body>${body}</body></html>`;
@@ -30,19 +29,6 @@ describe('gdocHtmlToMarkdown', () => {
     );
     expect(gdocHtmlToMarkdown(html)).toBe(
       '| Matchup | Plan |\n| --- | --- |\n| A | Go \\| fast then slow |\n',
-    );
-  });
-});
-
-describe('decklistToMarkdown', () => {
-  it('splits main deck and sideboard on a blank line', () => {
-    expect(decklistToMarkdown('Deck\n4 A\n2 B\n\n3 C\n')).toBe(
-      '## Principal\n- 4 A\n- 2 B\n\n## Sideboard\n- 3 C\n',
-    );
-  });
-  it('accepts a Sideboard marker', () => {
-    expect(decklistToMarkdown('4 A\nSideboard\n1 C')).toBe(
-      '## Principal\n- 4 A\n\n## Sideboard\n- 1 C\n',
     );
   });
 });

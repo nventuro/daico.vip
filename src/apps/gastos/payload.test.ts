@@ -1,35 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { openContents, openPattern, sealContents, sealPattern, upgradeContents } from './payload';
 import type { StatementContents } from './statement';
+import { line, statement } from './testing/contents';
 
 const masterKey = () =>
   crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, ['wrapKey', 'unwrapKey']);
 
-const contents: StatementContents = {
-  schema: 2,
-  format: 'galicia-visa',
+const contents = statement({
   number: 'VI0001',
-  previous_closed_on: '2026-07-23',
-  closed_on: '2026-08-20',
-  due_on: '2026-09-01',
   previous_ars_cents: 1,
   previous_usd_cents: 2,
-  pending_ars_cents: 0,
-  pending_usd_cents: 0,
   minimum_ars_cents: 3,
   total_ars_cents: 4,
   total_usd_cents: 5,
   usd_rate: 1477.63,
-  lines: Array.from({ length: 90 }, (_, i) => ({
-    on: '2026-08-01',
-    description: `MERPAGO*COMERCIO ${i}`,
-    installment: null,
-    ars_cents: i * 100,
-    usd_cents: 0,
-    charge: false,
-    one_off: i % 7 === 0,
-  })),
-};
+  lines: Array.from({ length: 90 }, (_, i) =>
+    line({ description: `MERPAGO*COMERCIO ${i}`, ars_cents: i * 100, one_off: i % 7 === 0 }),
+  ),
+});
 
 describe('a statement payload', () => {
   it('comes back whole, and a ninety-line statement stays a few KB', async () => {
