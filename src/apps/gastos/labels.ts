@@ -50,8 +50,9 @@ export function formatArs(cents: number, withCents = false): string {
 /** Pesos in thousands, tight, for a row with no room: "$ 123k", or with a
  *  decimal under COMPACT_AMOUNT_DECIMAL_BELOW_CENTS: "$ 45.7k"; from a
  *  million, in millions to the thousand, trailing zeros dropped: "$ 1.235m",
- *  "$ 1.25m". */
+ *  "$ 1.25m". Nothing spent is written plainly: "$ 0". */
 export function formatArsCompact(cents: number): string {
+  if (cents === 0) return '$ 0';
   const sign = cents < 0 ? '−' : '';
   const thousands = Math.abs(cents) / 100_000;
   if (Math.round(thousands) >= 1000) {
