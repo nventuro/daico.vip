@@ -108,14 +108,20 @@ export default function StatementsPage() {
   }
 
   const busy = reading || masterKey.status !== 'unlocked';
-  const cards = contents ? coverageByCard(contents, today) : [];
-  const listed: Listed[] = contents
+  // A statement and its contents are only ever read together: a row is named
+  // by the days it covers, which is in the payload. Until every one is open
+  // there is no list to build — and the list is built whether or not it is the
+  // one on screen, so a row without its contents is not something holding the
+  // list's place can save.
+  const opened = contents?.length === items.length ? contents : undefined;
+  const cards = opened ? coverageByCard(opened, today) : [];
+  const listed: Listed[] = opened
     ? [
         ...items.map((statement, i) => ({
           kind: 'statement' as const,
           on: statement.closed_on,
           statement,
-          contents: contents[i],
+          contents: opened[i],
         })),
         ...cards.flatMap((card) =>
           card.gaps.map((period) => ({
@@ -131,7 +137,7 @@ export default function StatementsPage() {
   return (
     <>
       <ListPage
-        loading={loading || (!openError && contents?.length !== items.length)}
+        loading={loading || (!openError && !opened)}
         error={error ?? openError}
         skeleton={<SkeletonRows subtitle />}
         bar={
