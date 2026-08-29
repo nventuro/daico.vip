@@ -17,8 +17,8 @@ import {
   isOneOffCategory,
   largestFirst,
   movementsOfMonth,
+  spendParts,
   sumCents,
-  usualAndOneOff,
   type CategoryShare,
   type Movement,
 } from './breakdown';
@@ -116,7 +116,7 @@ export default function MonthPage() {
 
   const total = sumCents(movements);
   const monthChange = comparable ? percentDelta(total, previousCents) : null;
-  const { usual, oneOff } = usualAndOneOff(movements, rules);
+  const { usual, oneOff } = spendParts(movements, rules);
   const largestShare = Math.max(...shares.map((share) => share.cents), 1);
   const selectedFiling = selected ? categoryOf(selected.line, rules) : null;
 
@@ -182,6 +182,7 @@ export default function MonthPage() {
             key={`${movement.statementId}-${movement.index}`}
             line={movement.line}
             cents={movement.cents}
+            whole
             oneOff={fixed || movement.line.one_off}
             onSelect={() => setSelected(movement)}
             onToggleOneOff={fixed ? undefined : () => toggleOneOff(movement)}
@@ -213,8 +214,8 @@ export default function MonthPage() {
       <div className="flex flex-col gap-2">
         <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
         <SpendLegend
-          usual={formatArs(usual)}
-          oneOff={formatArs(oneOff)}
+          usual={formatArsCompact(usual)}
+          oneOff={formatArsCompact(oneOff)}
           className="flex justify-between gap-3"
         />
       </div>
@@ -272,22 +273,18 @@ export default function MonthPage() {
         <section>
           <SectionLabel>De qué resúmenes sale</SectionLabel>
           <ul>
-            {sources.map((source) => {
-              const cuotas = source.movements.every((movement) => movement.line.installment);
-              const what = cuotas ? 'cuotas de compras' : 'movimientos';
-              return (
-                <LinkRow
-                  key={source.statement.id}
-                  to={statementPath(source.statement.id)}
-                  title={statementTitle(source.contents)}
-                  leading={<CardMark format={source.statement.format} />}
-                  subtitle={`${source.movements.length} ${what} de ${monthName(month, 'long')} · ${formatArs(
-                    sumCents(source.movements),
-                  )}`}
-                  chevron
-                />
-              );
-            })}
+            {sources.map((source) => (
+              <LinkRow
+                key={source.statement.id}
+                to={statementPath(source.statement.id)}
+                title={statementTitle(source.contents)}
+                leading={<CardMark format={source.statement.format} />}
+                subtitle={`${source.movements.length} movimientos de ${monthName(month, 'long')} · ${formatArs(
+                  sumCents(source.movements),
+                )}`}
+                chevron
+              />
+            ))}
           </ul>
         </section>
       )}

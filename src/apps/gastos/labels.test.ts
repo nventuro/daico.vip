@@ -56,12 +56,9 @@ describe('percentDelta / formatPercentDelta', () => {
 });
 
 describe('periodShort / statementTitle', () => {
-  it('writes the days covered in numbers, the year once', () => {
-    expect(periodShort('2026-07-03', '2026-07-30')).toBe('03/07 – 30/07/26');
-    expect(periodShort('2026-05-29', '2026-07-02')).toBe('29/05 – 02/07/26');
-  });
-
-  it('writes both years when the days run into a new one', () => {
+  it('writes the days covered in numbers, both ends whole', () => {
+    expect(periodShort('2026-07-03', '2026-07-30')).toBe('03/07/26 – 30/07/26');
+    expect(periodShort('2026-05-29', '2026-07-02')).toBe('29/05/26 – 02/07/26');
     expect(periodShort('2025-12-24', '2026-01-22')).toBe('24/12/25 – 22/01/26');
   });
 
@@ -70,7 +67,7 @@ describe('periodShort / statementTitle', () => {
       'cierre 30/07/26',
     );
     expect(statementTitle({ previous_closed_on: '2026-07-02', closed_on: '2026-07-30' })).toBe(
-      '03/07 – 30/07/26',
+      '03/07/26 – 30/07/26',
     );
   });
 });

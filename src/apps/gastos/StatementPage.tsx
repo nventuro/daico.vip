@@ -11,23 +11,24 @@ import ErrorLine from '../../components/ErrorLine';
 import SectionLabel from '../../components/SectionLabel';
 import FormFooter from '../../components/FormFooter';
 import { useStatements } from './useStatements';
-import { useStatementContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementContents';
 import { useMerchantRules } from './useMerchantRules';
 import {
   byCategory,
+  isLaterInstallment,
   isOneOff,
   isOneOffCategory,
   largestFirst,
   monthOf,
   movementsOf,
+  spendParts,
   toPayCents,
   totalCents,
-  usualAndOneOff,
   type CategoryShare,
   type Movement,
 } from './breakdown';
 import { categoryOf } from './rules';
-import { withOneOff, type StatementContents } from './statement';
+import { purchaseKey, withOneOff, type StatementContents } from './statement';
 import { STATEMENTS_PATH } from './paths';
 import {
   CATEGORY_LABELS,
@@ -69,8 +70,22 @@ export default function StatementPage() {
         .sort((a, b) => b.closed_on.localeCompare(a.closed_on))[0],
     [items, statement],
   );
-  const { contents, error: openError } = useStatementContents(statement);
-  const { contents: previousContents } = useStatementContents(previous);
+  // Every statement is opened, not only this one: an installment carries the
+  // mark of the purchase it belongs to, and that lives on the first
+  // installment, in whichever statement first billed it. Opening a statement
+  // already open costs nothing.
+  const { contents: all, error: openError } = useStatementsContents(items);
+  const contents = statement && all ? all[items.indexOf(statement)] : undefined;
+  const previousContents = previous && all ? all[items.indexOf(previous)] : undefined;
+
+  /** Whether the purchase behind each first installment is set apart. */
+  const purchaseMarks = useMemo(() => {
+    const marks = new Map<string, boolean>();
+    for (const opened of all ?? [])
+      for (const line of opened.lines)
+        if (line.installment?.number === 1) marks.set(purchaseKey(line), line.one_off);
+    return marks;
+  }, [all]);
   const rulesStore = useMerchantRules();
   const rules = useMemo(() => rulesStore.rules ?? [], [rulesStore.rules]);
 
@@ -107,9 +122,14 @@ export default function StatementPage() {
   const total = totalCents(contents);
   const previousTotal = previousContents ? totalCents(previousContents) : null;
   const sinceLast = previousTotal === null ? null : percentDelta(total, previousTotal);
-  const { usual, oneOff } = usualAndOneOff(movements, rules);
+  const { usual, oneOff, installments } = spendParts(movements, rules);
   const largestShare = Math.max(...shares.map((s) => s.cents), 1);
-  const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
+  // An installment of an earlier purchase is neither this period's usual
+  // spending nor a one-off of it; it has a section of its own.
+  const oneOffs = movements.filter(
+    (movement) => !isLaterInstallment(movement.line) && isOneOff(movement.line, rules),
+  );
+  const laterInstallments = movements.filter((movement) => isLaterInstallment(movement.line));
   // The due date has passed or it has not, whether or not it was paid; only
   // an unpaid statement past it is a problem.
   const overdue = !statement.paid && isPast(contents.due_on, today);
@@ -165,16 +185,22 @@ export default function StatementPage() {
     <ul className={`divide-y divide-border ${closed ? 'border-b border-border' : ''}`}>
       {largestFirst(list).map((movement) => {
         // A line its category already sets apart takes no mark of its own:
-        // it is filed differently, not unmarked.
+        // it is filed differently, not unmarked. An installment of an earlier
+        // purchase is marked from the month the purchase belongs to, so its
+        // flag is shown here and nothing more.
         const fixed = isOneOffCategory(categoryOf(movement.line, rules).category);
+        const later = isLaterInstallment(movement.line);
+        const marked = later
+          ? (purchaseMarks.get(purchaseKey(movement.line)) ?? false)
+          : movement.line.one_off;
         return (
           <LineRow
             key={movement.index}
             line={movement.line}
             cents={movement.cents}
-            oneOff={fixed || movement.line.one_off}
+            oneOff={fixed || marked}
             onSelect={() => setSelected(movement)}
-            onToggleOneOff={fixed ? undefined : () => toggleOneOff(movement.index)}
+            onToggleOneOff={fixed || later ? undefined : () => toggleOneOff(movement.index)}
           />
         );
       })}
@@ -232,10 +258,17 @@ export default function StatementPage() {
       </CheckRow>
 
       <div className="flex flex-col gap-2">
-        <SpendBar usual={usual} oneOff={oneOff} max={usual + oneOff} size="md" />
+        <SpendBar
+          usual={usual}
+          oneOff={oneOff}
+          installments={installments}
+          max={usual + oneOff + installments}
+          size="md"
+        />
         <SpendLegend
-          usual={formatArs(usual)}
-          oneOff={formatArs(oneOff)}
+          usual={formatArsCompact(usual)}
+          oneOff={formatArsCompact(oneOff)}
+          installments={installments > 0 ? formatArsCompact(installments) : undefined}
           className="flex justify-between gap-3"
         />
       </div>
@@ -286,6 +319,13 @@ export default function StatementPage() {
         <section>
           <SectionLabel detail={formatArs(oneOff)}>Puntuales</SectionLabel>
           {renderMovements(oneOffs, true)}
+        </section>
+      )}
+
+      {laterInstallments.length > 0 && (
+        <section>
+          <SectionLabel detail={formatArs(installments)}>Cuotas de meses anteriores</SectionLabel>
+          {renderMovements(laterInstallments, true)}
         </section>
       )}
 

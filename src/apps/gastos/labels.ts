@@ -1,5 +1,5 @@
 import type { SpendingCategory, StatementFormat } from '../../lib/offline/specs';
-import { addDays, formatDateCompact, formatDayMonth, monthName } from '../../utils/dateUtils';
+import { addDays, formatDateCompact, monthName } from '../../utils/dateUtils';
 import type { CardCoverage, Shortfall } from './coverage';
 import type { StatementContents } from './statement';
 
@@ -92,13 +92,12 @@ const day = (date: string) => String(Number(date.slice(8)));
 
 /**
  * The days a statement covers, in numbers and tight enough for a row:
- * "03/07 – 30/07/26", or "24/12/25 – 22/01/26" when it runs into a new year,
- * where the year of both ends is worth writing.
+ * "03/07/26 – 30/07/26". Both ends are written whole, even when they share
+ * the year, so that every row down the list is the same shape and none has
+ * to be read twice to see which shape it is in.
  */
 export function periodShort(from: string, to: string): string {
-  const start =
-    from.slice(0, 4) === to.slice(0, 4) ? formatDayMonth(from) : formatDateCompact(from);
-  return `${start} – ${formatDateCompact(to)}`;
+  return `${formatDateCompact(from)} – ${formatDateCompact(to)}`;
 }
 
 /** How a statement is named wherever it is listed: the days it covers, the

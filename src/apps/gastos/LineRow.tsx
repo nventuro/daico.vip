@@ -9,6 +9,10 @@ interface LineRowProps {
   cents: number;
   /** Whether the line is set apart from the usual spending. */
   oneOff?: boolean;
+  /** Whether the row stands for the whole purchase rather than for the one
+   *  installment the line is: a month holds a purchase once, so it says how
+   *  many installments it was split into instead of which one this is. */
+  whole?: boolean;
   /** Opens the line to file it. */
   onSelect: () => void;
   /** Marks the line as a one-off, or unmarks it; without it the flag is only
@@ -24,6 +28,7 @@ export default function LineRow({
   line,
   cents,
   oneOff = false,
+  whole = false,
   onSelect,
   onToggleOneOff,
 }: LineRowProps) {
@@ -43,7 +48,9 @@ export default function LineRow({
           <span className="truncate text-sm text-on-surface">{line.description}</span>
           {line.installment && (
             <span className="text-xs text-muted">
-              Cuota {line.installment.number} de {line.installment.of}
+              {whole
+                ? `En ${line.installment.of} cuotas`
+                : `Cuota ${line.installment.number} de ${line.installment.of}`}
             </span>
           )}
         </span>

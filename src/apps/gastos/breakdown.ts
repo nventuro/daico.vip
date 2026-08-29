@@ -21,6 +21,22 @@ export function lineCents(line: StatementLine, usdRate: number | null): number {
   return inPesos(line.ars_cents, line.usd_cents, usdRate);
 }
 
+/** One installment of a purchase made before the statement that bills it —
+ *  every installment but the first. A statement lists these because they have
+ *  to be paid; no month counts them, since the purchase is already whole in
+ *  the month it was made. */
+export function isLaterInstallment(line: StatementLine): boolean {
+  return line.installment !== null && line.installment.number > 1;
+}
+
+/** What the purchase behind a line came to, in pesos: a line paid in one go is
+ *  itself, and a first installment stands for the whole purchase — the bank
+ *  charges the same amount every month for the life of the plan, so the price
+ *  is known from the statement that first bills it. */
+export function purchaseCents(line: StatementLine, usdRate: number | null): number {
+  return lineCents(line, usdRate) * (line.installment?.of ?? 1);
+}
+
 /** One movement, already in pesos, and where to find it again: marking it
  *  rewrites the statement that holds it, at that place in its lines. */
 export interface Movement {
@@ -40,17 +56,34 @@ export function movementsOf(statementId: string, contents: StatementContents): M
   }));
 }
 
-/** The movements of `month` (yyyy-mm) across every statement given, by the
- *  day each was made — the day the bank prints, which for an installment is
- *  the day the purchase was made, not the day it is charged. */
+/**
+ * The purchases of `month` (yyyy-mm) across every statement given, by the day
+ * each was made — the day the bank prints, which for an installment is the day
+ * the purchase was made, not the day it is charged. A purchase split into
+ * installments is one movement for the whole price, from the statement that
+ * bills its first: how it is being paid says nothing about what was spent.
+ */
 export function movementsOfMonth(
   statements: { id: string }[],
   all: StatementContents[],
   month: string,
 ): Movement[] {
-  return statements.flatMap((statement, i) =>
-    all[i] ? movementsOf(statement.id, all[i]).filter((m) => yearMonthOf(m.line.on) === month) : [],
-  );
+  return statements.flatMap((statement, i) => {
+    const contents = all[i];
+    if (!contents) return [];
+    return contents.lines.flatMap((line, index) =>
+      yearMonthOf(line.on) === month && !isLaterInstallment(line)
+        ? [
+            {
+              line,
+              cents: purchaseCents(line, contents.usd_rate),
+              statementId: statement.id,
+              index,
+            },
+          ]
+        : [],
+    );
+  });
 }
 
 /** What movements come to. */
@@ -112,18 +145,27 @@ export function isOneOff(line: StatementLine, rules: Rule[]): boolean {
   return line.one_off || isOneOffCategory(categoryOf(line, rules).category);
 }
 
-/** What the usual spending and the one-offs come to. */
-export function usualAndOneOff(
+/**
+ * How the movements given divide: what was bought here and counts as usual,
+ * what was bought here and is set apart, and what is only being paid here.
+ * The last is always nothing on a month, which holds every purchase whole in
+ * the month it was made; on a statement it is what the bank is charging for
+ * purchases of earlier months, which is not spending of this one either way,
+ * so the mark on it never comes into the split.
+ */
+export function spendParts(
   movements: Movement[],
   rules: Rule[],
-): { usual: number; oneOff: number } {
+): { usual: number; oneOff: number; installments: number } {
   let usual = 0;
   let oneOff = 0;
+  let installments = 0;
   for (const movement of movements) {
-    if (isOneOff(movement.line, rules)) oneOff += movement.cents;
+    if (isLaterInstallment(movement.line)) installments += movement.cents;
+    else if (isOneOff(movement.line, rules)) oneOff += movement.cents;
     else usual += movement.cents;
   }
-  return { usual, oneOff };
+  return { usual, oneOff, installments };
 }
 
 /** `part` as a whole percentage of `whole`; 0 when there is no whole. */
@@ -149,14 +191,16 @@ export interface MonthTotal {
 }
 
 /**
- * Every month with a movement in it, newest first, summing what `pick` names.
- * A movement counts in the month it was made, not the month its statement
- * closed: the closing calendar is the bank's, and two cards never share it.
+ * Every month with a purchase in it, newest first, summing what `pick` names.
+ * A purchase counts once, whole, in the month it was made — not the month its
+ * statement closed, and not spread over the months the bank charges it in:
+ * the closing calendar is the bank's, and two cards never share it.
  */
 export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick): MonthTotal[] {
   const months = new Map<string, MonthTotal>();
   for (const contents of all) {
     for (const line of contents.lines) {
+      if (isLaterInstallment(line)) continue;
       const month = yearMonthOf(line.on);
       const row = months.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0 };
       months.set(month, row);
@@ -164,7 +208,7 @@ export function byMonth(all: StatementContents[], rules: Rule[], pick: TrendPick
       if (pick === 'usual' && oneOff) continue;
       if (pick !== 'total' && pick !== 'usual' && categoryOf(line, rules).category !== pick)
         continue;
-      const value = lineCents(line, contents.usd_rate);
+      const value = purchaseCents(line, contents.usd_rate);
       row.cents += value;
       if (oneOff) row.oneOff += value;
       else row.usual += value;

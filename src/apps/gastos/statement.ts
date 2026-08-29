@@ -75,6 +75,23 @@ export class UnknownLayout extends Error {
   }
 }
 
+/**
+ * What tells one purchase paid in installments from another, across every
+ * statement that bills one of them: the day it was made, the merchant as
+ * printed, how many installments it was split into and what one comes to. The
+ * pesos are taken to the peso — a bank rounds the first installment a cent or
+ * two above the rest, and the first is where the purchase's mark lives.
+ */
+export function purchaseKey(line: StatementLine): string {
+  return [
+    line.on,
+    line.description,
+    line.installment?.of ?? 1,
+    Math.round(line.ars_cents / 100),
+    line.usd_cents,
+  ].join(' ');
+}
+
 /** The contents with the line at `index` marked one-off, or unmarked when it
  *  already was. */
 export function withOneOff(contents: StatementContents, index: number): StatementContents {

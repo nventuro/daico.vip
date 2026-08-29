@@ -5,9 +5,10 @@ import {
   largestFirst,
   lineCents,
   movementsOf,
+  movementsOfMonth,
+  spendParts,
   toPayCents,
   totalCents,
-  usualAndOneOff,
 } from './breakdown';
 import type { Rule } from './rules';
 import { withOneOffsFrom, type StatementContents, type StatementLine } from './statement';
@@ -100,14 +101,76 @@ describe('byCategory', () => {
   });
 });
 
-describe('usualAndOneOff', () => {
+/** The same purchase, split in six, as two statements bill it. */
+const bought = statement({
+  lines: [
+    line({
+      on: '2026-08-04',
+      description: 'MUEBLERIA NORTE',
+      ars_cents: 12_000,
+      installment: { number: 1, of: 6 },
+    }),
+  ],
+});
+const billedLater = statement({
+  closed_on: '2026-09-20',
+  lines: [
+    line({
+      on: '2026-08-04',
+      description: 'MUEBLERIA NORTE',
+      ars_cents: 12_000,
+      installment: { number: 2, of: 6 },
+    }),
+  ],
+});
+
+describe('spendParts', () => {
   it('splits the total by the mark', () => {
-    expect(usualAndOneOff(movements(august), RULES)).toEqual({ usual: 1_960_000, oneOff: 5_000 });
+    expect(spendParts(movements(august), RULES)).toEqual({
+      usual: 1_960_000,
+      oneOff: 5_000,
+      installments: 0,
+    });
     expect(totalCents(august)).toBe(1_965_000);
   });
 
   it('counts a line its category sets apart, with no mark on it', () => {
-    expect(usualAndOneOff(movements(trip), RULES)).toEqual({ usual: 0, oneOff: 90_000 });
+    expect(spendParts(movements(trip), RULES)).toEqual({
+      usual: 0,
+      oneOff: 90_000,
+      installments: 0,
+    });
+  });
+
+  it('sets apart what is only being paid here, marked or not', () => {
+    expect(spendParts(movements(billedLater), RULES)).toEqual({
+      usual: 0,
+      oneOff: 0,
+      installments: 12_000,
+    });
+    const marked = statement({
+      lines: billedLater.lines.map((l) => ({ ...l, one_off: true })),
+    });
+    expect(spendParts(movements(marked), RULES).installments).toBe(12_000);
+  });
+});
+
+describe('movementsOfMonth', () => {
+  const ids = [{ id: 'a' }, { id: 'b' }];
+
+  it('holds a purchase whole, once, in the month it was made', () => {
+    expect(
+      movementsOfMonth(ids, [bought, billedLater], '2026-08').map((m) => [m.statementId, m.cents]),
+    ).toEqual([['a', 72_000]]);
+  });
+
+  it('leaves out the statement that only bills a later installment', () => {
+    expect(movementsOfMonth(ids, [bought, billedLater], '2026-09')).toEqual([]);
+  });
+
+  it('points a movement at the line the mark lives on', () => {
+    const [movement] = movementsOfMonth(ids, [bought, billedLater], '2026-08');
+    expect(movement.line.installment).toEqual({ number: 1, of: 6 });
   });
 });
 
@@ -145,7 +208,7 @@ describe('byMonth', () => {
 
   it('counts a movement in the month it was made, not the month its statement closed', () => {
     expect(byMonth([july, august, julyVisa], RULES, 'total')).toEqual([
-      { month: '2026-08', cents: 1_965_000, usual: 1_960_000, oneOff: 5_000 },
+      { month: '2026-08', cents: 1_975_000, usual: 1_960_000, oneOff: 15_000 },
       { month: '2026-07', cents: 8_000, usual: 7_000, oneOff: 1_000 },
     ]);
   });
@@ -157,6 +220,12 @@ describe('byMonth', () => {
   it('leaves out what a category sets apart as well', () => {
     expect(byMonth([trip], RULES, 'usual')[0].cents).toBe(0);
     expect(byMonth([trip], RULES, 'total')[0]).toMatchObject({ usual: 0, oneOff: 90_000 });
+  });
+
+  it('counts a purchase in installments whole, in the month it was made', () => {
+    expect(byMonth([bought, billedLater], RULES, 'total')).toEqual([
+      { month: '2026-08', cents: 72_000, usual: 72_000, oneOff: 0 },
+    ]);
   });
 
   it('follows one category', () => {

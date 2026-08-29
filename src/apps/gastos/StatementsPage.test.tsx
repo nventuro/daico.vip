@@ -88,8 +88,8 @@ describe('StatementsPage', () => {
   it('lists every statement by the days it covers', () => {
     state.contents = all;
     const html = render();
-    expect(html).toContain('03/07 – 28/07/26');
-    expect(html).toContain('29/05 – 02/07/26');
+    expect(html).toContain('03/07/26 – 28/07/26');
+    expect(html).toContain('29/05/26 – 02/07/26');
   });
 
   // Its gaps are rows of their own, in the list, where the statements that

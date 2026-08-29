@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   STATEMENT_CONTENTS_SCHEMA,
+  purchaseKey,
   withOneOff,
   type StatementContents,
   type StatementLine,
@@ -48,5 +49,27 @@ describe('withOneOff', () => {
     const twice = withOneOff(once, 1);
     expect(contents.lines.map((l) => l.one_off)).toEqual([false, false, true]);
     expect(twice.lines.map((l) => l.one_off)).toEqual([true, true, true]);
+  });
+});
+
+describe('purchaseKey', () => {
+  const installment = (number: number, ars_cents: number): StatementLine => ({
+    ...line('MUEBLERIA NORTE'),
+    ars_cents,
+    installment: { number, of: 6 },
+  });
+
+  it('is the same for every installment of one purchase, the first rounded', () => {
+    // The bank puts the odd cents of the division on the first installment.
+    expect(purchaseKey(installment(1, 988_985))).toBe(purchaseKey(installment(4, 988_983)));
+  });
+
+  it('tells apart two purchases of the same day and merchant', () => {
+    expect(purchaseKey(installment(1, 3_825_996))).not.toBe(purchaseKey(installment(1, 719_045)));
+  });
+
+  it('tells apart two plans of a different length', () => {
+    const short = { ...installment(1, 988_985), installment: { number: 1, of: 3 } };
+    expect(purchaseKey(short)).not.toBe(purchaseKey(installment(1, 988_985)));
   });
 });
