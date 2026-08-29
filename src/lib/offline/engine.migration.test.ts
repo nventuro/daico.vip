@@ -32,6 +32,9 @@ seedSql.push(
   )`,
   `INSERT INTO dates (id, title, created_at, updated_at, pending_op, synced)
     VALUES ('old', 'Dentista', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`,
+  // ...and one this device deleted offline and has not pushed yet.
+  `INSERT INTO dates (id, title, created_at, updated_at, pending_op, synced)
+    VALUES ('gone', 'Vacuna', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', 'delete', 1)`,
   // `shopping_items` with a column the spec no longer has: left in place it
   // would refuse every insert that does not fill it.
   `CREATE TABLE shopping_items (
@@ -132,6 +135,18 @@ describe('table migration', () => {
     // Emptied: the row had no value for `occurs_on`, and the next sync brings
     // the table down whole.
     expect(await rowsOf('dates')).toEqual([]);
+  });
+
+  it('keeps a deletion queued on a table it had to make again', async () => {
+    await engine.listVisible(DATES_SPEC);
+    // Only the id is kept, which every shape of the table has; without it the
+    // pull that fills the table again would bring the row back.
+    expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual(['gone']);
+  });
+
+  it('forgets that deletion once it has been pushed', async () => {
+    await engine.markDeleted(DATES_SPEC, 'gone');
+    expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual([]);
   });
 
   it('makes the table again when it has a column the spec dropped', async () => {

@@ -27,7 +27,7 @@ import {
   type RowInput,
   type TableSpec,
 } from './specs';
-import { LOCAL_SPECS } from './localTables';
+import { LOCAL_SPECS, PENDING_DELETES } from './localTables';
 import { checkDbOwnership, MultiTabError } from './singleTab';
 
 /** Filename of the local OPFS-backed SQLite database used for offline data. */
@@ -85,10 +85,17 @@ async function migrateTables(c: SQLocal): Promise<void> {
     const missing = columns.filter(([name]) => !present.has(name));
     const over = [...present].filter((name) => !expected.has(name));
     if (over.length > 0 || missing.some(([, ddl]) => !addable(ddl))) {
-      // Nothing here can be carried over: a row stored without a column the
-      // shape now requires has no value to give it, and one queued in the old
-      // shape is not a row the server would take either. The table is a copy
-      // of the server's, so the next sync brings it back whole.
+      // A queued edit cannot be carried over: a row stored without a column
+      // the shape now requires has no value to give it, and the server would
+      // not take it either. A queued deletion is carried over, because it is
+      // only an id — dropped with the table, it would be undone by the pull
+      // that fills the table again. The rest is a copy of the server's, so
+      // that pull brings it back whole.
+      await c.sql(
+        `INSERT OR IGNORE INTO ${PENDING_DELETES.table} (table_name, id)
+         SELECT ?, id FROM ${spec.table} WHERE pending_op = 'delete'`,
+        spec.table,
+      );
       await c.sql(`DROP TABLE IF EXISTS ${spec.table}`);
       await c.sql(createTableSql(spec));
       continue;
@@ -294,11 +301,14 @@ export async function getPendingUpserts<Row extends SyncedRow>(
   return rows.map((r) => toObject<Row>(spec, r));
 }
 
-/** Ids of rows whose deletion still needs to be pushed. */
+/** Ids of rows whose deletion still needs to be pushed, tombstones and the
+ *  ones set aside when their table was made again alike. */
 export async function getPendingDeletes(spec: TableSpec): Promise<string[]> {
   const c = await db();
   const rows = await c.sql<{ id: string }>(
-    `SELECT id FROM ${spec.table} WHERE pending_op = 'delete'`,
+    `SELECT id FROM ${spec.table} WHERE pending_op = 'delete'
+     UNION SELECT id FROM ${PENDING_DELETES.table} WHERE table_name = ?`,
+    spec.table,
   );
   return rows.map((r) => r.id);
 }
@@ -322,10 +332,16 @@ export async function markUpserted(
   );
 }
 
-/** Drop a local tombstone once its delete has been pushed. */
+/** Drop a local tombstone once its delete has been pushed, from wherever it
+ *  was waiting. */
 export async function markDeleted(spec: TableSpec, id: string): Promise<void> {
   const c = await db();
   await c.sql(`DELETE FROM ${spec.table} WHERE id = ? AND pending_op = 'delete'`, id);
+  await c.sql(
+    `DELETE FROM ${PENDING_DELETES.table} WHERE table_name = ? AND id = ?`,
+    spec.table,
+    id,
+  );
 }
 
 /**

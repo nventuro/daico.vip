@@ -88,10 +88,11 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   the LWW reconcile, and a thin hook over `useOfflineTable` gives the table its
   typed `insert` / `update` / `remove`. Conflict policy is last-write-wins with
   "delete wins".
-- **A table that never leaves the device** (a blob cache) is a `LocalTableSpec`
-  in `src/lib/offline/localTables.ts`, created and wiped with the rest; its rows
-  are read and written by whoever owns them, over the engine's `localQuery` /
-  `localWrite`. Nothing generic reads them, and they are never in `ALL_SPECS`.
+- **A table that never leaves the device** (a blob cache, the engine's own
+  bookkeeping) is a `LocalTableSpec` in `src/lib/offline/localTables.ts`,
+  created and wiped with the rest; its rows are read and written by whoever
+  owns them — the app's over the engine's `localQuery` / `localWrite`. They are
+  never in `ALL_SPECS`.
 - **What asks for a sync is installed once** (`installSyncTriggers`, from the
   shell's `AppProvider`, while a member is in): the connection coming back, and
   the app returning to the foreground. A table's hook only subscribes to its

@@ -120,7 +120,8 @@ anything being fetched carries `LoadingLine`.
 2. Add the column to the table's `TableSpec.columns`. The engine creates it for new
    clients and brings each existing local database up to the spec on next load —
    with `ADD COLUMN` where SQLite takes the column, and otherwise by making the
-   table again, which the next sync fills from the server. Sync carries the column
+   table again, which the next sync fills from the server (a deletion queued on
+   it is set aside and still pushed, so it isn't undone by that pull). Sync carries the column
    automatically.
 3. If you **backfill** existing rows, bump their `updated_at` in the same migration
    so the value reaches already-synced clients (their last-write-wins pull only

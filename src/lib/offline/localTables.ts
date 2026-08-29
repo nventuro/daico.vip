@@ -1,8 +1,8 @@
 // =============================================================================
 // The tables that never leave the device: what a sync would have to carry
-// wholesale, and could not. They are created and wiped with the synced ones,
-// but nothing generic reads them — each is written and read by whoever owns
-// it, over the engine's local query API.
+// wholesale and could not, and the engine's own bookkeeping. They are created
+// and wiped with the synced ones; each is written and read by whoever owns it,
+// the app's over the engine's local query API.
 // =============================================================================
 
 /** A local-only table: its name, and the whole CREATE TABLE that makes it. */
@@ -45,5 +45,22 @@ export const ATTACHMENT_FILES: LocalTableSpec = {
   )`,
 };
 
+/**
+ * Deletions queued on a table that had to be made again. A row waiting to be
+ * deleted is an ordinary row of its table marked `pending_op`, so a table the
+ * engine drops to bring it to its spec's shape takes the queued deletion with
+ * it, and the next pull brings the row back on a device that deleted it. A
+ * deletion is only an id, which every shape of a table has, so it is set aside
+ * here and pushed from here. The engine owns this one.
+ */
+export const PENDING_DELETES: LocalTableSpec = {
+  table: 'pending_deletes',
+  ddl: `CREATE TABLE IF NOT EXISTS pending_deletes (
+    table_name TEXT NOT NULL,
+    id TEXT NOT NULL,
+    PRIMARY KEY (table_name, id)
+  )`,
+};
+
 /** Every local-only table, created on init and wiped on sign-out. */
-export const LOCAL_SPECS: LocalTableSpec[] = [GUIDE_IMAGE_CACHE, ATTACHMENT_FILES];
+export const LOCAL_SPECS: LocalTableSpec[] = [GUIDE_IMAGE_CACHE, ATTACHMENT_FILES, PENDING_DELETES];
