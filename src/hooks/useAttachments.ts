@@ -4,6 +4,7 @@ import type { AttachmentOwner, AttachmentOwnerKind } from '../types';
 import * as engine from '../lib/offline/engine';
 import { encryptFile } from '../lib/householdKey';
 import {
+  attachmentProblem,
   attachmentType,
   deleteAttachmentFile,
   putAttachmentFile,
@@ -51,10 +52,10 @@ export function useAttachments(owner?: AttachmentOwner) {
     (file: File, masterKey: CryptoKey, name: string) =>
       mutate(async () => {
         if (kind === undefined || ownerId === undefined) {
-          throw new Error('An attachment needs an entry to belong to');
+          throw new Error('No se puede adjuntar nada sin una entrada.');
         }
         const mime = attachmentType(file);
-        if (!mime) throw new Error(`Unsupported attachment type ${file.type}`);
+        if (!mime) throw new Error(attachmentProblem(file) ?? 'No se pudo adjuntar el archivo.');
         const { data, wrappedFileKey } = await encryptFile(
           masterKey,
           new Uint8Array(await file.arrayBuffer()),
