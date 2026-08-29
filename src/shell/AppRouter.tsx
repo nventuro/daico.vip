@@ -5,6 +5,7 @@ import { apps } from '../apps/registry';
 import { appHue } from '../apps/types';
 import AppFrame from './AppFrame';
 import HomePage from './HomePage';
+import NotFound from './NotFound';
 
 const SearchPage = lazy(() => import('./SearchPage'));
 const ProximoPage = lazy(() => import('./ProximoPage'));
@@ -29,6 +30,7 @@ const routes: RouteObject[] = [
         element: <AppFrame name={app.name} hue={appHue(app.id)} icon={app.icon} />,
         children: app.routes,
       })),
+      { path: '*', element: <NotFound /> },
     ],
   },
 ];
