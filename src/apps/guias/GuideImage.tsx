@@ -3,7 +3,7 @@ import { guideImageUrl } from './guideImages';
 import LoadingLine from '../../components/LoadingLine';
 import Motif from '../../components/Motif';
 
-interface Props {
+interface GuideImageProps {
   imageKey: string;
   /** Percentage of the text column the image should take. */
   width: number;
@@ -17,7 +17,7 @@ const JUSTIFY = { left: 'justify-start', center: 'justify-center', right: 'justi
  * Until it is, a placeholder of the width it will take keeps the text where it
  * is. Mount with `key={imageKey}` so a different image gets a fresh instance.
  */
-export default function GuideImage({ imageKey, width, align }: Props) {
+export default function GuideImage({ imageKey, width, align }: GuideImageProps) {
   // undefined while resolving, null when unavailable (offline and never fetched).
   const [src, setSrc] = useState<string | null | undefined>(undefined);
 

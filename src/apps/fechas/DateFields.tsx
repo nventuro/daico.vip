@@ -5,7 +5,6 @@ import {
   repeatIntervalLabel,
   repeatLabel,
   repeatUnitsLabel,
-  type RepeatUnit,
 } from '../../utils/recurrence';
 import {
   CHIP_BASE_CLASS,
@@ -39,10 +38,7 @@ export type DateFieldsValue = Pick<
 >;
 
 interface DateFieldsProps {
-  occursOn: string;
-  repeatEvery: number | null;
-  repeatUnit: RepeatUnit | null;
-  noticeDays: number;
+  fields: DateFieldsValue;
   onChange: (patch: Partial<DateFieldsValue>) => void;
   /** `chips`: compact pills for the add bar; `form`: labelled stacked fields. */
   layout: 'chips' | 'form';
@@ -53,17 +49,10 @@ const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
 
 /** The date, repeat and notice controls shared by the add bar and the edit
  *  form. Controlled: every change is reported as a patch of the value. */
-export default function DateFields({
-  occursOn,
-  repeatEvery,
-  repeatUnit,
-  noticeDays,
-  onChange,
-  layout,
-}: DateFieldsProps) {
+export default function DateFields({ fields, onChange, layout }: DateFieldsProps) {
   const chips = layout === 'chips';
   const control = chips ? CHIP_CONTROL : CONTROL_CLASS;
-  const every = repeatEvery ?? DATE_REPEAT_EVERY_DEFAULT;
+  const every = fields.repeat_every ?? DATE_REPEAT_EVERY_DEFAULT;
 
   function field(label: string, icon: ReactNode, input: ReactNode) {
     return (
@@ -89,7 +78,7 @@ export default function DateFields({
         'Fecha',
         <IconCalendarEvent size={18} stroke={1.5} />,
         <DatePicker
-          value={occursOn}
+          value={fields.occurs_on}
           onChange={(value) => {
             if (value) onChange({ occurs_on: value });
           }}
@@ -102,7 +91,7 @@ export default function DateFields({
         'Repetición',
         <IconRepeat size={18} stroke={1.5} />,
         <Select
-          value={repeatUnit ?? ONCE}
+          value={fields.repeat_unit ?? ONCE}
           onChange={(e) => changeUnit(e.target.value)}
           aria-label="Repetición"
           className={control}
@@ -115,9 +104,9 @@ export default function DateFields({
           ))}
         </Select>,
       )}
-      {repeatUnit !== null &&
+      {fields.repeat_unit !== null &&
         field(
-          repeatIntervalLabel(repeatUnit),
+          repeatIntervalLabel(fields.repeat_unit),
           <span>Cada</span>,
           <span className="flex items-center gap-1.5">
             <TextInput
@@ -126,22 +115,22 @@ export default function DateFields({
               min={DATE_REPEAT_EVERY_MIN}
               max={DATE_REPEAT_EVERY_MAX}
               required
-              value={repeatEvery ?? ''}
+              value={fields.repeat_every ?? ''}
               onChange={(e) => {
                 const n = e.target.valueAsNumber;
                 onChange({ repeat_every: Number.isFinite(n) ? n : null });
               }}
-              aria-label={repeatIntervalLabel(repeatUnit)}
+              aria-label={repeatIntervalLabel(fields.repeat_unit)}
               className={`${control} ${chips ? 'w-12' : 'w-24'}`}
             />
-            {chips && <span>{repeatUnitsLabel(repeatUnit)}</span>}
+            {chips && <span>{repeatUnitsLabel(fields.repeat_unit)}</span>}
           </span>,
         )}
       {field(
         'Aviso',
         <IconBell size={18} stroke={1.5} />,
         <NoticeDaysSelect
-          value={noticeDays}
+          value={fields.notice_days}
           onChange={(days) => onChange({ notice_days: days })}
           options={DATE_NOTICE_DAYS_OPTIONS}
           className={control}

@@ -29,7 +29,7 @@ interface ChecklistItemProps {
    * and there is nothing else to read on it. A linked row always has its
    * square, since that is its toggle.
    */
-  circle?: boolean;
+  showCheck?: boolean;
   /** Handle a reorderable row is dragged by, leftmost on it. */
   dragHandle?: ReactNode;
   containerRef?: (node: HTMLElement | null) => void;
@@ -54,7 +54,7 @@ export default function ChecklistItem({
   toggleLabel,
   to,
   trailing,
-  circle = true,
+  showCheck = true,
   dragHandle,
   containerRef,
   style,
@@ -106,7 +106,7 @@ export default function ChecklistItem({
           title={toggleLabel}
           className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pl-1' : ''}`}
         >
-          {circle && <CheckSquare checked={checked} />}
+          {showCheck && <CheckSquare checked={checked} />}
           {text}
         </button>
       )}

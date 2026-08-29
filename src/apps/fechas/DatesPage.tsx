@@ -46,10 +46,7 @@ export default function DatesPage() {
       bar={
         <AddBar onAdd={addDate} placeholder="Agregar una fecha..." inputLabel="Nueva fecha">
           <DateFields
-            occursOn={newFields.occurs_on}
-            repeatEvery={newFields.repeat_every}
-            repeatUnit={newFields.repeat_unit}
-            noticeDays={newFields.notice_days}
+            fields={newFields}
             onChange={(patch) => setNewFields((fields) => ({ ...fields, ...patch }))}
             layout="chips"
           />

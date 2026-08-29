@@ -8,12 +8,12 @@ import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import LoginScreen from './LoginScreen';
-import NoAccess from './NoAccess';
+import NoAccessScreen from './NoAccessScreen';
 import UnlockScreen from './UnlockScreen';
 import FirstSyncScreen from './FirstSyncScreen';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
-const TabConflict = lazy(() => import('./TabConflict'));
+const TabConflictScreen = lazy(() => import('./TabConflictScreen'));
 
 export default function MainLayout() {
   const { session, isMember, signOut } = useAppContext();
@@ -24,12 +24,12 @@ export default function MainLayout() {
   const [enteredEarly, setEnteredEarly] = useState(false);
 
   if (!session) return <LoginScreen />;
-  if (!isMember) return <NoAccess />;
+  if (!isMember) return <NoAccessScreen />;
   // The local store allows one connection per browser; a second tab is diverted.
   if (dbOwnership === 'blocked')
     return (
       <Suspense fallback={null}>
-        <TabConflict />
+        <TabConflictScreen />
       </Suspense>
     );
   // A device without the household's master key stops here until the phrase

@@ -23,9 +23,10 @@ interface RuleDialogProps {
   rule: Rule | null;
   /** How the line is filed now: by its rule, or as a charge. */
   category: SpendingCategory | null;
-  /** Keeps what changed: the rule to write, or `'remove'` to drop the one
-   *  filing the line. */
-  onSave: (change: RuleChange | 'remove') => void;
+  /** Keeps the rule to write for the line's merchant. */
+  onSave: (change: RuleChange) => void;
+  /** Drops the rule filing the line. */
+  onRemove: () => void;
   /** Called when the dialog closes on its own (Escape, a phone's back gesture). */
   onClose: () => void;
 }
@@ -42,6 +43,7 @@ export default function RuleDialog({
   rule,
   category: filed,
   onSave,
+  onRemove,
   onClose,
 }: RuleDialogProps) {
   const [pattern, setPattern] = useState(rule?.pattern ?? merchantKey(line.description));
@@ -49,10 +51,10 @@ export default function RuleDialog({
 
   const text = pattern.trim();
   // A charge is filed by the bank, never by a rule.
-  function ruleChange(): RuleChange | 'remove' | null {
-    if (line.charge) return null;
-    if (category === null) return rule ? 'remove' : null;
-    if (text === '') return null;
+  const removes = !line.charge && category === null && rule !== null;
+
+  function ruleChange(): RuleChange | null {
+    if (line.charge || category === null || text === '') return null;
     const same = rule && rule.pattern === text && rule.category === category;
     return same ? null : { pattern: text, category };
   }
@@ -60,7 +62,8 @@ export default function RuleDialog({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (change !== null) onSave(change);
+    if (removes) onRemove();
+    else if (change !== null) onSave(change);
   }
 
   return (
@@ -108,7 +111,7 @@ export default function RuleDialog({
           <DialogFooter
             onCancel={onClose}
             confirmLabel="Guardar"
-            confirmDisabled={change === null}
+            confirmDisabled={change === null && !removes}
             submit
           />
         </div>

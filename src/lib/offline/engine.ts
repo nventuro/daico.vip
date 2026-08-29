@@ -370,7 +370,7 @@ export async function reconcile(spec: TableSpec, remote: DbRow[]): Promise<void>
       } else if (local.pending_op === null) {
         if (Date.parse(r.updated_at as string) > Date.parse(local.updated_at as string)) {
           const setCols = [...columnNames(spec), 'created_at', 'updated_at'];
-          const sets = setCols.map((c) => `${c} = ?`).concat('synced = 1');
+          const sets = setCols.map((name) => `${name} = ?`).concat('synced = 1');
           await tx.sql(
             `UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ?`,
             ...columnsOf(spec).map(([name, col]) => toDb(col, r[name])),

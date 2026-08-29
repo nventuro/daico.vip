@@ -13,7 +13,7 @@ import SpendBar from './SpendBar';
 import SpendLegend from './SpendLegend';
 import Delta from './Delta';
 import { useStatements } from './useStatements';
-import { useStatementsContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementsContents';
 import { useMerchantRules } from './useMerchantRules';
 import { byMonth, type TrendPick } from './breakdown';
 import { cardIsShort, coverageByCard, coveredMonths, monthCoverage } from './coverage';

@@ -1,5 +1,12 @@
 import type { ReactNode } from 'react';
 
+interface SpendLegendProps {
+  usual?: ReactNode;
+  oneOff?: ReactNode;
+  installments?: ReactNode;
+  className?: string;
+}
+
 /** What the parts of a spending bar mean, and — where there is room for it —
  *  what each comes to. Three entries only fit a phone written short, so an
  *  amount comes in the compact form. */
@@ -8,12 +15,7 @@ export default function SpendLegend({
   oneOff,
   installments,
   className = 'flex gap-4',
-}: {
-  usual?: ReactNode;
-  oneOff?: ReactNode;
-  installments?: ReactNode;
-  className?: string;
-}) {
+}: SpendLegendProps) {
   return (
     <div className={`${className} text-sm`}>
       <span className="flex items-center gap-2">

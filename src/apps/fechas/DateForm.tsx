@@ -44,10 +44,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <DateFields
-          occursOn={fields.occurs_on}
-          repeatEvery={fields.repeat_every}
-          repeatUnit={fields.repeat_unit}
-          noticeDays={fields.notice_days}
+          fields={fields}
           onChange={(patch) => setFields((current) => ({ ...current, ...patch }))}
           layout="form"
         />

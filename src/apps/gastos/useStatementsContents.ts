@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Statement } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { errorMessage } from '../../utils/textUtils';
@@ -43,15 +43,4 @@ export function useStatementsContents(statements: Statement[]): {
   }, [statements, masterKey]);
 
   return state;
-}
-
-/** The contents of one statement; undefined until open, or when there is
- *  no statement. */
-export function useStatementContents(statement: Statement | undefined): {
-  contents: StatementContents | undefined;
-  error: string | null;
-} {
-  const list = useMemo(() => (statement ? [statement] : []), [statement]);
-  const { contents, error } = useStatementsContents(list);
-  return { contents: statement && contents?.length === 1 ? contents[0] : undefined, error };
 }

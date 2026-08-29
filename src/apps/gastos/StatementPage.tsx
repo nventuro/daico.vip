@@ -11,7 +11,7 @@ import ErrorLine from '../../components/ErrorLine';
 import SectionLabel from '../../components/SectionLabel';
 import FormFooter from '../../components/FormFooter';
 import { useStatements } from './useStatements';
-import { useStatementsContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementsContents';
 import { useMerchantRules } from './useMerchantRules';
 import { useRuleDialog } from './useRuleDialog';
 import {

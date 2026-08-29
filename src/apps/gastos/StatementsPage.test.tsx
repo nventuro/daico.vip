@@ -57,7 +57,7 @@ vi.mock('./useStatements', () => ({
     remove: vi.fn(),
   }),
 }));
-vi.mock('./useStatementContents', () => ({
+vi.mock('./useStatementsContents', () => ({
   useStatementsContents: () => ({ contents: state.contents, error: null }),
   openStatement: vi.fn(),
 }));

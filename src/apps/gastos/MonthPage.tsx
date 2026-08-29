@@ -8,7 +8,7 @@ import ErrorLine from '../../components/ErrorLine';
 import LinkRow from '../../components/LinkRow';
 import SectionLabel from '../../components/SectionLabel';
 import { useStatements } from './useStatements';
-import { useStatementsContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementsContents';
 import { useMerchantRules } from './useMerchantRules';
 import { useRuleDialog } from './useRuleDialog';
 import {

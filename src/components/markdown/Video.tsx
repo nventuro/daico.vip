@@ -1,7 +1,7 @@
 import { YOUTUBE_EMBED_URL, YOUTUBE_ID_PATTERN, YOUTUBE_WATCH_URL } from '../../config';
 import { useOnline } from '../../hooks/useOnline';
 
-interface Props {
+interface VideoProps {
   id: string;
   /** Playback start offset in seconds. */
   start: number;
@@ -10,7 +10,7 @@ interface Props {
 /** An embedded YouTube video; offline it degrades to a link. Nothing is drawn
  *  for anything but a video id: what the directive carries ends up in the
  *  frame's address, and imported content is only as careful as its source. */
-export default function GuideVideo({ id, start }: Props) {
+export default function Video({ id, start }: VideoProps) {
   const online = useOnline();
 
   if (!YOUTUBE_ID_PATTERN.test(id)) return null;

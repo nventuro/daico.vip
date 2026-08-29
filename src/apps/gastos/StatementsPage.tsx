@@ -21,7 +21,7 @@ import {
   ADD_BAR_INPUT_CLASS,
 } from '../../components/controlClasses';
 import { useStatements } from './useStatements';
-import { openStatement, useStatementsContents } from './useStatementContents';
+import { openStatement, useStatementsContents } from './useStatementsContents';
 import { parseStatement } from './parsers';
 import { StatementError, withOneOffsFrom, type StatementContents } from './statement';
 import { toPayCents } from './breakdown';

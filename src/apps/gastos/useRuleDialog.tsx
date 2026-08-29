@@ -20,16 +20,18 @@ export function useRuleDialog(store: ReturnType<typeof useMerchantRules>): {
   const rules = store.rules ?? [];
   const filing = selected ? categoryOf(selected.line, rules) : null;
 
-  async function save(change: RuleChange | 'remove') {
+  async function save(change: RuleChange) {
     if (masterKey.status !== 'unlocked' || !selected) return;
     const { rule } = categoryOf(selected.line, rules);
-    if (change === 'remove') {
-      if (rule) await store.remove(rule.id);
-    } else if (rule) {
-      await store.save(rule.id, change, masterKey.key);
-    } else {
-      await store.add(change.pattern, change.category, masterKey.key);
-    }
+    if (rule) await store.save(rule.id, change, masterKey.key);
+    else await store.add(change.pattern, change.category, masterKey.key);
+    setSelected(null);
+  }
+
+  async function remove() {
+    if (!selected) return;
+    const { rule } = categoryOf(selected.line, rules);
+    if (rule) await store.remove(rule.id);
     setSelected(null);
   }
 
@@ -44,6 +46,7 @@ export function useRuleDialog(store: ReturnType<typeof useMerchantRules>): {
           rule={filing.rule}
           category={filing.category}
           onSave={(change) => void save(change)}
+          onRemove={() => void remove()}
           onClose={() => setSelected(null)}
         />
       ) : null,

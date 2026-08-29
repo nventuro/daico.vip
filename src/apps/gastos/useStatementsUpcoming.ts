@@ -3,7 +3,7 @@ import type { Upcoming } from '../types';
 import { addDays, todayIso } from '../../utils/dateUtils';
 import { STATEMENTS_PATH, statementPath } from './paths';
 import { useStatements } from './useStatements';
-import { useStatementsContents } from './useStatementContents';
+import { useStatementsContents } from './useStatementsContents';
 import { toPayCents } from './breakdown';
 import { CARD_LATE_DAYS, cardCloses } from './coverage';
 import { FORMAT_LABELS, formatArsCompact } from './labels';

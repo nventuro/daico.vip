@@ -22,15 +22,20 @@ export default function UpcomingRows({ children }: UpcomingRowsProps) {
     setByApp((prev) => withReport(prev, appId, items));
   }, []);
 
-  const sources = apps.filter((m) => m.useUpcoming);
+  const sources = apps.filter((app) => app.useUpcoming);
   const rows = sortUpcoming(Object.values(byApp).flatMap((items) => items ?? []));
-  const ready = sources.every((m) => m.id in byApp);
+  const ready = sources.every((app) => app.id in byApp);
 
   return (
     <>
-      {sources.map((m) =>
-        m.useUpcoming ? (
-          <UpcomingSource key={m.id} appId={m.id} useUpcoming={m.useUpcoming} onItems={onItems} />
+      {sources.map((app) =>
+        app.useUpcoming ? (
+          <UpcomingSource
+            key={app.id}
+            appId={app.id}
+            useUpcoming={app.useUpcoming}
+            onItems={onItems}
+          />
         ) : null,
       )}
       {children(rows, ready)}

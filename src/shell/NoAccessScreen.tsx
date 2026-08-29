@@ -2,7 +2,7 @@ import { IconLock } from '@tabler/icons-react';
 import Gate from './Gate';
 import SignOutLink from './SignOutLink';
 
-export default function NoAccess() {
+export default function NoAccessScreen() {
   return (
     <Gate
       icon={IconLock}

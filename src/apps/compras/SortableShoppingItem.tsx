@@ -20,7 +20,7 @@ export default function SortableShoppingItem({ item, onToggle }: SortableShoppin
     <ChecklistItem
       checked={item.checked}
       label={item.name}
-      circle={false}
+      showCheck={false}
       onToggle={onToggle}
       toggleLabel={item.checked ? 'Destachar' : 'Tachar'}
       containerRef={setNodeRef}

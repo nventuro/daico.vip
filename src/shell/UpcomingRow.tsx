@@ -5,8 +5,13 @@ import EntryMarks from '../components/EntryMarks';
 import { daysUntil, relativeDay } from '../utils/dateUtils';
 import { hueStyle } from '../components/hue';
 
-export default function UpcomingRow({ row, today }: { row: Upcoming; today: string }) {
-  const app = apps.find((m) => m.id === row.appId);
+interface UpcomingRowProps {
+  row: Upcoming;
+  today: string;
+}
+
+export default function UpcomingRow({ row, today }: UpcomingRowProps) {
+  const app = apps.find(({ id }) => id === row.appId);
   const past = daysUntil(today, row.on) < 0;
 
   return (

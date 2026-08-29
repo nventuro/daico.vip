@@ -7,7 +7,7 @@ import Gate from './Gate';
  * allows a single connection per browser, so this tab can't use it; the user
  * continues in the tab that's already open, or reloads here after closing it.
  */
-export default function TabConflict() {
+export default function TabConflictScreen() {
   return (
     <Gate
       icon={IconAppWindow}
