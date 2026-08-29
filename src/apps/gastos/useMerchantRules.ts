@@ -9,13 +9,13 @@ import { openPattern, sealPattern } from './payload';
 import type { Rule } from './rules';
 
 /** Local-first merchant rules with their patterns in the clear, undefined
- *  until every one is unsealed. Adding or changing one seals the pattern on
- *  the device; `addMany` takes rules in bulk, moving a rule that already has
- *  the pattern to the category given rather than doubling it, and never
- *  removes one. Sealing is part of the write, so it happens inside `mutate`
- *  like the write itself: what it fails at is reported on the screen, never
- *  thrown at the caller, which has nowhere to say it. Every action is instant
- *  and works offline. */
+ *  until the table has been read and every one is unsealed. Adding or changing
+ *  one seals the pattern on the device; `addMany` takes rules in bulk, moving a
+ *  rule that already has the pattern to the category given rather than doubling
+ *  it, and never removes one. Sealing is part of the write, so it happens
+ *  inside `mutate` like the write itself: what it fails at is reported on the
+ *  screen, never thrown at the caller, which has nowhere to say it. Every
+ *  action is instant and works offline. */
 export function useMerchantRules() {
   const { items, loading, error, mutate, remove } = useOfflineTable(MERCHANT_RULES_SPEC);
   const masterKey = useMasterKey();
@@ -25,7 +25,10 @@ export function useMerchantRules() {
   const [openError, setOpenError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (masterKey.status !== 'unlocked') return;
+    // An empty table and one not read yet look the same from here, so the
+    // rules wait for the read: reporting none of them for a moment would file
+    // every movement as unfiled and lay the screens waiting on them out twice.
+    if (masterKey.status !== 'unlocked' || loading) return;
     let active = true;
     Promise.all(
       items.map(async (row) => ({
@@ -47,7 +50,7 @@ export function useMerchantRules() {
     return () => {
       active = false;
     };
-  }, [items, masterKey]);
+  }, [items, loading, masterKey]);
 
   const add = useCallback(
     (text: string, category: SpendingCategory, key: CryptoKey) =>
