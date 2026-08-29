@@ -1,4 +1,6 @@
 import { useState } from 'react';
+// The only place an app reaches into another. Recetas is still a sketch;
+// where pushing to the shopping list belongs is settled when it is built out.
 import { useShoppingList } from '../compras/useShoppingList';
 import Button from '../../components/Button';
 import IngredientRow from './IngredientRow';
