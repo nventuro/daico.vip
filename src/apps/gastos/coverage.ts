@@ -12,9 +12,14 @@ import type { StatementFormat } from '../../lib/offline/specs';
 import { addDays, addMonths, daysUntil, yearMonthOf } from '../../utils/dateUtils';
 import type { StatementContents } from './statement';
 
-/** After this long with nothing new from a card, it is late enough to say so:
- *  a cycle runs about thirty days, so this is a couple of weeks over. */
-export const CARD_LATE_DAYS = 45;
+/** After this long with nothing new from a card, it is late enough to say so.
+ *  A cycle runs four or five weeks and the statement arrives within days of
+ *  closing, so by four weeks and change the usual one is in hand. The five-week
+ *  cycles do read as late for a few days before they arrive, and that is the
+ *  way round to be wrong: what has not come in yet carries a payment due barely
+ *  a week after it does, so waiting costs the payment while asking early only
+ *  costs a card looking short for a few days. */
+export const CARD_LATE_DAYS = 32;
 
 /** A stretch of days, both ends included (yyyy-mm-dd). */
 export interface Period {
