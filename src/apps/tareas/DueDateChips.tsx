@@ -13,8 +13,7 @@ interface DueDateChipsProps {
 
 /**
  * A due date as one tap: Hoy, Mañana, Sin fecha, or a calendar chip that opens
- * the native picker for any other day and then reads as that day. Used by the
- * add bar and the task form alike, so a date is chosen the same way everywhere.
+ * the native picker for any other day and then reads as that day.
  */
 export default function DueDateChips({ value, onChange, today }: DueDateChipsProps) {
   const tomorrow = addDays(today, 1);

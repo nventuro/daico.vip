@@ -62,7 +62,7 @@ export function useShoppingList() {
     [mutate],
   );
 
-  /** Persist a new fractional-index key for a dragged item (see ordering.ts). */
+  /** Persist a new fractional-index key for a dragged item. */
   const move = useCallback((id: string, position: string) => update(id, { position }), [update]);
 
   return { items, loading, error, add, toggle, removeChecked, restore, move };

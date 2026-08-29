@@ -1,9 +1,8 @@
 // =============================================================================
 // The tables that never leave the device: what a sync would have to carry
 // wholesale, and could not. They are created and wiped with the synced ones,
-// but nothing generic reads them — each is written and read where it is used
-// (an attachment's file in attachmentFiles.ts, a guide's images in the guides
-// app), over the engine's local query API.
+// but nothing generic reads them — each is written and read by whoever owns
+// it, over the engine's local query API.
 // =============================================================================
 
 /** A local-only table: its name, and the whole CREATE TABLE that makes it. */

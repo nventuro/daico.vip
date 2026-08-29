@@ -26,7 +26,6 @@ async function forget(what: string, run: () => Promise<void>): Promise<void> {
 export async function clearDevice(userId: string | null): Promise<void> {
   if (userId !== null) forgetVerdict(userId);
   resetSyncStatus();
-  // clearAll() is what spins up the local database worker; importing it does not.
   await forget('the local data', clearAll);
   await forget('the master key', clearMasterKey);
 }

@@ -1,9 +1,8 @@
 // =============================================================================
-// The class strings behind the form primitives (FormField, TextInput, TextArea,
-// Select, Chip). Every control component takes a `className` that replaces its
-// own look, so these are exported for the two cases that needs: a control that
-// sits inside something else (a chip), and one that is the usual control plus
-// a tweak.
+// The class strings behind the form controls. Every control component takes a
+// `className` that replaces its own look, so these are exported for the two
+// cases that needs: a control that sits inside something else (a chip), and one
+// that is the usual control plus a tweak.
 // =============================================================================
 
 /** A labelled field: caption above, control below. */

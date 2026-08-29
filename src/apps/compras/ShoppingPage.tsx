@@ -33,9 +33,8 @@ export default function ShoppingPage() {
   // Optimistic ordering: a drag reorder is reflected here synchronously so the
   // dropped row stays in its new slot, instead of snapping back for a frame
   // until the async local-store write lands (which read as a jiggle). When the
-  // store update arrives it carries the same order, so nothing moves. Adopting
-  // the canonical list during render (vs. an effect) avoids a flash and the
-  // "you might not need an effect" cascade.
+  // store update arrives it carries the same order, so nothing moves — and it
+  // is adopted while rendering, which is what keeps that frame from showing.
   const [view, setView] = useState(items);
   const [syncedItems, setSyncedItems] = useState(items);
   if (syncedItems !== items) {

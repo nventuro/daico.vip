@@ -4,9 +4,8 @@
 // the key from here but never read its bytes. Scoped to this origin like every
 // other store. Nothing else lives in this database.
 //
-// One state for the whole app sits on top of it: the gate, the attachment
-// screens and the file sync all read the same key, and unlocking anywhere
-// unlocks everywhere. `useMasterKey` is how a screen reads it.
+// One state for the whole app sits on top of it, so unlocking anywhere unlocks
+// everywhere.
 // =============================================================================
 /** IndexedDB database and store holding this device's unwrapped master key. */
 const MASTER_KEY_DB = 'daico-keys';

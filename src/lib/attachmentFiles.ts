@@ -1,16 +1,7 @@
 // =============================================================================
-// The attachment files' side of sync. Rows travel with the tables; the files
-// go to and from the storage bucket here, one at a time:
-//
-//   - a file added on this device is uploaded once there is a connection;
-//   - a file opened on this device is downloaded once and kept;
-//   - every document's files are fetched and kept, so a document can be seen
-//     with no connection wherever it was added;
-//   - after a sync, files of rows that are gone are dropped here, and objects
-//     in the bucket that no row refers to any more are removed there.
-//
-// Everything goes over the bucket as the opaque encrypted blob it is; the
-// keys never come near this module.
+// The attachment files' side of sync. The rows travel with the tables; the
+// files go to and from the storage bucket here, one at a time, and always as
+// the opaque encrypted blob a file is — the keys never come near this module.
 // =============================================================================
 import { supabase } from './supabase';
 import { isPermanentStatus } from './refusals';

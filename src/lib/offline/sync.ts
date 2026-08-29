@@ -1,6 +1,6 @@
 // =============================================================================
-// Sync engine. Reconciles every local table (engine.ts) with its Postgres
-// counterpart whenever there's a connection. Per table, in order:
+// Sync engine. Reconciles every local table with its Postgres counterpart
+// whenever there's a connection. Per table, in order:
 //
 //   1. PUSH queued upserts  → Supabase upsert, then clear the local flag.
 //   2. PUSH queued deletes  → Supabase delete, then drop the local tombstone.
@@ -96,7 +96,7 @@ export function subscribeSyncStatus(listener: () => void): () => void {
   };
 }
 
-/** Note how far the documents' files have got in this run. For the file sync. */
+/** Note how far the documents' files have got in this run. */
 export function reportFiles(done: number, total: number): void {
   setStatus({ files: { done, total } });
 }

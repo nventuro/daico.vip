@@ -43,8 +43,8 @@ interface DateFieldsProps {
 const CHIP = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`;
 const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
 
-/** The date, repeat and notice controls shared by the add bar and the edit
- *  form. Controlled: every change is reported as a patch of the value. */
+/** The date, repeat and notice controls of a dated entry. Controlled: every
+ *  change is reported as a patch of the value. */
 export default function DateFields({
   occursOn,
   repeat,

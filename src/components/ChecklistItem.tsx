@@ -6,15 +6,14 @@ import CheckSquare from './CheckSquare';
 interface ChecklistItemProps {
   /** Whether the item is completed (done / bought). */
   checked: boolean;
-  /** Primary text shown on the row. */
   label: string;
-  /** Optional secondary line under the label (e.g. a due date). */
+  /** A second line under the label, e.g. when the entry is due. */
   subtitle?: ReactNode;
   /** Whether the subtitle is about something already past, which is said in
    *  the error colour. */
   overdue?: boolean;
   onToggle: () => void;
-  /** Accessible label/title for the toggle button. */
+  /** What the toggle is called, for whoever cannot see the row. */
   toggleLabel: string;
   /**
    * Where the row opens. When set, only the check square toggles and the rest
@@ -31,18 +30,16 @@ interface ChecklistItemProps {
    * square, since that is its toggle.
    */
   circle?: boolean;
-  /** Optional drag handle (reorderable lists), rendered leftmost on the row. */
+  /** Handle a reorderable row is dragged by, leftmost on it. */
   dragHandle?: ReactNode;
-  /** Ref for the row element, used by drag-and-drop to track it. */
   containerRef?: (node: HTMLElement | null) => void;
-  /** Inline style for the row (drag transform / transition). */
   style?: CSSProperties;
-  /** Whether the row is currently being dragged (lifts it visually). */
+  /** Whether the row is being dragged, which lifts it off the list. */
   dragging?: boolean;
 }
 
 /**
- * A single checklist row shared by the chores and shopping lists. Two shapes:
+ * A single checklist row, in two shapes:
  * a plain row is one tap target that toggles completion (with an optional
  * drag handle); a row with `to` splits into a check square that toggles and
  * a body that opens the item, so a thumb landing on the text never completes

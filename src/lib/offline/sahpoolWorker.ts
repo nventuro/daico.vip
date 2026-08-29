@@ -3,14 +3,16 @@
 //
 // SQLocal's default worker opens the database with the classic OPFS VFS, which
 // reaches the file system through a SharedArrayBuffer/Atomics async proxy and
-// therefore requires cross-origin isolation (COOP/COEP response headers). The
-// static host can't send those headers, so that VFS silently falls back to an
-// in-memory database and nothing persists.
+// therefore requires cross-origin isolation (COOP/COEP response headers). A
+// static host cannot send those headers, and without them that VFS falls back
+// to an in-memory database with nothing but a console warning: the app would
+// look like it works and lose everything on reload.
 //
 // The SAH-pool VFS opens OPFS sync access handles directly in this worker — no
-// SharedArrayBuffer, no headers — so it persists on the static host. Same OPFS
-// storage, different access strategy. The only cost is that it allows a single
-// connection per origin; the engine enforces one tab with a Web Lock.
+// SharedArrayBuffer, no headers — so it persists wherever the app is served
+// from. Same OPFS storage, different access strategy. The one cost is that it
+// allows a single connection per origin, which is why a single tab owns the
+// database.
 //
 // This file mirrors SQLocal's own worker entry (its `dist/worker.js`) but swaps
 // in a driver that opens an `OpfsSAHPoolDb`. Everything else — the query
@@ -18,12 +20,7 @@
 // =============================================================================
 import { SQLiteMemoryDriver, SQLocalProcessor } from 'sqlocal';
 
-/**
- * Name of the OPFS SAH-pool VFS the local database is opened through. This VFS
- * persists to OPFS without needing `SharedArrayBuffer` (and therefore no
- * COOP/COEP headers, which the static host can't set), at the cost of a single
- * connection per origin — hence the single-tab lock.
- */
+/** Name the SAH-pool VFS is installed under, for the origin's own pool. */
 const LOCAL_DB_VFS_NAME = 'daico-opfs-sahpool';
 
 type InitConfig = Parameters<SQLiteMemoryDriver['init']>[0];

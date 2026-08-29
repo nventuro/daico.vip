@@ -1,7 +1,7 @@
 // =============================================================================
 // The offline-synced tables, one place each: the row as the app sees it, the
 // values its enumerated columns may take, and the spec that drives the generic
-// engine (engine.ts) — local schema, CRUD, and sync. Adding another offline
+// engine — local schema, CRUD, and sync. Adding another offline
 // table is another entry here, no new sync code.
 //
 // Every row carries the standard columns the engine manages itself (SyncedRow:
@@ -230,7 +230,7 @@ export const DATES_SPEC: TableSpec<DateEntry> = {
   table: 'dates',
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
-    // yyyy-mm-dd, like chores.due_on.
+    // yyyy-mm-dd: the day the entry falls on.
     occurs_on: { ddl: 'TEXT NOT NULL' },
     repeat: { ddl: "TEXT NOT NULL DEFAULT 'none'" },
     repeat_months: { ddl: 'INTEGER' },
@@ -289,7 +289,7 @@ export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
   table: 'documents',
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
-    // yyyy-mm-dd, like dates.occurs_on; null for a document that never expires.
+    // yyyy-mm-dd; null for a document that never expires.
     expires_on: { ddl: 'TEXT' },
     notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DOCUMENT_NOTICE_DAYS_DEFAULT}` },
   },
@@ -348,7 +348,7 @@ export const STATEMENTS_SPEC: TableSpec<Statement> = {
   table: 'statements',
   columns: {
     format: { ddl: 'TEXT NOT NULL' },
-    // yyyy-mm-dd, like dates.occurs_on.
+    // yyyy-mm-dd: the day the bank closed the period.
     closed_on: { ddl: 'TEXT NOT NULL' },
     due_on: { ddl: 'TEXT NOT NULL' },
     total_ars_cents: { ddl: 'INTEGER NOT NULL' },

@@ -1,6 +1,6 @@
 // =============================================================================
 // Generic local-first store backed by SQLite in the browser (SQLocal over OPFS,
-// in a Web Worker). Drives every table declared in specs.ts, so the UI reads
+// in a Web Worker). Drives every table a spec declares, so the UI reads
 // and writes locally — instant, and working with no connection.
 //
 // Each local row mirrors its Postgres table plus two LOCAL-ONLY bookkeeping
@@ -11,7 +11,7 @@
 // Folding the sync queue into the row itself (vs. a separate outbox table)
 // keeps a write and its queued op in one atomic statement. A row pending
 // 'delete' is a transient local tombstone: hidden from the UI, kept only until
-// its delete is pushed. The sync engine lives in sync.ts.
+// its delete is pushed.
 //
 // Identifiers (table/column names) interpolated into SQL come only from the
 // static specs, never from user input; values always travel as `?` bindings.
@@ -44,9 +44,9 @@ let ready: Promise<SQLocal> | null = null;
  * declares: `onInit` creates the ones that are missing, and `migrateTables`
  * brings the ones an older client left behind up to date.
  *
- * The database is opened through a custom worker that uses the OPFS SAH-pool VFS
- * (sahpoolWorker.ts) so it persists without COOP/COEP headers. Opening is gated
- * on this tab owning the single-connection lock; a non-owner throws MultiTabError.
+ * It is opened through a worker of its own, on a VFS that persists without
+ * cross-origin isolation and takes one connection per origin, so opening is
+ * gated on this tab owning it: a non-owner throws MultiTabError.
  */
 function db(): Promise<SQLocal> {
   if (!ready) {
@@ -130,19 +130,17 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** App value → stored value (booleans become 0/1; undefined becomes NULL). */
 function toDb(col: ColumnSpec, value: unknown): unknown {
   if (col.boolean) return value ? 1 : 0;
   return value === undefined ? null : value;
 }
 
-/** Stored value → app value (0/1 becomes boolean). */
 function fromDb(col: ColumnSpec, value: unknown): unknown {
   if (col.boolean) return value !== 0 && value !== null;
   return value;
 }
 
-/** A raw local row → the app-facing object (no bookkeeping columns). */
+/** A raw local row without the bookkeeping columns, as the app reads it. */
 function toObject<Row>(spec: TableSpec, row: DbRow): Row {
   const obj: DbRow = {
     id: row.id,
@@ -173,7 +171,6 @@ export function subscribe(table: string, listener: () => void): () => void {
   };
 }
 
-/** Tell whoever watches `table` that its rows changed. */
 function emit(table: string): void {
   listeners.get(table)?.forEach((listener) => listener());
 }
@@ -181,8 +178,8 @@ function emit(table: string): void {
 // ─── Local-only tables ───────────────────────────────────────────────────────
 
 // The synced tables are read and written through the spec API below; a
-// local-only table (localTables.ts) is read and written by its owner, whose
-// statements are as static as a spec's.
+// local-only table is read and written by its owner, whose statements are as
+// static as a spec's.
 
 /** Rows of a local-only table. */
 export async function localQuery<T extends Record<string, unknown>>(
@@ -286,7 +283,7 @@ export async function clearAll(): Promise<void> {
   for (const spec of [...ALL_SPECS, ...LOCAL_SPECS]) emit(spec.table);
 }
 
-// ─── Sync support (used by sync.ts) ──────────────────────────────────────────
+// ─── Sync support ────────────────────────────────────────────────────────────
 
 /** Rows with a queued create/update, as full server-shaped objects to push. */
 export async function getPendingUpserts<Row extends SyncedRow>(

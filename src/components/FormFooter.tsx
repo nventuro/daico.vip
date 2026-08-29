@@ -9,7 +9,7 @@ interface FormFooterProps {
   confirmQuestion: string;
   onRemove: () => void;
   submitLabel?: string;
-  /** Forms pass true until the draft differs from the saved record (see `hasChanges`). */
+  /** Forms pass true until the draft differs from the saved record. */
   submitDisabled?: boolean;
   /** What to show instead of the submit button, for a screen whose main
    *  action is not saving a form (opening or sharing what it shows); `null`

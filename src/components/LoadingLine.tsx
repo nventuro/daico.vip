@@ -2,7 +2,7 @@ interface LoadingLineProps {
   /** How much of the wait is behind, 0 to 1. Left out, the line sweeps: the
    *  wait can't be counted. */
   share?: number;
-  /** Drawn for an inverse surface (the lightbox, the picture editor). */
+  /** Drawn for an inverse surface. */
   inverse?: boolean;
   /** Where the line sits; it is a block as wide as its parent. */
   className?: string;
