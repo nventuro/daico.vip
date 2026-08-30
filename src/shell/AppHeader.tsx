@@ -10,7 +10,7 @@ export default function AppHeader({ name, icon: Icon }: { name: string; icon?: T
   const { pathname } = useLocation();
 
   return (
-    <div className="relative -mx-4 mb-4 flex h-14 items-center gap-2.5 overflow-hidden bg-(--app) px-3 text-on-primary">
+    <div className="sticky top-(--header-height) z-20 -mx-4 mb-4 flex h-14 items-center gap-2.5 overflow-hidden bg-(--app) px-3 text-on-primary">
       <Motif band />
       <IconButton
         label="Volver"

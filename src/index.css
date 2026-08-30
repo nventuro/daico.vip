@@ -11,6 +11,10 @@
   --color-primary-subtle: #ded5be;
   --color-on-primary: #ede6d6;
 
+  /* Height of the shell's band, which every screen scrolls under. An app's
+     own band stops right below it, so the two have to agree on it. */
+  --header-height: 3.625rem;
+
   /* Page background & raised surfaces (inputs, blocks) */
   --color-surface: #ede6d6;
   --color-surface-raised: #f6f1e6;

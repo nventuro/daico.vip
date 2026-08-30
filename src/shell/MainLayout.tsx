@@ -43,8 +43,8 @@ export default function MainLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
-      <header className="sticky top-0 z-10 border-b-2 border-on-surface bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-30 h-(--header-height) border-b-2 border-on-surface bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex h-full max-w-2xl items-center justify-between px-4">
           <span className="flex items-center gap-2.5">
             <span className="font-display text-2xl font-black tracking-tight">daico</span>
             {sync.syncing && (
