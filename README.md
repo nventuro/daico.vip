@@ -31,6 +31,13 @@ local store, so search works with no connection.
 the first `UPCOMING_MAX_ROWS` (4); when there are more, "Ver todo" opens
 `/proximo` with the same entries in full.
 
+**Ajustes** (`/ajustes`, the gear in the header) is what this device has to say
+about itself: when it last brought everything down, what it still has to push,
+anything the server has refused for good, how much room it is taking and what
+of that can be let go, which build it is running — and the way out, since
+signing out leaves the device with nothing and the screen is where that can be
+read before it happens. Its numbers come from the local store alone.
+
 ### Adding an app
 
 1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`,
@@ -92,7 +99,11 @@ goes away is the other case — add it, deploy, and drop it in a later migration
   **last-write-wins** by an `updated_at` timestamp set at edit time, enforced on
   both sides: the pull applies only newer rows, and a trigger on every table
   skips a pushed row older than the stored one, so devices converge instead of
-  overwriting each other. Deletes win over a concurrent edit. Each row carries a
+  overwriting each other. Deletes win over a concurrent edit. A row the server
+  refuses for good — a constraint it breaks, something the session may not do —
+  is skipped so it doesn't hold up the rest of its table, and written down
+  (table, id and the code, never the message, which quotes the row) for Ajustes
+  to show; the note goes when the row does. Each row carries a
   client-generated UUID so an offline-created row has a stable identity before
   it ever reaches the server.
 

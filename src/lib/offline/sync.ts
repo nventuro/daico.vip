@@ -14,6 +14,7 @@
 import { supabase } from '../supabase';
 import { isPermanentRowError } from '../refusals';
 import { ALL_SPECS, type TableSpec } from './specs';
+import { PENDING_DELETES, SYNC_PROBLEMS } from './localTables';
 import * as engine from './engine';
 
 /** How recently (ms) a sync run must have ended for a screen that opens not
@@ -94,6 +95,53 @@ export function subscribeSyncStatus(listener: () => void): () => void {
   return () => {
     statusListeners.delete(listener);
   };
+}
+
+// ─── Refusals ────────────────────────────────────────────────────────────────
+
+/** A row this device cannot get onto the server, as it can be shown: which
+ *  table it belongs to, and the code the server refused it with. */
+export interface Refusal {
+  table: string;
+  id: string;
+  code: string;
+  /** When the refusal was last seen, as an ISO timestamp. */
+  at: string;
+}
+
+/** Everything still stuck, most recently refused first. */
+export async function listRefusals(): Promise<Refusal[]> {
+  const rows = await engine.localQuery<{
+    table_name: string;
+    id: string;
+    code: string;
+    at: string;
+  }>(`SELECT table_name, id, code, at FROM ${SYNC_PROBLEMS.table} ORDER BY at DESC`);
+  return rows.map(({ table_name, id, code, at }) => ({ table: table_name, id, code, at }));
+}
+
+async function recordRefusal(table: string, id: string, code: string): Promise<void> {
+  await engine.localWrite(
+    SYNC_PROBLEMS.table,
+    `INSERT OR REPLACE INTO ${SYNC_PROBLEMS.table} (table_name, id, code, at) VALUES (?, ?, ?, ?)`,
+    table,
+    id,
+    code,
+    new Date().toISOString(),
+  );
+}
+
+/** Forget the refusals of rows that have since gone through or gone away, so
+ *  what is left is what is still stuck. */
+async function forgetSettledRefusals(spec: TableSpec): Promise<void> {
+  await engine.localWrite(
+    SYNC_PROBLEMS.table,
+    `DELETE FROM ${SYNC_PROBLEMS.table} WHERE table_name = ? AND id NOT IN (
+       SELECT id FROM ${spec.table} WHERE pending_op IS NOT NULL
+       UNION SELECT id FROM ${PENDING_DELETES.table} WHERE table_name = ?)`,
+    spec.table,
+    spec.table,
+  );
 }
 
 /** Note how far the documents' files have got in this run. */
@@ -238,12 +286,17 @@ function describe(err: unknown): string {
  * Whether the server will never take this row — it breaks a constraint, or
  * asks for something this session may not do. Such a row would otherwise stop
  * every later row of its table on this device, run after run; the caller goes
- * on instead and leaves it queued, which costs one request a run. Says so in
- * the log, because nothing else will.
+ * on instead and leaves it queued, which costs one request a run. The refusal
+ * is written down so a screen can say that something is stuck.
  */
-function refusedForGood(table: string, error: { code?: string; message?: string }): boolean {
+async function refusedForGood(
+  table: string,
+  id: string,
+  error: { code?: string; message?: string },
+): Promise<boolean> {
   if (!isPermanentRowError(error)) return false;
   console.warn(`[offline] ${table}: the server refused a row, skipping it:`, describe(error));
+  await recordRefusal(table, id, error.code ?? '');
   return true;
 }
 
@@ -275,7 +328,7 @@ async function syncTable(spec: TableSpec): Promise<void> {
   for (const row of await engine.getPendingUpserts(spec)) {
     const { error } = await supabase.from(spec.table).upsert(row);
     if (error) {
-      if (!refusedForGood(spec.table, error)) throw error;
+      if (!(await refusedForGood(spec.table, row.id, error))) throw error;
       continue;
     }
     await engine.markUpserted(spec, row.id, row.updated_at);
@@ -285,7 +338,7 @@ async function syncTable(spec: TableSpec): Promise<void> {
   for (const id of await engine.getPendingDeletes(spec)) {
     const { error } = await supabase.from(spec.table).delete().eq('id', id);
     if (error) {
-      if (!refusedForGood(spec.table, error)) throw error;
+      if (!(await refusedForGood(spec.table, id, error))) throw error;
       continue;
     }
     await engine.markDeleted(spec, id);
@@ -293,4 +346,6 @@ async function syncTable(spec: TableSpec): Promise<void> {
 
   // 3. Full pull + reconcile.
   await engine.reconcile(spec, await pull(spec));
+
+  await forgetSettledRefusals(spec);
 }

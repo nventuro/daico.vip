@@ -97,10 +97,13 @@
   display: none;
 }
 
-/* Per-app accent colours. `static` because these tokens are only ever
-   referenced through a CSS variable set at runtime, never as a literal utility
-   class, so Tailwind would otherwise prune them as unused. */
+/* Per-app accent colours, and the one the shell's own Próximo is painted with.
+   `static` because these tokens are only ever referenced through a CSS variable
+   set at runtime, never as a literal utility class, so Tailwind would otherwise
+   prune them as unused. */
 @theme static {
+  --color-proximo: #8a4a5f;
+
   --color-app-tareas: #5e6e33;
   --color-app-compras: #3b5b7c;
   --color-app-guias: #7a2b2a;

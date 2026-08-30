@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -24,6 +25,25 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'self'",
 ].join('; ');
 
+/**
+ * What the build calls itself: the day the commit was made and its short hash,
+ * e.g. "30/08 · 3400c58". Taken from the commit rather than from the clock, so
+ * two builds of the same source say the same thing. Outside a checkout there
+ * is no answer to give.
+ */
+function buildVersion(): string {
+  try {
+    const [hash, date] = execSync('git log -1 --format="%h %cd" --date=format:%d/%m', {
+      encoding: 'utf8',
+    })
+      .trim()
+      .split(' ');
+    return `${date} · ${hash}`;
+  } catch {
+    return 'sin versión';
+  }
+}
+
 function contentSecurityPolicy(): Plugin {
   return {
     name: 'content-security-policy',
@@ -40,6 +60,7 @@ function contentSecurityPolicy(): Plugin {
 }
 
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(buildVersion()) },
   plugins: [
     react(),
     tailwindcss(),

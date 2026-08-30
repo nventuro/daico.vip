@@ -8,6 +8,7 @@ import * as engine from './engine';
 import {
   afterSync,
   getSyncStatus,
+  listRefusals,
   resetSyncStatus,
   subscribeSyncStatus,
   syncAll,
@@ -168,6 +169,22 @@ describe('syncAll', () => {
     expect(await bookkeeping('chores', refused)).toEqual({ pending_op: 'upsert', synced: 0 });
     expect(callLog()).toContain('select:chores');
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes down what the server refused for good, and forgets it once it goes through', async () => {
+    const refused = await engine.insert(CHORES_SPEC, newChore);
+    server.fail('upsert', 'chores', 'violates check constraint "chores_title_check"', {
+      code: '23514',
+      id: refused,
+    });
+    await syncAll();
+
+    // The code and nothing else: a refusal comes back quoting the private row.
+    expect(await listRefusals()).toEqual([{ table: 'chores', id: refused, code: '23514', at: T0 }]);
+
+    server.reset();
+    await syncAll();
+    expect(await listRefusals()).toEqual([]);
   });
 
   it('pulls a table of more rows than one page whole, and keeps them', async () => {

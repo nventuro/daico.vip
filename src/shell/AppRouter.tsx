@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import { useRoutes, type RouteObject } from 'react-router-dom';
+import { IconSettings } from '@tabler/icons-react';
 import App from '../App';
 import { apps } from '../apps/registry';
 import { appHue } from '../apps/types';
@@ -9,6 +10,7 @@ import NotFound from './NotFound';
 
 const SearchPage = lazy(() => import('./SearchPage'));
 const ProximoPage = lazy(() => import('./ProximoPage'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
 
 const routes: RouteObject[] = [
   {
@@ -22,8 +24,13 @@ const routes: RouteObject[] = [
       },
       {
         path: 'proximo',
-        element: <AppFrame name="Próximo" hue="primary" />,
+        element: <AppFrame name="Próximo" hue="proximo" />,
         children: [{ index: true, Component: ProximoPage }],
+      },
+      {
+        path: 'ajustes',
+        element: <AppFrame name="Ajustes" hue="primary" icon={IconSettings} />,
+        children: [{ index: true, Component: SettingsPage }],
       },
       ...apps.map((app) => ({
         path: app.id,

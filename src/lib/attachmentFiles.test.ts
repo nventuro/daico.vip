@@ -10,7 +10,9 @@ import { T0, at, network } from './offline/testing/clock';
 import * as engine from './offline/engine';
 import { afterSync, syncAll } from './offline/sync';
 import {
+  attachmentFileUsage,
   attachmentUploadState,
+  dropCachedFiles,
   fetchAttachmentFile,
   localAttachmentFile,
   putAttachmentFile,
@@ -369,5 +371,43 @@ describe('syncAttachmentFiles', () => {
     } finally {
       stop();
     }
+  });
+});
+
+describe('making room', () => {
+  /** A document's file the bucket has, a chore's the bucket has, and one the
+   *  bucket has never seen. */
+  async function threeFiles(): Promise<void> {
+    await putAttachmentFile('doc', bytes('abc'), true);
+    await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
+    await putAttachmentFile('cached', bytes('abcdef'), true);
+    await engine.insert(ATTACHMENTS_SPEC, row, 'cached');
+    await putAttachmentFile('only-copy', bytes('ab'), false);
+    await engine.insert(ATTACHMENTS_SPEC, row, 'only-copy');
+  }
+
+  it('drops what can be fetched again, and nothing else', async () => {
+    await threeFiles();
+    await dropCachedFiles();
+
+    expect(await localAttachmentFile('cached')).toBeNull();
+    // Every device keeps a document's, so the next sync would fetch it straight back.
+    expect(await localAttachmentFile('doc')).not.toBeNull();
+    // The bucket does not have this one: here is the only copy there is.
+    expect(await localAttachmentFile('only-copy')).not.toBeNull();
+  });
+
+  it('says what the files come to and how many are still waiting', async () => {
+    await threeFiles();
+    expect(await attachmentFileUsage()).toEqual({
+      bytes: 11,
+      documentBytes: 3,
+      waiting: 1,
+      failed: 0,
+    });
+
+    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
+    await uploadPending();
+    expect(await attachmentFileUsage()).toMatchObject({ waiting: 1, failed: 1 });
   });
 });

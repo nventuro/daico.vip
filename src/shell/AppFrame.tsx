@@ -1,14 +1,13 @@
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
-import type { AppHue } from '../apps/types';
 import AppHeader from './AppHeader';
-import { HueContext, hueStyle } from '../components/hue';
+import { HueContext, hueStyle, type Hue } from '../components/hue';
 import SkeletonRows from '../components/SkeletonRows';
 
 interface AppFrameProps {
   name: string;
-  hue: AppHue | 'primary';
+  hue: Hue;
   icon?: TablerIcon;
 }
 

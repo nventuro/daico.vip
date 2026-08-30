@@ -1,9 +1,8 @@
 import { lazy, Suspense, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { IconLogout, IconSearch } from '@tabler/icons-react';
+import { IconSearch, IconSettings } from '@tabler/icons-react';
 import IconButton from '../components/IconButton';
 import { useAppContext } from './appContext';
-import { useOnline } from '../hooks/useOnline';
 import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
 import { useSyncStatus } from '../hooks/useSyncStatus';
@@ -16,8 +15,7 @@ import FirstSyncScreen from './FirstSyncScreen';
 const TabConflictScreen = lazy(() => import('./TabConflictScreen'));
 
 export default function MainLayout() {
-  const { session, isMember, signOut } = useAppContext();
-  const online = useOnline();
+  const { session, isMember } = useAppContext();
   const dbOwnership = useDbOwnership();
   const masterKey = useMasterKey();
   const sync = useSyncStatus();
@@ -65,13 +63,11 @@ export default function MainLayout() {
               className="px-2 py-1"
             />
             <IconButton
-              label="Cerrar sesión"
-              title={online ? 'Cerrar sesión' : 'Necesitás conexión para cerrar sesión'}
-              icon={IconLogout}
+              label="Ajustes"
+              icon={IconSettings}
+              to="/ajustes"
               tone="band"
-              className="px-2 py-1 disabled:cursor-not-allowed disabled:text-disabled disabled:hover:opacity-100"
-              onClick={signOut}
-              disabled={!online}
+              className="px-2 py-1"
             />
           </div>
         </div>

@@ -125,6 +125,46 @@ export async function deleteAttachmentFile(id: string): Promise<void> {
   );
 }
 
+/** What this device's copies of the files come to: the room they take, how
+ *  much of that is documents', and how many are still waiting for the bucket —
+ *  of those, the ones it has refused for good. */
+export interface AttachmentFileUsage {
+  bytes: number;
+  documentBytes: number;
+  waiting: number;
+  failed: number;
+}
+
+export async function attachmentFileUsage(): Promise<AttachmentFileUsage> {
+  const rows = await engine.localQuery<AttachmentFileUsage & Record<string, unknown>>(
+    `SELECT
+       coalesce(sum(length(f.data)), 0) AS bytes,
+       coalesce(sum(CASE WHEN a.owner_kind = 'document' THEN length(f.data) ELSE 0 END), 0)
+         AS documentBytes,
+       coalesce(sum(CASE WHEN f.uploaded = 0 THEN 1 ELSE 0 END), 0) AS waiting,
+       coalesce(sum(CASE WHEN f.uploaded = 0 AND f.upload_error IS NOT NULL THEN 1 ELSE 0 END), 0)
+         AS failed
+     FROM ${ATTACHMENT_FILES.table} f
+     LEFT JOIN ${ATTACHMENTS_SPEC.table} a ON a.id = f.id`,
+  );
+  return rows[0] ?? { bytes: 0, documentBytes: 0, waiting: 0, failed: 0 };
+}
+
+/**
+ * Let go of the copies that can be fetched again: a file the bucket already
+ * has, and not a document's, since every device keeps those and the next sync
+ * would bring them straight back. A file the bucket does not have is the only
+ * copy there is anywhere, so it is never dropped here.
+ */
+export async function dropCachedFiles(): Promise<void> {
+  await engine.localWrite(
+    ATTACHMENT_FILES.table,
+    `DELETE FROM ${ATTACHMENT_FILES.table}
+      WHERE uploaded = 1
+        AND id IN (SELECT id FROM ${ATTACHMENTS_SPEC.table} WHERE owner_kind <> 'document')`,
+  );
+}
+
 /** Drop the files of attachments that no longer exist here (deleted, on this
  *  device or elsewhere), pending uploads included: with the row gone there is
  *  nothing to upload for. */

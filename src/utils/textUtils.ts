@@ -42,7 +42,7 @@ const BYTES_PER_UNIT = 1024;
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB'];
 
 /** A byte count as people read it, e.g. "3,4 MB". */
-function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number): string {
   let value = bytes;
   let unit = 0;
   while (value >= BYTES_PER_UNIT && unit < BYTE_UNITS.length - 1) {

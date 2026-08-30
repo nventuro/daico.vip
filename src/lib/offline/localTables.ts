@@ -62,5 +62,28 @@ export const PENDING_DELETES: LocalTableSpec = {
   )`,
 };
 
+/**
+ * Rows the server has refused for good: a value it will not hold, a constraint
+ * they break, something this session may not do. Such a row stays queued and
+ * every run tries it again, so without this nothing would ever say that a
+ * change is never going up. Only the code is kept — the server reports a
+ * refusal quoting the row that caused it, and rows are private.
+ */
+export const SYNC_PROBLEMS: LocalTableSpec = {
+  table: 'sync_problems',
+  ddl: `CREATE TABLE IF NOT EXISTS sync_problems (
+    table_name TEXT NOT NULL,
+    id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    at TEXT NOT NULL,
+    PRIMARY KEY (table_name, id)
+  )`,
+};
+
 /** Every local-only table, created on init and wiped on sign-out. */
-export const LOCAL_SPECS: LocalTableSpec[] = [GUIDE_IMAGE_CACHE, ATTACHMENT_FILES, PENDING_DELETES];
+export const LOCAL_SPECS: LocalTableSpec[] = [
+  GUIDE_IMAGE_CACHE,
+  ATTACHMENT_FILES,
+  PENDING_DELETES,
+  SYNC_PROBLEMS,
+];

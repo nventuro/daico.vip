@@ -314,6 +314,28 @@ export async function getPendingDeletes(spec: TableSpec): Promise<string[]> {
 }
 
 /**
+ * How many changes each table still has to push: rows written here and not yet
+ * sent, plus the deletions waiting, tombstones and set-aside ones alike. Only
+ * how many — what is in them is nobody's business but the app's.
+ */
+export async function pendingCounts(): Promise<Record<string, number>> {
+  const c = await db();
+  const counts: Record<string, number> = {};
+  for (const spec of ALL_SPECS) {
+    const rows = await c.sql<{ n: number }>(
+      `SELECT (SELECT count(*) FROM ${spec.table} WHERE pending_op = 'upsert')
+            + (SELECT count(*) FROM (
+                 SELECT id FROM ${spec.table} WHERE pending_op = 'delete'
+                 UNION SELECT id FROM ${PENDING_DELETES.table} WHERE table_name = ?
+               )) AS n`,
+      spec.table,
+    );
+    counts[spec.table] = rows[0]?.n ?? 0;
+  }
+  return counts;
+}
+
+/**
  * Clear the 'upsert' flag after a successful push — but only if the row hasn't
  * changed since (its updated_at still matches what we pushed), so a concurrent
  * local edit is never silently dropped.
