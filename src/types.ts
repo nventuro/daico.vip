@@ -21,14 +21,15 @@ export interface SyncedRow {
 
 /**
  * A fact about an entry that is drawn as a small icon on its row wherever the
- * entry is listed — in its app and on the home screen alike. `notes` also
+ * entry is listed — in its app and on the home screen alike. `comments` also
  * stands for attachments: to the row, something written and something attached
- * are the same thing.
+ * are the same thing — which is why in Notas, where the writing is the entry
+ * itself, it can only mean a picture.
  */
-export type EntryMark = 'notes' | 'repeat';
+export type EntryMark = 'comments' | 'repeat';
 
 /** The kinds of entry an attachment can belong to. */
-export type AttachmentOwnerKind = 'chore' | 'document';
+export type AttachmentOwnerKind = 'chore' | 'document' | 'note';
 
 /** The entry an attachment belongs to. */
 export interface AttachmentOwner {

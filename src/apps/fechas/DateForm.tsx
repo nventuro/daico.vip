@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DateEntry } from '../../lib/offline/specs';
 import TitleField from '../../components/TitleField';
-import NotesField from '../../components/NotesField';
+import CommentsField from '../../components/CommentsField';
 import FormFooter from '../../components/FormFooter';
 import { entryForm } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
@@ -18,7 +18,7 @@ interface DateFormProps {
  *  local draft starts from the entry once and never chases it afterwards. */
 export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
   const [title, setTitle] = useState(entry.title);
-  const [notes, setNotes] = useState(entry.notes ?? '');
+  const [comments, setComments] = useState(entry.comments ?? '');
   const [fields, setFields] = useState<DateFieldsValue>({
     occurs_on: entry.occurs_on,
     repeat_every: entry.repeat_every,
@@ -29,7 +29,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
   const input: DateInput = {
     title: lowercaseTrimmed(title),
     ...fields,
-    notes: notes.trim() || null,
+    comments: comments.trim() || null,
   };
   const { canSave, onSubmit } = entryForm(
     input,
@@ -50,7 +50,7 @@ export default function DateForm({ entry, onSave, onRemove }: DateFormProps) {
         />
       </div>
 
-      <NotesField value={notes} onChange={setNotes} rows={4} />
+      <CommentsField value={comments} onChange={setComments} rows={4} />
 
       <FormFooter
         removeLabel="Eliminar fecha"

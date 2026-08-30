@@ -1,20 +1,20 @@
 import FormField from './FormField';
 import TextArea from './TextArea';
 
-interface NotesFieldProps {
+interface CommentsFieldProps {
   value: string;
   onChange: (value: string) => void;
   rows?: number;
 }
 
 /** Whatever else there is to say about an entry, free text. */
-export default function NotesField({ value, onChange, rows = 5 }: NotesFieldProps) {
+export default function CommentsField({ value, onChange, rows = 5 }: CommentsFieldProps) {
   return (
-    <FormField label="Notas">
+    <FormField label="Comentarios">
       <TextArea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Notas"
+        aria-label="Comentarios"
         rows={rows}
       />
     </FormField>

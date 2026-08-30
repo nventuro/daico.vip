@@ -183,9 +183,9 @@ describe('update', () => {
   });
 
   it('stores an undefined value as null', async () => {
-    const id = await engine.insert(CHORES_SPEC, { ...newChore, notes: 'con manguera' });
-    await engine.update(CHORES_SPEC, id, { notes: undefined });
-    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].notes).toBeNull();
+    const id = await engine.insert(CHORES_SPEC, { ...newChore, comments: 'con manguera' });
+    await engine.update(CHORES_SPEC, id, { comments: undefined });
+    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].comments).toBeNull();
   });
 
   it('queues a clean synced row for upsert again', async () => {
@@ -328,7 +328,7 @@ describe('sync queues', () => {
     await pulled(serverChore('clean', T0));
     await pulled(serverChore('edited', T0));
     at(T1);
-    await engine.update(CHORES_SPEC, 'edited', { notes: 'n' });
+    await engine.update(CHORES_SPEC, 'edited', { comments: 'n' });
     await pulled(serverChore('gone', T0));
     await engine.remove(CHORES_SPEC, 'gone');
 
@@ -341,7 +341,7 @@ describe('sync queues', () => {
       created_at: T0,
       updated_at: T0,
     });
-    expect(pending).toContainEqual(serverChore('edited', T1, { notes: 'n' }));
+    expect(pending).toContainEqual(serverChore('edited', T1, { comments: 'n' }));
     for (const row of pending) expect(Object.keys(row)).not.toContain('pending_op');
   });
 
@@ -393,10 +393,10 @@ describe('sync queues', () => {
 describe('reconcile', () => {
   it('inserts unknown server rows as clean synced rows', async () => {
     await engine.reconcile(CHORES_SPEC, [
-      serverChore('a', T0, { last_done_on: '2026-08-27', notes: 'n' }),
+      serverChore('a', T0, { last_done_on: '2026-08-27', comments: 'n' }),
     ]);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
-      serverChore('a', T0, { last_done_on: '2026-08-27', notes: 'n' }),
+      serverChore('a', T0, { last_done_on: '2026-08-27', comments: 'n' }),
     ]);
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
   });

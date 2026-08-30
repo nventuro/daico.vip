@@ -52,12 +52,12 @@ describe('searchTable', () => {
     await engine.clearAll();
   });
 
-  const add = (title: string, notes: string | null = null) =>
-    engine.insert(CHORES_SPEC, { ...newChore, title, notes });
+  const add = (title: string, comments: string | null = null) =>
+    engine.insert(CHORES_SPEC, { ...newChore, title, comments });
 
   const hits = (query: string) =>
     searchTable(CHORES_SPEC, query, {
-      fields: ['title', 'notes'],
+      fields: ['title', 'comments'],
       hit: (chore, matched) => ({
         title: chore.title,
         subtitle: matched,
@@ -75,7 +75,7 @@ describe('searchTable', () => {
   it('says which field matched, so a hit can quote the right one', async () => {
     await add('comprar pan', 'de la panadería');
     expect((await hits('pan'))[0].subtitle).toBe('title');
-    expect((await hits('panadería'))[0].subtitle).toBe('notes');
+    expect((await hits('panadería'))[0].subtitle).toBe('comments');
   });
 
   it('finds nothing in a row whose fields are empty', async () => {

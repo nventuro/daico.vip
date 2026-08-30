@@ -7,7 +7,7 @@ const TODAY = '2026-09-10';
 function chore(overrides: Partial<Chore> & Pick<Chore, 'id'>): Chore {
   return {
     title: overrides.id,
-    notes: null,
+    comments: null,
     due_on: null,
     last_done_on: null,
     repeat_every: null,

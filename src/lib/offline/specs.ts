@@ -121,7 +121,8 @@ export type RepeatFrom = (typeof REPEAT_FROMS)[number];
  */
 export interface Chore extends SyncedRow {
   title: string;
-  notes: string | null;
+  /** Whatever else there is to say about the chore. */
+  comments: string | null;
   /** When it is due (yyyy-mm-dd); for a chore that repeats, the day the next
    *  one falls on. Null for a chore with no date, which never repeats. */
   due_on: string | null;
@@ -140,7 +141,7 @@ export const CHORES_SPEC: TableSpec<Chore> = {
   table: 'chores',
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
-    notes: { ddl: 'TEXT' },
+    comments: { ddl: 'TEXT' },
     // Dates as yyyy-mm-dd strings (date-only, no timezone).
     due_on: { ddl: 'TEXT' },
     last_done_on: { ddl: 'TEXT' },
@@ -243,7 +244,8 @@ export interface DateEntry extends SyncedRow {
   repeat_unit: RepeatUnit | null;
   /** How many days ahead the entry shows on the home screen (0 = only on the day). */
   notice_days: number;
-  notes: string | null;
+  /** Whatever else there is to say about the date. */
+  comments: string | null;
 }
 
 /** Notice window (days ahead) a new date gets unless the user picks another. */
@@ -258,7 +260,7 @@ export const DATES_SPEC: TableSpec<DateEntry> = {
     repeat_every: { ddl: 'INTEGER' },
     repeat_unit: { ddl: 'TEXT' },
     notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
-    notes: { ddl: 'TEXT' },
+    comments: { ddl: 'TEXT' },
   },
   orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
 };
@@ -407,6 +409,36 @@ export const MERCHANT_RULES_SPEC: TableSpec<MerchantRule> = {
   orderBy: 'created_at ASC',
 };
 
+// ─── Notas ───────────────────────────────────────────────────────────────────
+
+/**
+ * A note: a title and a body in the app's markdown dialect. The body never
+ * reaches the server in the clear — it is compressed and encrypted under a key
+ * of its own, like a statement's payload — so the title is what lists the note
+ * and the only thing Buscar can match.
+ */
+export interface Note extends SyncedRow {
+  title: string;
+  /** Base64: the body, compressed then encrypted. */
+  body: string;
+  /** Base64: the body's own key, wrapped under the household's master key. */
+  wrapped_key: string;
+}
+
+export const NOTES_SPEC: TableSpec<Note> = {
+  table: 'notes',
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    // Base64 of the sealed body: a note is text, so the row stays small enough
+    // to be pulled with its table.
+    body: { ddl: 'TEXT NOT NULL' },
+    wrapped_key: { ddl: 'TEXT NOT NULL' },
+  },
+  // The note last written on is the one being looked for; the list groups by
+  // the same order.
+  orderBy: 'updated_at DESC, created_at DESC',
+};
+
 // ─── Sync order ──────────────────────────────────────────────────────────────
 
 /** Tables no single app owns — the shell's own, and the ones several apps
@@ -425,4 +457,5 @@ export const ALL_SPECS: TableSpec[] = [
   DOCUMENTS_SPEC,
   STATEMENTS_SPEC,
   MERCHANT_RULES_SPEC,
+  NOTES_SPEC,
 ];

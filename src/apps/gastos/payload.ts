@@ -7,11 +7,7 @@
 import { STATEMENT_CONTENTS_SCHEMA, type StatementContents, type StatementLine } from './statement';
 import type { MerchantRule, Statement } from '../../lib/offline/specs';
 import { decryptFile, encryptFile, fromBase64, toBase64 } from '../../lib/householdKey';
-
-async function through(bytes: Uint8Array<ArrayBuffer>, stream: GenericTransformStream) {
-  const piped = new Blob([bytes]).stream().pipeThrough(stream);
-  return new Uint8Array(await new Response(piped).arrayBuffer());
-}
+import { gunzip, gzip } from '../../lib/compress';
 
 /** The payload and wrapped key that carry `contents`, sealed under `masterKey`. */
 export async function sealContents(
@@ -19,7 +15,7 @@ export async function sealContents(
   contents: StatementContents,
 ): Promise<Pick<Statement, 'payload' | 'wrapped_key'>> {
   const plain = new TextEncoder().encode(JSON.stringify(contents));
-  const packed = await through(plain, new CompressionStream('gzip'));
+  const packed = await gzip(plain);
   const { data, wrappedFileKey } = await encryptFile(masterKey, packed);
   return { payload: toBase64(data), wrapped_key: wrappedFileKey };
 }
@@ -64,7 +60,7 @@ export async function openContents(
   statement: Pick<Statement, 'payload' | 'wrapped_key'>,
 ): Promise<StatementContents> {
   const packed = await decryptFile(masterKey, statement.wrapped_key, fromBase64(statement.payload));
-  const plain = await through(packed, new DecompressionStream('gzip'));
+  const plain = await gunzip(packed);
   return upgradeContents(JSON.parse(new TextDecoder().decode(plain)) as Record<string, unknown>);
 }
 

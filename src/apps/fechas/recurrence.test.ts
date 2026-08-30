@@ -10,7 +10,7 @@ function entry(overrides: Partial<DateEntry> & Pick<DateEntry, 'id' | 'occurs_on
     repeat_every: null,
     repeat_unit: null,
     notice_days: 7,
-    notes: null,
+    comments: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

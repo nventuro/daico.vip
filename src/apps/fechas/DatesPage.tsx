@@ -28,7 +28,7 @@ export default function DatesPage() {
     // The next entry most likely repeats and warns the same way; only the day
     // is surely different.
     setNewFields((fields) => ({ ...fields, occurs_on: today }));
-    void add({ title, ...newFields, notes: null });
+    void add({ title, ...newFields, comments: null });
   }
 
   const { upcoming, past } = useMemo(() => splitByToday(items, today), [items, today]);

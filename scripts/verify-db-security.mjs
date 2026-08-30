@@ -35,6 +35,7 @@ const TABLE_PRIVILEGES = {
   documents: CRUD,
   statements: CRUD,
   merchant_rules: CRUD,
+  notes: CRUD,
   attachments: CRUD,
 };
 

@@ -6,6 +6,7 @@ import fechas from './fechas';
 import recetas from './recetas';
 import documentos from './documentos';
 import gastos from './gastos';
+import notas from './notas';
 
 /** Every app, in the order they appear on the home screen. */
 export const apps: readonly AppModule[] = [
@@ -16,4 +17,5 @@ export const apps: readonly AppModule[] = [
   recetas,
   documentos,
   gastos,
+  notas,
 ];

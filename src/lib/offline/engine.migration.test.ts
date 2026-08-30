@@ -8,7 +8,7 @@ vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 // Three tables as older clients left them, each with a row synced back then,
 // seeded before the store opens its database.
 seedSql.push(
-  // `chores` before it gained `notes`, `due_on` and the four that came with
+  // `chores` before it gained `comments`, `due_on` and the four that came with
   // repetition — all of them columns SQLite can add to a table that exists.
   `CREATE TABLE chores (
     id TEXT PRIMARY KEY,
@@ -74,7 +74,7 @@ describe('table migration', () => {
       'updated_at',
       'pending_op',
       'synced',
-      'notes',
+      'comments',
       'due_on',
       'last_done_on',
       'repeat_every',
@@ -85,7 +85,7 @@ describe('table migration', () => {
       {
         id: 'old',
         title: 'Regar',
-        notes: null,
+        comments: null,
         due_on: null,
         last_done_on: null,
         repeat_every: null,
@@ -100,7 +100,7 @@ describe('table migration', () => {
   it('then takes rows using the added columns', async () => {
     const id = await engine.insert(CHORES_SPEC, {
       title: 'Podar',
-      notes: 'fondo',
+      comments: 'fondo',
       due_on: '2026-09-01',
       last_done_on: null,
       repeat_every: 3,
@@ -109,7 +109,7 @@ describe('table migration', () => {
     });
     const rows = await engine.listVisible<Chore>(CHORES_SPEC);
     expect(rows.find((c) => c.id === id)).toMatchObject({
-      notes: 'fondo',
+      comments: 'fondo',
       due_on: '2026-09-01',
       repeat_every: 3,
       repeat_unit: 'month',
@@ -126,7 +126,7 @@ describe('table migration', () => {
       'repeat_every',
       'repeat_unit',
       'notice_days',
-      'notes',
+      'comments',
       'created_at',
       'updated_at',
       'pending_op',

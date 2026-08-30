@@ -12,7 +12,7 @@ export interface ChoreInput {
   title: string;
   /** yyyy-mm-dd, or null for no due date. */
   due_on: string | null;
-  notes: string | null;
+  comments: string | null;
   repeat_every: number | null;
   repeat_unit: RepeatUnit | null;
   repeat_from: RepeatFrom | null;
@@ -37,7 +37,7 @@ export function useChores() {
       if (!value) return Promise.resolve(undefined);
       return insert({
         title: value,
-        notes: null,
+        comments: null,
         due_on: dueOn || null,
         last_done_on: null,
         repeat_every: null,

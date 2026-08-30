@@ -210,6 +210,31 @@ clear. These are the rules on top of it.
   rule change refiles every statement at once. **Never add a built-in merchant
   list**: the repo is public and where the household shops is private.
 
+## Notes (Notas) — read before touching them
+
+The README's "Notas" says what a note is. These are the rules on top of it.
+
+- **A note's body never reaches the server in the clear.** It is sealed by
+  `src/apps/notas/body.ts` (gzip, then `encryptFile` from `householdKey.ts` —
+  never other crypto) under its own `wrapped_key`, exactly like a statement's
+  payload. **Never add a column that holds what a note says**, and never log or
+  persist an opened body. `NOTE_BODY_SCHEMA` is bumped when the sealed shape
+  changes, and a build that meets a later schema refuses the note rather than
+  reading it as an older one: saving it back would reseal the loss under a
+  newer `updated_at` and carry it to every device.
+- **Notas contributes only titles to search** (`fields: ['title']`, plus its
+  attachments by name), for the reason Gastos contributes nothing: matching a
+  word inside would mean opening every note on every keystroke.
+- **The body is pulled with the table**, so a note is text and nothing else: a
+  picture goes in as an attachment (`'note'`, fetched on demand like a chore's),
+  never inside the body.
+- **The list is grouped by `updated_at`** (`grouping.ts`) and has no pinned
+  column: the note last written on is the one being looked for.
+- **What is written about a chore or a date is `comments`** («Comentarios»,
+  `CommentsField`), and the mark drawn on any listed entry is `'comments'` —
+  Notas is the app called notes. In Notas that mark can only mean the entry has
+  pictures.
+
 ## Privacy — the code is public, the data is private
 
 - This repository is public; the database is private. **Never reference any real
@@ -279,8 +304,8 @@ clear. These are the rules on top of it.
   `border-b border-border`, or on the list `divide-y divide-border` — never a
   bordered box. A group of rows is headed by `SectionLabel`; a done/undone mark
   is `CheckSquare`. Corners are square everywhere — no `rounded-*`.
-- **Marks on a listed entry** (has notes, repeats, ...) are declared once per app in
-  `src/apps/<id>/marks.ts` (`choreMarks`, `dateMarks`) as `EntryMark[]` and drawn by
+- **Marks on a listed entry** (has comments, repeats, ...) are declared once per app in
+  `src/apps/<id>/marks.ts` (`choreMarks`, `dateMarks`, `noteMarks`) as `EntryMark[]` and drawn by
   `EntryMarks` — the app's own list passes them as `ChecklistItem`'s `trailing`, and
   its `useUpcoming` sets them on each `Upcoming`, so Próximo shows the same marks.
   Never draw an ad-hoc icon on a row: a mark that is not in `marks.ts` is missing

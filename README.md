@@ -167,7 +167,7 @@ connection. What each app does with its rows is the code's to say; what follows
 is what the rows are and what may never change about them.
 
 **Tareas** — `chores`: a title, an optional due date (`due_on`, a plain date)
-and notes. A task is done or not.
+and comments. A task is done or not.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
 fractional index (`position`), so reordering the list writes one row.
@@ -213,6 +213,15 @@ payload, and every view splits spending into base and one-offs. **Gastos
 contributes nothing to Buscar**: searching it would mean unsealing every
 statement on every keystroke.
 
+**Notas** — `notes`: a title and a body in the markdown dialect below. The
+body **never reaches the server in the clear** — it is compressed and encrypted
+under a key of its own, like a statement's payload — so the row is a title, two
+timestamps and an opaque blob. That is also why **Buscar matches a note's title
+and nothing else**: finding a word inside would mean opening every note on
+every keystroke. The list groups notes by when each was last written, since
+the note last touched is the one being looked for, and a note carries pictures
+like a chore does.
+
 **Guías** — `guides` / `guide_chapters`: imported content the app never writes
 (see Guides below), in the same markdown dialect.
 
@@ -239,7 +248,7 @@ Links to other guides or chapters are ordinary relative links
 
 ## Adjuntos
 
-A chore or a document can carry attachments — pictures, up to
+A chore, a note or a document can carry attachments — pictures, up to
 `ATTACHMENT_MAX_BYTES` each — that are encrypted on the device before they
 leave it, so the server only ever stores ciphertext.
 

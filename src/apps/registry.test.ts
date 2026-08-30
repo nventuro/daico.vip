@@ -55,6 +55,7 @@ describe('apps registry', () => {
       'documents',
       'statements',
       'merchant_rules',
+      'notes',
     ]);
     expect(new Set(tables).size).toBe(tables.length);
   });

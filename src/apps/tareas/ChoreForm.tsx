@@ -5,7 +5,7 @@ import { lowercaseTrimmed } from '../../utils/textUtils';
 import { entryForm } from '../../utils/formUtils';
 import FormField from '../../components/FormField';
 import TitleField from '../../components/TitleField';
-import NotesField from '../../components/NotesField';
+import CommentsField from '../../components/CommentsField';
 import FormFooter from '../../components/FormFooter';
 import AttachmentGrid from '../../components/AttachmentGrid';
 import { entryPath } from '../types';
@@ -24,7 +24,7 @@ interface ChoreFormProps {
 export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
   const [title, setTitle] = useState(chore.title);
   const [dueOn, setDueOn] = useState<string | null>(chore.due_on);
-  const [notes, setNotes] = useState(chore.notes ?? '');
+  const [comments, setComments] = useState(chore.comments ?? '');
   const [repeat, setRepeat] = useState<RepeatValue>({
     repeat_every: chore.repeat_every,
     repeat_unit: chore.repeat_unit,
@@ -43,7 +43,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
   const input: ChoreInput = {
     title: lowercaseTrimmed(title),
     due_on: dueOn,
-    notes: notes.trim() || null,
+    comments: comments.trim() || null,
     ...repeat,
   };
   const { canSave, onSubmit } = entryForm(input, chore, onSave, input.title !== '');
@@ -58,7 +58,7 @@ export default function ChoreForm({ chore, onSave, onRemove }: ChoreFormProps) {
 
       <RepeatFields value={repeat} onChange={changeRepeat} lastDoneOn={chore.last_done_on} />
 
-      <NotesField value={notes} onChange={setNotes} />
+      <CommentsField value={comments} onChange={setComments} />
 
       <FormField label="Adjuntos" group>
         <AttachmentGrid

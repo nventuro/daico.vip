@@ -13,6 +13,7 @@ export const APP_IDS = [
   'recetas',
   'documentos',
   'gastos',
+  'notas',
 ] as const;
 
 export type AppId = (typeof APP_IDS)[number];

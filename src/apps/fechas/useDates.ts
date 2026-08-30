@@ -12,7 +12,7 @@ export interface DateInput {
   repeat_every: number | null;
   repeat_unit: RepeatUnit | null;
   notice_days: number;
-  notes: string | null;
+  comments: string | null;
 }
 
 /** A unit only means something alongside an interval, so the two are set and

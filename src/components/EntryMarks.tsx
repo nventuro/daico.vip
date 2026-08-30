@@ -2,7 +2,7 @@ import { IconNotes, IconRepeat, type TablerIcon } from '@tabler/icons-react';
 import type { EntryMark } from '../types';
 
 const ICONS: Record<EntryMark, { Icon: TablerIcon; label: string }> = {
-  notes: { Icon: IconNotes, label: 'Tiene notas' },
+  comments: { Icon: IconNotes, label: 'Tiene comentarios o adjuntos' },
   repeat: { Icon: IconRepeat, label: 'Se repite' },
 };
 

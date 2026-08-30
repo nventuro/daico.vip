@@ -5,6 +5,6 @@ import type { EntryMark } from '../../types';
 export function dateMarks(entry: DateEntry): EntryMark[] {
   const marks: EntryMark[] = [];
   if (entry.repeat_every !== null) marks.push('repeat');
-  if (entry.notes) marks.push('notes');
+  if (entry.comments) marks.push('comments');
   return marks;
 }

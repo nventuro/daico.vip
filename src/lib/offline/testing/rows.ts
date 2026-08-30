@@ -18,7 +18,7 @@ export function serverChore(
   return {
     id,
     title: `Chore ${id}`,
-    notes: null,
+    comments: null,
     due_on: null,
     last_done_on: null,
     repeat_every: null,
@@ -33,7 +33,7 @@ export function serverChore(
 /** A chore as the app hands one to the store to create. */
 export const newChore = {
   title: 'Regar',
-  notes: null,
+  comments: null,
   due_on: null,
   last_done_on: null,
   repeat_every: null,
