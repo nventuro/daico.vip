@@ -48,14 +48,14 @@ describe('apps registry', () => {
       'attachments',
       'chores',
       'shopping_items',
-      'guides',
-      'guide_chapters',
       'dates',
-      'recipes',
+      'notes',
       'documents',
       'statements',
       'merchant_rules',
-      'notes',
+      'recipes',
+      'guides',
+      'guide_chapters',
     ]);
     expect(new Set(tables).size).toBe(tables.length);
   });
