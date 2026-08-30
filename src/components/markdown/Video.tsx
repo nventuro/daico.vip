@@ -41,8 +41,11 @@ export default function Video({ id, start }: VideoProps) {
         allow="accelerometer; encrypted-media; picture-in-picture"
         allowFullScreen
         loading="lazy"
-        referrerPolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin allow-presentation"
+        // YouTube refuses to configure its player ("error 153") when the frame
+        // arrives with no referrer at all: it checks the embedding origin. The
+        // origin is all it gets — never the page's path.
+        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
       />
     </div>
   );
