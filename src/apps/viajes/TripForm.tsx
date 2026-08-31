@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { Trip } from '../../lib/offline/specs';
-import { lowercaseTrimmed } from '../../utils/textUtils';
 import { entryForm } from '../../utils/formUtils';
 import DatePicker from '../../components/DatePicker';
 import FormField from '../../components/FormField';
@@ -27,7 +26,7 @@ export default function TripForm({ trip, onSave, onRemove }: TripFormProps) {
   const [endsOn, setEndsOn] = useState(trip.ends_on);
 
   const input: TripInput = {
-    title: lowercaseTrimmed(title),
+    title: title.trim(),
     starts_on: startsOn,
     ends_on: endsOn,
   };

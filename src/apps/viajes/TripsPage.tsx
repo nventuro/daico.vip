@@ -50,6 +50,7 @@ export default function TripsPage() {
           }
           placeholder="Agregar un viaje..."
           inputLabel="Nuevo viaje"
+          autoCapitalize="sentences"
         />
       }
     >

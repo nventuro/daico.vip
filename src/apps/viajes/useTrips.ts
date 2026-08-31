@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { TRIPS_SPEC } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
-import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a trip; the row's own columns minus the
  *  engine-managed ones. */
@@ -22,10 +21,12 @@ export function useTrips() {
   const { items, loading, error, insert, update, remove } = useOfflineTable(TRIPS_SPEC);
 
   /** Creates a trip, resolving the new id so the caller can open it;
-   *  undefined for a blank title or a failed write. */
+   *  undefined for a blank title or a failed write. A trip is called after a
+   *  place, so its name keeps the capitals it was typed with — unlike the
+   *  lower-case titles the lists of things to do and buy are kept in. */
   const add = useCallback(
     (input: TripInput): Promise<string | undefined> => {
-      const title = lowercaseTrimmed(input.title);
+      const title = input.title.trim();
       if (!title) return Promise.resolve(undefined);
       return insert({ ...input, title });
     },

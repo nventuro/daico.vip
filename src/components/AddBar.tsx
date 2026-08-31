@@ -12,13 +12,23 @@ interface AddBarProps {
   children?: ReactNode;
   /** What belongs above the input row: a transient undo bar, or a list-level action. */
   notice?: ReactNode;
+  /** Whether the keyboard capitalises what is typed: a list of things named
+   *  after places takes capitals, one of things to do or buy does not. */
+  autoCapitalize?: 'none' | 'sentences';
 }
 
 /** Bottom-anchored add bar — within thumb reach for one-handed use. The bar
  *  holds what is being typed; pages pass extra controls (like a date picker) as
  *  children and what goes above the input (an undo bar, a list-level action) as
  *  `notice`, so both stay pinned with the bar. */
-export default function AddBar({ onAdd, placeholder, inputLabel, children, notice }: AddBarProps) {
+export default function AddBar({
+  onAdd,
+  placeholder,
+  inputLabel,
+  children,
+  notice,
+  autoCapitalize = 'none',
+}: AddBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
 
@@ -47,7 +57,7 @@ export default function AddBar({ onAdd, placeholder, inputLabel, children, notic
             placeholder={placeholder}
             aria-label={inputLabel}
             enterKeyHint="done"
-            autoCapitalize="none"
+            autoCapitalize={autoCapitalize}
             className={ADD_BAR_INPUT_CLASS}
           />
           <button
