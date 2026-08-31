@@ -12,7 +12,7 @@ export default function AppTile({ app }: { app: AppModule }) {
       style={hueStyle(appHue(app.id))}
       className="relative flex aspect-square flex-col items-center justify-center gap-2 overflow-hidden bg-(--app) p-4 text-on-primary transition-opacity hover:opacity-90 active:opacity-80"
     >
-      <Motif />
+      <Motif hue={appHue(app.id)} />
       <Icon size={36} stroke={1.75} className="relative" />
       <span className="relative max-w-full truncate font-display text-2xl font-black">
         {app.name}

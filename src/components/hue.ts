@@ -1,10 +1,10 @@
 import { createContext, type CSSProperties } from 'react';
 import type { AppHue } from '../apps/types';
 
-/** What one of the shell's own screens is painted with: the shell's colour, or
- *  — for Próximo, which shows the apps' entries rather than being a tool — one
- *  of its own. */
-export type ShellHue = 'primary' | 'proximo';
+/** What one of the shell's own screens is painted with: the shell's colour.
+ *  Próximo included — it shows the apps' entries, each named by its own
+ *  colour, so the frame around them stays the shell's. */
+export type ShellHue = 'primary';
 
 /** Every colour a screen can be painted in. */
 export type Hue = AppHue | ShellHue;

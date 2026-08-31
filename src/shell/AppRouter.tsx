@@ -24,7 +24,7 @@ const routes: RouteObject[] = [
       },
       {
         path: 'proximo',
-        element: <AppFrame name="Próximo" hue="proximo" />,
+        element: <AppFrame name="Próximo" hue="primary" />,
         children: [{ index: true, Component: ProximoPage }],
       },
       {
