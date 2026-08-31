@@ -31,7 +31,7 @@ export default function HomePage() {
           `Sin conexión — lo último es de ${relativeDayTime(todayIso(), completedAt)}.`}
       </OfflineBanner>
       <UpcomingStrip />
-      <ul className="-mx-4 grid grid-cols-2 gap-0.75 sm:grid-cols-3">
+      <ul className="-mx-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {apps.map((app) => (
           <li key={app.id}>
             <AppTile app={app} />
