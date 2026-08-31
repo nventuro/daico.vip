@@ -279,6 +279,10 @@ The README's "Notas" says what a note is. These are the rules on top of it.
   `DatePicker` (or `NativeDatePicker` behind a control of your own): a native
   `<input type="date">` prints in the browser's language. ESLint enforces both
   (`no-restricted-syntax` in `eslint.config.js`).
+- **Time format**: always the 24-hour clock. An hour is written by `formatTime`
+  from the same file and picked with `TimePicker` (or `NativeTimePicker` behind
+  a control of your own) — a native `<input type="time">` reads 12-hour with
+  am/pm in English, and the same ESLint rule bans it.
 - **Repetition**: anything that comes back says so the same way — `repeat_every`
   and `repeat_unit` (`day`/`week`/`month`/`year`), both null or both set, on
   `chores` and `dates` alike. The arithmetic and the words for it are

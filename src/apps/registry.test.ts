@@ -50,6 +50,8 @@ describe('apps registry', () => {
       'shopping_items',
       'dates',
       'notes',
+      'trips',
+      'trip_items',
       'documents',
       'statements',
       'merchant_rules',

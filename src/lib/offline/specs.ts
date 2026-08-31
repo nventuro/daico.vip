@@ -439,6 +439,82 @@ export const NOTES_SPEC: TableSpec<Note> = {
   orderBy: 'updated_at DESC, created_at DESC',
 };
 
+// ─── Viajes ──────────────────────────────────────────────────────────────────
+
+/** What a row of a trip can be: what is still to resolve before leaving, and
+ *  the four things that get booked. Also the order the sections are drawn in. */
+export const TRIP_KINDS = ['todo', 'ticket', 'lodging', 'booking', 'place'] as const;
+export type TripKind = (typeof TRIP_KINDS)[number];
+
+/**
+ * A trip: what is booked and what is still missing, in the weeks before it.
+ * Its days are stored rather than derived from its rows — a trip exists before
+ * anything is booked, and a to-do dated a week early would otherwise move its
+ * start.
+ */
+export interface Trip extends SyncedRow {
+  title: string;
+  /** yyyy-mm-dd; both null for a trip that exists before its dates do. */
+  starts_on: string | null;
+  ends_on: string | null;
+}
+
+export const TRIPS_SPEC: TableSpec<Trip> = {
+  table: 'trips',
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    // yyyy-mm-dd: the first and the last day away.
+    starts_on: { ddl: 'TEXT' },
+    ends_on: { ddl: 'TEXT' },
+  },
+  orderBy: 'starts_on ASC NULLS LAST, title COLLATE NOCASE ASC',
+};
+
+/**
+ * One row of a trip: a pendiente to resolve before leaving, or something
+ * booked — a pasaje, an alojamiento, a reserva, a lugar. Every class uses the
+ * same columns and leaves the ones it has no use for null; `on` and `at` are
+ * reserved words, hence the names.
+ */
+export interface TripItem extends SyncedRow {
+  trip_id: string;
+  kind: TripKind;
+  title: string;
+  /** The day it starts (yyyy-mm-dd), and the hour when its class has one. */
+  on_date: string | null;
+  /** HH:MM, or the HH:MM:SS the server writes back. */
+  at_time: string | null;
+  /** The day it ends: a pasaje's arrival, an alojamiento's last day. */
+  ends_on: string | null;
+  ends_at: string | null;
+  /** IATA codes, a pasaje's only. */
+  from_code: string | null;
+  to_code: string | null;
+  /** Only a `todo` is ever ticked. */
+  done: boolean;
+  /** Whatever else there is to say about the row: a booking code, an address. */
+  comments: string | null;
+}
+
+export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
+  table: 'trip_items',
+  columns: {
+    trip_id: { ddl: 'TEXT NOT NULL' },
+    kind: { ddl: 'TEXT NOT NULL' },
+    title: { ddl: 'TEXT NOT NULL' },
+    on_date: { ddl: 'TEXT' },
+    at_time: { ddl: 'TEXT' },
+    ends_on: { ddl: 'TEXT' },
+    ends_at: { ddl: 'TEXT' },
+    from_code: { ddl: 'TEXT' },
+    to_code: { ddl: 'TEXT' },
+    done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    comments: { ddl: 'TEXT' },
+  },
+  // By date, then by when it was added; the section a row falls in is its class.
+  orderBy: 'on_date ASC NULLS LAST, created_at ASC',
+};
+
 // ─── Sync order ──────────────────────────────────────────────────────────────
 
 /** Tables no single app owns — the shell's own, and the ones several apps
@@ -452,6 +528,8 @@ export const ALL_SPECS: TableSpec[] = [
   SHOPPING_SPEC,
   DATES_SPEC,
   NOTES_SPEC,
+  TRIPS_SPEC,
+  TRIP_ITEMS_SPEC,
   DOCUMENTS_SPEC,
   STATEMENTS_SPEC,
   MERCHANT_RULES_SPEC,

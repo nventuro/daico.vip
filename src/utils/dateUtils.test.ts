@@ -3,6 +3,9 @@ import {
   addDays,
   addMonths,
   daysUntil,
+  formatDayMonthShort,
+  formatDayRange,
+  formatTime,
   formatDayMonth,
   formatWeekdayDay,
   monthLabel,
@@ -110,5 +113,33 @@ describe('formatWeekdayDay', () => {
 describe('formatDayMonth', () => {
   it('formats as dd/mm', () => {
     expect(formatDayMonth('2026-03-05')).toBe('05/03');
+  });
+});
+
+describe('formatDayMonthShort', () => {
+  it('names the day and its month', () => {
+    expect(formatDayMonthShort('2026-03-05')).toBe('5 mar');
+  });
+});
+
+describe('formatDayRange', () => {
+  it('says the month once when both days fall in it', () => {
+    expect(formatDayRange('2026-09-12', '2026-09-19')).toBe('12 → 19 sept');
+  });
+
+  it('spells both when they do not', () => {
+    expect(formatDayRange('2026-09-28', '2026-10-01')).toBe('28 sept → 1 oct');
+    expect(formatDayRange('2026-12-28', '2027-01-04')).toBe('28 dic → 4 ene');
+  });
+});
+
+describe('formatTime', () => {
+  it('reads on the 24-hour clock, with no leading zero on the hour', () => {
+    expect(formatTime('08:40')).toBe('8:40');
+    expect(formatTime('21:15')).toBe('21:15');
+  });
+
+  it('reads the seconds the server writes back the same way', () => {
+    expect(formatTime('08:40:00')).toBe('8:40');
   });
 });

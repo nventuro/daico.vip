@@ -233,6 +233,24 @@ every keystroke. The list groups notes by when each was last written, since
 the note last touched is the one being looked for, and a note carries pictures
 like a chore does.
 
+**Viajes** — `trips` (a title and the days, both nullable: a trip exists long
+before its dates do, so they are stored rather than derived from what is booked)
+and `trip_items`, every row of a trip in one table, told apart by `kind`. The app
+is for the weeks **before** a trip — what is booked and what is still missing —
+and during it for looking up a booking code or an address. It is **never an
+agenda**: nothing is grouped by day, and only the pendientes are ticked. The five
+classes are fixed sections (Pendientes, Pasajes, Alojamiento, Reservas, Lugares)
+and an empty one is not drawn, so the pendientes head the screen while any
+remain and the bookings rise on their own once the last is ticked. Every class
+uses the same columns and leaves the ones it has no use for null; the class is
+chosen when a row is created and only stated afterwards. **Only a dated
+pendiente reaches Próximo.** Everything travels in the clear — a row's free text
+is `comments`, like a chore's — so Buscar matches a booking code, and a row
+carries pictures the way a chore does. Airport codes are typed by hand and
+offered from a curated few-KB list with the household's own codes first: no
+lookup is possible offline, and the full IATA set would be precached on every
+device.
+
 **Guías** — `guides` / `guide_chapters`: imported content the app never writes
 (see Guides below), in the same markdown dialect.
 

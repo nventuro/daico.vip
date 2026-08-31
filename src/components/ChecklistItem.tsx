@@ -44,6 +44,10 @@ interface ChecklistItemProps {
  * drag handle); a row with `to` splits into a check square that toggles and
  * a body that opens the item, so a thumb landing on the text never completes
  * anything by accident.
+ *
+ * If you find yourself adding another prop here, consider splitting this into
+ * separate components instead: it is already large, and the props are starting
+ * to read as a configuration language rather than as one row.
  */
 export default function ChecklistItem({
   checked,

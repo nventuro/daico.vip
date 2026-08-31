@@ -53,9 +53,24 @@ export function formatDayMonth(dateStr: string): string {
   return `${day}/${month}`;
 }
 
+/** Formats an hour of the day (HH:MM, or the HH:MM:SS the server writes back)
+ *  the way it is read here, on a 24-hour clock: "8:40", "21:15". */
+export function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':');
+  return `${Number(hours)}:${minutes}`;
+}
+
 /** The month a yyyy-mm-dd date falls in, as yyyy-mm. */
 export function yearMonthOf(date: string): string {
   return date.slice(0, 7);
+}
+
+/** Two days as one range: "12 → 19 sep", with the month said once when both
+ *  fall in it and spelled on either side when they do not. */
+export function formatDayRange(from: string, to: string): string {
+  const start =
+    yearMonthOf(from) === yearMonthOf(to) ? parseIso(from)[2] : formatDayMonthShort(from);
+  return `${start} → ${formatDayMonthShort(to)}`;
 }
 
 /** Whether `date` (yyyy-mm-dd) has gone by on `today`. */
@@ -110,6 +125,12 @@ export function addMonths(date: string, months: number): string {
 /** One es-AR date part (a weekday or month name), lower-case and without the abbreviation dot. */
 function namePart(date: Date, options: Intl.DateTimeFormatOptions): string {
   return date.toLocaleDateString('es-AR', options).toLowerCase().replace(/\.$/, '');
+}
+
+/** A day and the name of its month: "12 sep". */
+export function formatDayMonthShort(dateStr: string): string {
+  const [year, month, day] = parseIso(dateStr);
+  return `${day} ${namePart(new Date(year, month - 1, day), { month: 'short' })}`;
 }
 
 /**

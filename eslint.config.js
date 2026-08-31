@@ -5,14 +5,15 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
-// Dates read dd/mm in this app whatever the browser's language, so whatever
-// lets the browser choose the order is confined to one file each: the native
-// date input to NativeDatePicker, turning a date into text to dateUtils.
+// Dates read dd/mm and hours read 24-hour in this app whatever the browser's
+// language, so whatever lets the browser choose is confined to one file each:
+// the native inputs to NativeDatePicker / NativeTimePicker, turning a date
+// into text to dateUtils.
 const NATIVE_DATE_INPUT_TYPES = /^(date|datetime-local|month|week|time)$/;
 const nativeDateInput = {
   selector: `JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type']:matches([value.value=${NATIVE_DATE_INPUT_TYPES}], [value.expression.value=${NATIVE_DATE_INPUT_TYPES}])`,
   message:
-    "A native date input prints the date in the browser's language (month first in English). Use DatePicker, or NativeDatePicker behind a control of your own.",
+    "A native date or time input follows the browser's language (month first, and a 12-hour clock, in English). Use DatePicker / TimePicker, or NativeDatePicker / NativeTimePicker behind a control of your own.",
 };
 const dateToTextMessage =
   'A date becomes text only in src/utils/dateUtils.ts, where the order is dd/mm: use a helper from there, or add one.';
@@ -65,7 +66,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/components/NativeDatePicker.tsx'],
+    files: ['src/components/NativeDatePicker.tsx', 'src/components/NativeTimePicker.tsx'],
     rules: { 'no-restricted-syntax': ['error', ...dateToText, browserLocale] },
   },
   {

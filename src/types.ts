@@ -29,7 +29,7 @@ export interface SyncedRow {
 export type EntryMark = 'comments' | 'repeat';
 
 /** The kinds of entry an attachment can belong to. */
-export type AttachmentOwnerKind = 'chore' | 'document' | 'note';
+export type AttachmentOwnerKind = 'chore' | 'document' | 'note' | 'trip_item';
 
 /** The entry an attachment belongs to. */
 export interface AttachmentOwner {
