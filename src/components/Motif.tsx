@@ -13,18 +13,18 @@ const square = (x: number, y: number, half: number) =>
   `M${x - half} ${y - half} H${x + half} V${y + half} H${x - half} Z`;
 
 /** The joints every motif shares: the corner fans, which complete into a
- *  rosette where four tiles meet, and the edge diamonds, which pair up across
- *  the gap — so any two neighbouring tiles fit together whatever their
- *  centres. */
+ *  rosette where four tiles meet, and the edge half-diamonds, cut at the
+ *  border so two neighbours complete one diamond across the gap — any two
+ *  tiles fit together whatever their centres. */
 const JOINTS = [
   'M0 0 H30 A30 30 0 0 1 0 30 Z',
   'M100 0 V30 A30 30 0 0 1 70 0 Z',
   'M100 100 H70 A30 30 0 0 1 100 70 Z',
   'M0 100 V70 A30 30 0 0 1 30 100 Z',
-  'M50 2 L55 7 L50 12 L45 7 Z',
-  'M98 50 L93 55 L88 50 L93 45 Z',
-  'M50 98 L45 93 L50 88 L55 93 Z',
-  'M2 50 L7 45 L12 50 L7 55 Z',
+  'M43.5 0 L50 6.5 L56.5 0 Z',
+  'M100 43.5 L93.5 50 L100 56.5 Z',
+  'M56.5 100 L50 93.5 L43.5 100 Z',
+  'M0 56.5 L6.5 50 L0 43.5 Z',
 ];
 
 interface MotifShapes {
