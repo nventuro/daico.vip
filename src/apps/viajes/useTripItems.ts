@@ -41,7 +41,7 @@ export const NEW_TRIP_ITEM: TripItemFields = {
 /** Every class uses the same columns and leaves the ones it has no use for
  *  null, so what the class does not draw is cleared here rather than kept from
  *  whichever class the row was being written as a moment earlier. */
-function withKindFields(input: TripItemInput): TripItemInput {
+export function withKindFields(input: TripItemInput): TripItemInput {
   const shape = TRIP_KIND_SHAPES[input.kind];
   return {
     ...input,

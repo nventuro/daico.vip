@@ -11,14 +11,17 @@ import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import { draftTitleState } from '../../hooks/useDraftTitle';
+import InboxRow from './InboxRow';
 import { pendingCounts, splitTrips } from './grouping';
 import { tripSubtitle } from './labels';
+import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
 
 export default function TripsPage() {
   const { items: trips, loading, error } = useTrips();
   const { items } = useTripItems();
+  const { groups } = useTripInbox();
   const navigate = useNavigate();
 
   const today = todayIso();
@@ -55,6 +58,18 @@ export default function TripsPage() {
       }
     >
       {trips.length === 0 && <EmptyState>Todavía no hay viajes.</EmptyState>}
+      {/* What came in by email waits above everything: it is not a trip yet,
+          and it is the one thing on the screen asking to be dealt with. */}
+      {groups.length > 0 && (
+        <section className="mb-6">
+          <SectionLabel>Inbox</SectionLabel>
+          <ul>
+            {groups.map((group) => (
+              <InboxRow key={group.importId} group={group} today={today} />
+            ))}
+          </ul>
+        </section>
+      )}
       {upcoming.length > 0 && (
         <section className="mb-6">
           <SectionLabel>Próximos</SectionLabel>

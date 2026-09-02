@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { Trip, TripItem, TripKind } from '../../lib/offline/specs';
-import { pendingCounts, splitTrips, tripSections } from './grouping';
+import type { Trip, TripInboxItem, TripItem, TripKind } from '../../lib/offline/specs';
+import {
+  CREATE_TRIP_CHOICE,
+  inboxGroups,
+  inboxTripChoices,
+  pendingCounts,
+  splitTrips,
+  suggestedTripChoice,
+  tripSections,
+} from './grouping';
 
 const TODAY = '2026-09-10';
 
@@ -105,5 +113,94 @@ describe('pendingCounts', () => {
       ['v1', 2],
       ['v2', 1],
     ]);
+  });
+});
+
+function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxItem {
+  return {
+    id,
+    import_id: 'e1',
+    email_subject: 'Fwd: Tu vuelo',
+    trip_title: 'Bariloche',
+    kind: 'ticket',
+    title: id,
+    on_date: null,
+    at_time: null,
+    ends_on: null,
+    ends_at: null,
+    from_code: null,
+    to_code: null,
+    comments: null,
+    created_at: '2026-09-01T10:00:00Z',
+    updated_at: '2026-09-01T10:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('inboxGroups', () => {
+  it('lists a group by class, then by day with the undated last, then by title', () => {
+    const rows = [
+      staged('excursión', { kind: 'booking', on_date: '2026-09-15' }),
+      staged('vuelta', { kind: 'ticket', on_date: '2026-09-19' }),
+      staged('hotel', { kind: 'lodging', on_date: '2026-09-12' }),
+      staged('sin fecha', { kind: 'ticket' }),
+      staged('ida', { kind: 'ticket', on_date: '2026-09-12' }),
+      staged('auto', { kind: 'booking', on_date: '2026-09-12' }),
+      staged('bus', { kind: 'ticket', on_date: '2026-09-12' }),
+    ];
+    const [group] = inboxGroups(rows);
+    expect(group.items.map((item) => item.title)).toEqual([
+      'bus',
+      'ida',
+      'vuelta',
+      'sin fecha',
+      'hotel',
+      'auto',
+      'excursión',
+    ]);
+  });
+
+  it('puts the email that came last first, and dates a group by its earliest row', () => {
+    const groups = inboxGroups([
+      staged('a', { import_id: 'old', created_at: '2026-09-01T10:00:00Z' }),
+      staged('b', { import_id: 'new', created_at: '2026-09-02T10:00:00.500Z' }),
+      staged('c', { import_id: 'new', created_at: '2026-09-02T10:00:00+00:00' }),
+      staged('d', { import_id: 'old', created_at: '2026-09-01T09:00:00Z' }),
+    ]);
+    expect(groups.map((group) => group.importId)).toEqual(['new', 'old']);
+    expect(groups[0].receivedAt).toBe('2026-09-02T10:00:00+00:00');
+    expect(groups[1].receivedAt).toBe('2026-09-01T09:00:00Z');
+    expect(groups[0].tripTitle).toBe('Bariloche');
+    expect(groups[0].emailSubject).toBe('Fwd: Tu vuelo');
+  });
+
+  it('makes nothing of nothing', () => {
+    expect(inboxGroups([])).toEqual([]);
+  });
+});
+
+describe('inboxTripChoices', () => {
+  // In the spec's order: by start, the undated last.
+  const trips = [
+    trip('pasado', '2026-08-01', '2026-08-10'),
+    trip('en curso', '2026-09-08', '2026-09-12'),
+    trip('próximo', '2026-09-20'),
+    trip('lejano', '2026-12-01', '2026-12-15'),
+    trip('sin fechas', null),
+  ];
+
+  it('offers the next trip first, the furthest after, the undated last, and never a past one', () => {
+    expect(inboxTripChoices(trips, TODAY).map((t) => t.id)).toEqual([
+      'en curso',
+      'próximo',
+      'lejano',
+      'sin fechas',
+    ]);
+  });
+
+  it('suggests the next trip, and creating one when only past trips exist', () => {
+    expect(suggestedTripChoice(inboxTripChoices(trips, TODAY))).toBe('en curso');
+    expect(suggestedTripChoice(inboxTripChoices([trips[0]], TODAY))).toBe(CREATE_TRIP_CHOICE);
+    expect(suggestedTripChoice(inboxTripChoices([], TODAY))).toBe(CREATE_TRIP_CHOICE);
   });
 });

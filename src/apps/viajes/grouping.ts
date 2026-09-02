@@ -1,4 +1,10 @@
-import { TRIP_KINDS, type Trip, type TripItem, type TripKind } from '../../lib/offline/specs';
+import {
+  TRIP_KINDS,
+  type Trip,
+  type TripInboxItem,
+  type TripItem,
+  type TripKind,
+} from '../../lib/offline/specs';
 import { isPast } from '../../utils/dateUtils';
 import { TRIP_SECTION_LABELS } from './labels';
 
@@ -57,4 +63,80 @@ export function pendingCounts(items: TripItem[]): Map<string, number> {
     counts.set(item.trip_id, (counts.get(item.trip_id) ?? 0) + 1);
   }
   return counts;
+}
+
+/** What one email left to review: its rows, and what they have in common. */
+export interface InboxGroup {
+  importId: string;
+  /** The model's name for the trip the rows belong to. */
+  tripTitle: string;
+  emailSubject: string;
+  /** When the email was read, as an ISO instant: the earliest of its rows. */
+  receivedAt: string;
+  items: TripInboxItem[];
+}
+
+const titleCollator = new Intl.Collator('es');
+
+function instant(iso: string): number {
+  return new Date(iso).getTime();
+}
+
+/** A group's rows as the review lists them: by class in `TRIP_KINDS` order,
+ *  the dated ones first within a class, soonest first, then by title. */
+function compareInboxItems(a: TripInboxItem, b: TripInboxItem): number {
+  const byKind = TRIP_KINDS.indexOf(a.kind) - TRIP_KINDS.indexOf(b.kind);
+  if (byKind !== 0) return byKind;
+  if (a.on_date !== b.on_date) {
+    if (a.on_date === null) return 1;
+    if (b.on_date === null) return -1;
+    return a.on_date < b.on_date ? -1 : 1;
+  }
+  return titleCollator.compare(a.title, b.title);
+}
+
+/** The staged rows as the list shows them: one group per email, the one
+ *  that came last first. */
+export function inboxGroups(rows: TripInboxItem[]): InboxGroup[] {
+  const byImport = new Map<string, TripInboxItem[]>();
+  for (const row of rows) {
+    const items = byImport.get(row.import_id);
+    if (items) items.push(row);
+    else byImport.set(row.import_id, [row]);
+  }
+  return [...byImport.entries()]
+    .map(([importId, items]) => {
+      const first = items.reduce((earliest, row) =>
+        instant(row.created_at) < instant(earliest.created_at) ? row : earliest,
+      );
+      return {
+        importId,
+        tripTitle: first.trip_title,
+        emailSubject: first.email_subject,
+        receivedAt: first.created_at,
+        items: [...items].sort(compareInboxItems),
+      };
+    })
+    .sort((a, b) => instant(b.receivedAt) - instant(a.receivedAt));
+}
+
+/** The choice of creating a trip rather than picking one. A trip's id is a
+ *  uuid, so nothing can be mistaken for this. */
+export const CREATE_TRIP_CHOICE = 'create';
+
+/**
+ * The trips a group of suggestions may go into, in the order the selector
+ * offers them: the ones still ahead soonest first, then the ones without
+ * dates. A trip already over is not offered at all — what is being booked is
+ * never in the past. Expects the rows in the spec's order, like `splitTrips`.
+ */
+export function inboxTripChoices(trips: Trip[], today: string): Trip[] {
+  const { upcoming, undated } = splitTrips(trips, today);
+  return [...upcoming, ...undated];
+}
+
+/** What the selector starts on: the next trip, or creating one when nothing
+ *  is ahead. */
+export function suggestedTripChoice(choices: Trip[]): string {
+  return choices[0]?.id ?? CREATE_TRIP_CHOICE;
 }

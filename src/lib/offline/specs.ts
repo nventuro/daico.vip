@@ -542,6 +542,57 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
   orderBy: 'on_date ASC NULLS LAST, created_at ASC',
 };
 
+/** What a confirmation email can contain: the booked classes, never a
+ *  pendiente or a lugar. */
+export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'>;
+
+/**
+ * A booking the email pipeline staged for review: one row per item the model
+ * extracted from a forwarded email, the rows of one email sharing an
+ * `import_id` and reviewed as a group. It mirrors a row of a trip minus the
+ * trip and the tick, which only exist once a member confirms it into a real
+ * row; `trip_title` is the model's name for the trip, matched to a real one
+ * or created at that point. Written by the worker, never by the app — which
+ * only confirms or discards, and puts a row back after an undo.
+ */
+export interface TripInboxItem extends SyncedRow {
+  import_id: string;
+  /** The email's subject, so the review can say where it all came from. */
+  email_subject: string;
+  trip_title: string;
+  kind: TripInboxKind;
+  title: string;
+  on_date: string | null;
+  /** HH:MM, or the HH:MM:SS the server writes back. */
+  at_time: string | null;
+  ends_on: string | null;
+  ends_at: string | null;
+  from_code: string | null;
+  to_code: string | null;
+  comments: string | null;
+}
+
+export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
+  table: 'trip_inbox',
+  columns: {
+    import_id: { ddl: 'TEXT NOT NULL' },
+    email_subject: { ddl: 'TEXT NOT NULL' },
+    trip_title: { ddl: 'TEXT NOT NULL' },
+    kind: { ddl: 'TEXT NOT NULL' },
+    title: { ddl: 'TEXT NOT NULL' },
+    on_date: { ddl: 'TEXT' },
+    at_time: { ddl: 'TEXT' },
+    ends_on: { ddl: 'TEXT' },
+    ends_at: { ddl: 'TEXT' },
+    from_code: { ddl: 'TEXT' },
+    to_code: { ddl: 'TEXT' },
+    comments: { ddl: 'TEXT' },
+  },
+  // The groups and their order are made on display; here the rows only keep
+  // the order they were staged in.
+  orderBy: 'created_at ASC',
+};
+
 // ─── Sync order ──────────────────────────────────────────────────────────────
 
 /** Tables no single app owns — the shell's own, and the ones several apps
@@ -558,6 +609,7 @@ export const ALL_SPECS: TableSpec[] = [
   IDEAS_SPEC,
   TRIPS_SPEC,
   TRIP_ITEMS_SPEC,
+  TRIP_INBOX_SPEC,
   DOCUMENTS_SPEC,
   STATEMENTS_SPEC,
   MERCHANT_RULES_SPEC,

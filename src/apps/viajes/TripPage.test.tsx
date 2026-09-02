@@ -40,6 +40,15 @@ vi.mock('./useTrips', () => ({
 vi.mock('./useTripItems', () => ({
   useTripItems: () => ({ items: state.items, loading: false, error: null, save: vi.fn() }),
 }));
+vi.mock('./useTripInbox', () => ({
+  useTripInbox: () => ({
+    groups: [],
+    loading: false,
+    error: null,
+    insert: vi.fn(),
+    remove: vi.fn(),
+  }),
+}));
 vi.mock('../../hooks/useAttachments', () => ({
   useAttachments: () => ({ items: [], loading: false, error: null }),
   ownersWithAttachments: () => new Set<string>(),

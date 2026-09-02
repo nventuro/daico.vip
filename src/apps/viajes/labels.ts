@@ -1,5 +1,11 @@
 import type { Trip, TripItem, TripKind } from '../../lib/offline/specs';
-import { daysUntil, formatDayRange, formatTime, relativeDay } from '../../utils/dateUtils';
+import {
+  daysUntil,
+  formatDayRange,
+  formatTime,
+  relativeDay,
+  relativeDayTime,
+} from '../../utils/dateUtils';
 import { countLabel } from '../../utils/textUtils';
 
 /** What each class is called: the word its control offers and its chip states. */
@@ -113,4 +119,39 @@ export function itemSubtitle(item: TripItem, today: string): string | undefined 
     case 'place':
       return undefined;
   }
+}
+
+/** How many suggestions a group of them holds. */
+export function inboxCountLabel(count: number): string {
+  return countLabel(count, 'ítem', 'ítems');
+}
+
+/** The line under a group in the list: how much it holds, and when it came. */
+export function inboxSubtitle(count: number, receivedAt: string, today: string): string {
+  return `${inboxCountLabel(count)} · ${relativeDayTime(today, receivedAt)}`;
+}
+
+/** Where a group came from: the subject of the email. */
+export function inboxSourceLabel(subject: string): string {
+  return `Fuente: «${subject}»`;
+}
+
+/** A trip as the selector offers it: its name, and when it is. */
+export function tripChoiceLabel(trip: Trip, today: string): string {
+  return `${trip.title} · ${tripDatesLabel(trip, today) ?? 'sin fechas'}`;
+}
+
+/** The selector's last choice: a trip named as the suggestions were. */
+export function createTripLabel(tripTitle: string): string {
+  return `Crear viaje «${tripTitle}»`;
+}
+
+/** The review's main action: «Agregar 3 ítems». */
+export function addInboxLabel(count: number): string {
+  return `Agregar ${inboxCountLabel(count)}`;
+}
+
+/** What the undo bar says once they are in the trip. */
+export function inboxAddedLabel(count: number): string {
+  return count === 1 ? 'Se agregó 1 ítem' : `Se agregaron ${count} ítems`;
 }

@@ -39,8 +39,20 @@ const TABLE_PRIVILEGES = {
   ideas: CRUD,
   trips: CRUD,
   trip_items: CRUD,
+  trip_inbox: CRUD,
   attachments: CRUD,
 };
+
+// The email worker's role: what the pipeline that stages trip suggestions may
+// touch, and nothing else. Insert-only on the staging table plus the sender
+// gate's read of members — a compromised worker can add junk suggestions and
+// learn the member emails it already handles mail for, but read or change
+// nothing else.
+const WRITER_ROLE = 'trip_inbox_writer';
+const WRITER_GRANTS = [
+  ['trip_inbox', 'INSERT'],
+  ['members', 'SELECT'],
+];
 
 // The one shape a policy may have: it grants the authenticated role what
 // private.is_member() says, and nothing else. A `for select` policy has no
@@ -108,15 +120,70 @@ const CHECKS = [
   },
   {
     // Permissive policies OR together, so one policy that says something else
-    // opens the table however careful the others are.
-    name: 'every policy on a public table is the private.is_member() policy',
+    // opens the table however careful the others are. Two policies besides the
+    // member ones may exist: the email worker's, in exactly the shapes pinned
+    // here — anything else is drift.
+    name: 'every policy on a public table is the is_member() policy or a pinned writer policy',
     sql: `select p.tablename || ': ' || p.policyname as violation
           from pg_policies p
           where p.schemaname = 'public'
-            and (p.roles <> '{authenticated}'::name[]
-                 or coalesce(p.qual, '${MEMBER_POLICY}') <> '${MEMBER_POLICY}'
-                 or coalesce(p.with_check, '${MEMBER_POLICY}') <> '${MEMBER_POLICY}'
-                 or (p.qual is null and p.with_check is null))`,
+            and not (p.roles = '{authenticated}'::name[]
+                     and coalesce(p.qual, '${MEMBER_POLICY}') = '${MEMBER_POLICY}'
+                     and coalesce(p.with_check, '${MEMBER_POLICY}') = '${MEMBER_POLICY}'
+                     and not (p.qual is null and p.with_check is null))
+            and not (p.roles = '{${WRITER_ROLE}}'::name[]
+                     and ((p.tablename = 'trip_inbox' and p.cmd = 'INSERT'
+                           and p.qual is null and p.with_check = 'true')
+                          or (p.tablename = 'members' and p.cmd = 'SELECT'
+                              and p.qual = 'true' and p.with_check is null)))`,
+  },
+  {
+    name: `${WRITER_ROLE} holds exactly its listed privileges`,
+    sql: `with expected(table_name, privilege_type) as (values ${WRITER_GRANTS.map(
+      ([t, p]) => `('${t}', '${p}')`,
+    ).join(', ')}),
+               granted as (
+                 select table_schema::text, table_name::text, privilege_type::text
+                 from information_schema.role_table_grants
+                 where grantee = '${WRITER_ROLE}'
+               )
+          select g.table_schema || '.' || g.table_name || ' [' || g.privilege_type || ']' as violation
+          from granted g
+          where g.table_schema <> 'public'
+             or not exists (select 1 from expected e
+                            where e.table_name = g.table_name
+                              and e.privilege_type = g.privilege_type)
+          union all
+          select e.table_name || ' [' || e.privilege_type || '] — missing' as violation
+          from expected e
+          where not exists (select 1 from granted g
+                            where g.table_schema = 'public'
+                              and g.table_name = e.table_name
+                              and g.privilege_type = e.privilege_type)`,
+  },
+  {
+    // The narrow grants only mean something if the role cannot step around
+    // them: no RLS bypass, no capability flags, no membership in any role
+    // (membership in e.g. authenticated would OR the member policies in).
+    name: `${WRITER_ROLE} can log in and nothing more`,
+    sql: `select '${WRITER_ROLE}: ' || attr as violation
+          from pg_roles r,
+               lateral (values ('superuser', r.rolsuper),
+                               ('createdb', r.rolcreatedb),
+                               ('createrole', r.rolcreaterole),
+                               ('bypassrls', r.rolbypassrls),
+                               ('replication', r.rolreplication),
+                               ('cannot log in', not r.rolcanlogin)) as flags(attr, held)
+          where r.rolname = '${WRITER_ROLE}' and held
+          union all
+          select '${WRITER_ROLE}: member of ' || g.rolname as violation
+          from pg_auth_members m
+          join pg_roles r on r.oid = m.member
+          join pg_roles g on g.oid = m.roleid
+          where r.rolname = '${WRITER_ROLE}'
+          union all
+          select '${WRITER_ROLE}: role does not exist' as violation
+          where not exists (select 1 from pg_roles where rolname = '${WRITER_ROLE}')`,
   },
   {
     name: 'no SECURITY DEFINER function lives in the public schema',

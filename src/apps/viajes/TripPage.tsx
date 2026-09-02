@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { IconPencil } from '@tabler/icons-react';
 import type { TripItem } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
+import { UNDO_MS, useUndo } from '../../hooks/useUndo';
 import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
@@ -14,25 +15,61 @@ import IconButton from '../../components/IconButton';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
-import { entryPath } from '../types';
+import UndoBar from '../../components/UndoBar';
+import { appPath, entryPath } from '../types';
 import ItemRow from './ItemRow';
 import { draftTitleState } from '../../hooks/useDraftTitle';
 import { tripSections } from './grouping';
+import { inboxRowInput, inboxUndoOf, type InboxUndo } from './inboxUndo';
 import { tripDatesLabel } from './labels';
+import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
 
 export default function TripPage() {
   const { tripId = '' } = useParams();
-  const { items: trips, loading, error } = useTrips();
+  const { items: trips, loading, error, remove: removeTrip } = useTrips();
   const trip = useEntry(trips, 'tripId');
-  const { items, loading: itemsLoading, error: itemsError, save } = useTripItems(tripId);
+  const {
+    items,
+    loading: itemsLoading,
+    error: itemsError,
+    save,
+    remove: removeItem,
+  } = useTripItems(tripId);
+  const { insert: restage } = useTripInbox();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
   const navigate = useNavigate();
+  const { state, pathname } = useLocation();
+  const undo = useUndo<InboxUndo>(UNDO_MS);
+
+  // What the review just put in arrives with the navigation and is offered
+  // for a moment; the navigation is then replaced without it, so coming
+  // back to the screen later does not offer it again.
+  const arrived = inboxUndoOf(state);
+  const offer = undo.offer;
+  useEffect(() => {
+    if (!arrived) return;
+    offer(arrived);
+    navigate(pathname, { replace: true, state: null });
+  }, [arrived, offer, navigate, pathname]);
+
+  /** Takes the rows out again and puts the suggestions back as they were;
+   *  a trip created for them goes too, and with it the screen. */
+  async function undoInbox(added: InboxUndo) {
+    undo.clear();
+    for (const id of added.itemIds) await removeItem(id);
+    for (const row of added.staged) await restage(inboxRowInput(row));
+    if (added.tripCreated) {
+      await removeTrip(added.tripId);
+      navigate(appPath('viajes'));
+    }
+  }
 
   const today = todayIso();
   const { sections, done } = useMemo(() => tripSections(items), [items]);
+  const justAdded = undo.value;
 
   function renderItem(item: TripItem) {
     return (
@@ -60,6 +97,11 @@ export default function TripPage() {
           }
           placeholder="Agregar al viaje..."
           inputLabel="Agregar al viaje"
+          notice={
+            justAdded && (
+              <UndoBar message={justAdded.label} onAction={() => void undoInbox(justAdded)} />
+            )
+          }
         />
       }
     >

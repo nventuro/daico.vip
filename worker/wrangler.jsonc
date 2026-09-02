@@ -1,0 +1,21 @@
+// The email worker's deployment. Cloudflare does not watch the repository:
+// every change ships with `npx wrangler deploy` from this directory.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trips-inbox",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-31",
+  // `pg` needs Node's net and events.
+  "compatibility_flags": ["nodejs_compat"],
+  // Mail in, nothing else: no workers.dev URL and no preview URLs, so the
+  // worker is never reachable over HTTP.
+  "workers_dev": false,
+  "preview_urls": false,
+  // The database, as the writer role, through Hyperdrive: it holds the
+  // connection string and verifies the pooler's certificate against the
+  // uploaded Supabase root, which a worker on its own cannot do. The id is
+  // the one `wrangler hyperdrive create` prints (see
+  // scripts/trip-inbox-writer-password.mjs at the repo root).
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "bb0526149afd439dae8633252b621be1" }],
+  // Secrets, never here: ANTHROPIC_API_KEY (`npx wrangler secret put`).
+}

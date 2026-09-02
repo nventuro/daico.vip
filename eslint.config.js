@@ -48,7 +48,10 @@ const HOOKS = ['**/hooks/**'];
 const SHELL = ['**/shell/**'];
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `worker/` is a package of its own, run by Cloudflare rather than in the
+  // app: its dependencies, its globals and its types are its own, so the
+  // app's rules are not run over it.
+  globalIgnores(['dist', 'worker']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

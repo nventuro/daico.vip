@@ -16,7 +16,13 @@
     "db:push": "set -a && . ./.env && supabase db push && node scripts/verify-db-security.mjs",
     "db:verify": "set -a && . ./.env && node scripts/verify-db-security.mjs",
     "db:migration:new": "supabase migration new",
-    "guides:import": "set -a && . ./.env && node scripts/import-guides.mjs"
+    "guides:import": "set -a && . ./.env && node scripts/import-guides.mjs",
+    "worker:test": "npm --prefix worker test && npm --prefix worker run check",
+    "worker:deploy": "set -a && . ./.env && cd worker && npx wrangler deploy",
+    "worker:secret": "set -a && . ./.env && cd worker && printf '%s' \"$ANTHROPIC_API_KEY\" | npx wrangler secret put ANTHROPIC_API_KEY",
+    "worker:cert": "set -a && . ./.env && cd worker && npx wrangler cert upload certificate-authority --ca-cert ../supabase/ca.crt --name supabase-root",
+    "worker:hyperdrive": "set -a && . ./.env && node scripts/trip-inbox-writer-password.mjs",
+    "worker:tail": "set -a && . ./.env && cd worker && npx wrangler tail"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

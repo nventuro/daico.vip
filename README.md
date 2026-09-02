@@ -261,7 +261,18 @@ is `comments`, like a chore's — so Buscar matches a booking code, and a row
 carries pictures the way a chore does. Airport codes are typed by hand and
 offered from a curated few-KB list with the household's own codes first: no
 lookup is possible offline, and the full IATA set would be precached on every
-device.
+device. A confirmation email can also be **forwarded to the household's
+address**: a Cloudflare Email Worker (`worker/`, deployed on its own) accepts
+mail only from a member whose message passed DMARC, has a model extract the
+bookings, and stages one row per booking in `trip_inbox`. The rows of one email form a group under **Inbox** at the top of
+the list; opening it shows what arrived and a trip to put it in (the next trip
+suggested, or a new one named as the model named it), «Agregar» creates the real
+rows through the offline engine and deletes the staged ones, undoable for a
+moment from the trip, and «Descartar» only deletes them. The worker connects as
+a role that can insert there and read `members` and nothing else, never holds
+the service key, reads PDF attachments for extraction without storing them, and
+always replies to the sender. Staged rows reach neither Buscar nor Próximo: they
+are suggestions, not commitments.
 
 **Guías** — `guides` / `guide_chapters`: imported content the app never writes
 (see Guides below), in the same markdown dialect.
@@ -399,6 +410,7 @@ authenticate until you wire up a Supabase project (below).
   SUPABASE_PROJECT_REF=your-project-ref
   SUPABASE_DB_PASSWORD=your-db-password
   ```
+  (The email worker adds two more; see step 5.)
 
 ### 2. Configure Google OAuth
 
@@ -426,3 +438,24 @@ the app. Until a member exists, the app denies everyone.
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and deploys
 to GitHub Pages.
+
+### 5. The email worker (Correo a Viajes)
+
+The worker in `worker/` is deployed to Cloudflare on its own; the app's deploy
+does not touch it. It needs two more lines in `.env`: `CLOUDFLARE_API_TOKEN`
+(template "Edit Cloudflare Workers", plus **Hyperdrive: Edit** and **SSL and
+Certificates: Edit** on the account) and `ANTHROPIC_API_KEY` (a key from a
+workspace of its own, with a spend limit). Then, in order:
+
+```bash
+npm run worker:cert                            # uploads supabase/ca.crt, prints a certificate id
+npm run worker:hyperdrive -- <certificate id>  # sets the role's password, creates the Hyperdrive config, writes its id into worker/wrangler.jsonc
+npm run worker:deploy                          # creates the worker; the binding has to exist first
+npm run worker:secret                          # puts ANTHROPIC_API_KEY on it
+```
+
+Then, in the Cloudflare dashboard → Email Routing → Email addresses, create the
+household's address with the action «Send to a Worker» → `trips-inbox`.
+`npm run worker:tail` follows the log; the first real forward is the test.
+Rotating the role's password is `npm run worker:hyperdrive` again, and every
+change to the worker is `npm run worker:deploy` again.
