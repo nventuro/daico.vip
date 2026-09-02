@@ -439,6 +439,33 @@ export const NOTES_SPEC: TableSpec<Note> = {
   orderBy: 'updated_at DESC, created_at DESC',
 };
 
+// ─── Ideas ───────────────────────────────────────────────────────────────────
+
+/**
+ * An idea: a title, the group it is filed under and a body in the app's
+ * markdown dialect, all in the clear like a recipe. A group is whatever ideas
+ * name it — it has no row of its own, so it exists exactly as long as one of
+ * them does and can never be left empty.
+ */
+export interface Idea extends SyncedRow {
+  title: string;
+  group_name: string;
+  body: string;
+}
+
+export const IDEAS_SPEC: TableSpec<Idea> = {
+  table: 'ideas',
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    group_name: { ddl: 'TEXT NOT NULL' },
+    body: { ddl: "TEXT NOT NULL DEFAULT ''" },
+  },
+  // The section a row falls in is its group; inside one, the idea last
+  // written on comes first. Groups are ordered again on display, in the
+  // household's language, since this order puts an accented name last.
+  orderBy: 'group_name ASC, updated_at DESC, created_at DESC',
+};
+
 // ─── Viajes ──────────────────────────────────────────────────────────────────
 
 /** What a row of a trip can be: what is still to resolve before leaving, and
@@ -528,6 +555,7 @@ export const ALL_SPECS: TableSpec[] = [
   SHOPPING_SPEC,
   DATES_SPEC,
   NOTES_SPEC,
+  IDEAS_SPEC,
   TRIPS_SPEC,
   TRIP_ITEMS_SPEC,
   DOCUMENTS_SPEC,

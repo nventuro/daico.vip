@@ -3,6 +3,7 @@ import tareas from './tareas';
 import compras from './compras';
 import fechas from './fechas';
 import notas from './notas';
+import ideas from './ideas';
 import viajes from './viajes';
 import documentos from './documentos';
 import gastos from './gastos';
@@ -16,6 +17,7 @@ export const apps: readonly AppModule[] = [
   compras,
   fechas,
   notas,
+  ideas,
   viajes,
   documentos,
   gastos,

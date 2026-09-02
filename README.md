@@ -233,6 +233,18 @@ every keystroke. The list groups notes by when each was last written, since
 the note last touched is the one being looked for, and a note carries pictures
 like a chore does.
 
+**Ideas** — `ideas`: a title, the group it is filed under (`group_name`, plain
+text such as «comer» or «películas») and a markdown body, all in the clear like
+a recipe: an idea is what to try and where to go, never a secret (that is a
+note).
+**A group is not a table**: it is whatever ideas name it, so it exists for
+exactly as long as one of them does and can never be left empty — deleting a
+group's last idea, or moving it elsewhere, is all there is to deleting the
+group. The list is the groups in name order, each a divider like a month in
+Fechas, with the idea last written on first; a new idea is filed from the form
+the add bar opens, into a group there is or one named right there. Buscar
+matches an idea's title, its group and its body.
+
 **Viajes** — `trips` (a title and the days, both nullable: a trip exists long
 before its dates do, so they are stored rather than derived from what is booked)
 and `trip_items`, every row of a trip in one table, told apart by `kind`. The app

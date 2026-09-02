@@ -67,6 +67,19 @@ const MOTIFS: Record<AppHue, MotifShapes> = {
     center: ['M38 26 L62 26 L74 38 L74 62 L62 74 L38 74 L26 62 L26 38 Z'],
     accent: [square(50, 50, 8)],
   },
+  'app-ideas': {
+    center: [
+      diamond(50, 24, 5),
+      diamond(68.4, 31.6, 5),
+      diamond(76, 50, 5),
+      diamond(68.4, 68.4, 5),
+      diamond(50, 76, 5),
+      diamond(31.6, 68.4, 5),
+      diamond(24, 50, 5),
+      diamond(31.6, 31.6, 5),
+    ],
+    accent: [disc(50, 50, 7)],
+  },
   'app-viajes': {
     center: ['M50 14 L57 43 L86 50 L57 57 L50 86 L43 57 L14 50 L43 43 Z'],
     accent: [disc(50, 50, 7)],

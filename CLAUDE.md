@@ -235,6 +235,29 @@ The README's "Notas" says what a note is. These are the rules on top of it.
   Notas is the app called notes. In Notas that mark can only mean the entry has
   pictures.
 
+## Ideas — read before touching them
+
+The README's "Ideas" says what an idea is. These are the rules on top of it.
+
+- **A group is a column (`ideas.group_name`), never a table.** It exists
+  exactly while an idea names it, which is what keeps a group from ever being
+  left empty — by the schema, not by a trigger or the UI. Never add an
+  `idea_groups` table: a foreign key between rows that cascade has a race the
+  offline model can't survive — one device deletes a group's last idea and the
+  server drops the group, another adds to that group offline, and its row is
+  then refused for good on sync. With the column, that idea just brings the
+  group back. A group is never renamed; its ideas are moved one at a time.
+- **Everything travels in the clear**, the body included, like a recipe's: an
+  idea is where the household keeps what to try and where to go, not where a
+  secret is written down — that is Notas, sealed. So **Buscar matches an
+  idea's title, group and body**, and an idea carries pictures the way a chore
+  does.
+- **Groups are dividers, nothing more**: no group page, no count, no collapse.
+  Their order is the household's language (`Intl.Collator('es')` in
+  `grouping.ts`), and a new idea starts on the group of the idea last written
+  on. An idea is written on save, from the form the add bar opens (`nuevo`,
+  routed before `:id`), never from the bar itself.
+
 ## Privacy — the code is public, the data is private
 
 - This repository is public; the database is private. **Never reference any real

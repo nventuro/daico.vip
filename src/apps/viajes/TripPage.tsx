@@ -16,7 +16,7 @@ import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import ItemRow from './ItemRow';
-import { draftTitleState } from './draftTitle';
+import { draftTitleState } from '../../hooks/useDraftTitle';
 import { tripSections } from './grouping';
 import { tripDatesLabel } from './labels';
 import { useTripItems } from './useTripItems';

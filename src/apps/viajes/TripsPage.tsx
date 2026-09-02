@@ -10,7 +10,7 @@ import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
-import { draftTitleState } from './draftTitle';
+import { draftTitleState } from '../../hooks/useDraftTitle';
 import { pendingCounts, splitTrips } from './grouping';
 import { tripSubtitle } from './labels';
 import { useTripItems } from './useTripItems';

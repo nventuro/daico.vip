@@ -14,6 +14,7 @@ export const APP_IDS = [
   'documentos',
   'gastos',
   'notas',
+  'ideas',
   'viajes',
 ] as const;
 

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { entryPath } from '../types';
 import TripForm from './TripForm';
-import { useDraftTitle } from './draftTitle';
+import { useDraftTitle } from '../../hooks/useDraftTitle';
 import { NEW_TRIP, useTrips, type TripInput } from './useTrips';
 
 export default function TripNewPage() {
