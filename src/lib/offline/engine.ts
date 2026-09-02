@@ -15,7 +15,6 @@
 //
 // Identifiers (table/column names) interpolated into SQL come only from the
 // static specs, never from user input; values always travel as `?` bindings.
-// SQLocal's `sql(query, ...params)` is variadic, so param arrays are spread.
 // =============================================================================
 import { SQLocal } from 'sqlocal';
 import type { SyncedRow } from '../../types';

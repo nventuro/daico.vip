@@ -7,7 +7,7 @@ allowlisted accounts can see or change anything.
 ## Stack
 
 React + TypeScript + Vite · Tailwind CSS v4 · Supabase (Postgres + Google OAuth) ·
-GitHub Pages.
+GitHub Pages · a Cloudflare Email Worker for the one thing that arrives by mail.
 
 ## Shell and modules
 
@@ -19,24 +19,15 @@ tables it owns — described by an `AppModule` object (contract in
 `src/apps/types.ts`) and listed in `src/apps/registry.ts`. The router and the
 home screen are built from the registry; its order is the tile order.
 
-**Buscar** (`/buscar`, the magnifier in the header) searches every app at once.
-A module takes part by exporting an optional `search(query)` adapter returning
-its hits (title, optional subtitle, link); the page runs every adapter and
-groups the results by app, in registry order. Matching is case- and
-accent-insensitive (`noquis` finds "Ñoquis"), and each adapter reads its own
-local store, so search works with no connection.
-
-**Próximo** is the home screen's list of what is coming up: every module's
-`useUpcoming()` entries merged and sorted soonest-first. The home screen shows
-the first `UPCOMING_MAX_ROWS` (4); when there are more, "Ver todo" opens
-`/proximo` with the same entries in full.
-
-**Ajustes** (`/ajustes`, the gear in the header) is what this device has to say
-about itself: when it last brought everything down, what it still has to push,
-anything the server has refused for good, how much room it is taking and what
-of that can be let go, which build it is running — and the way out, since
-signing out leaves the device with nothing and the screen is where that can be
-read before it happens. Its numbers come from the local store alone.
+Three screens are the shell's rather than any app's. **Buscar** (the magnifier
+in the header) searches every app at once, offline: a module takes part by
+exporting a `search(query)` adapter over its own local store, and the hits are
+grouped by app in registry order. **Próximo** is the home screen's list of what
+is coming up, every module's `useUpcoming()` entries merged soonest-first, with
+«Ver todo» opening the whole list. **Ajustes** (the gear) is what this device
+has to say about itself — when it last synced, what it still has to push, what
+the server has refused, how much room it takes, which build it runs — and where
+to sign out, which leaves the device with nothing.
 
 ### Adding an app
 
@@ -55,76 +46,35 @@ read before it happens. Its numbers come from the local store alone.
 Every table works with **no connection** — you can open the app, add, check off
 and delete offline (at a shop with no signal, say), and it all syncs once you
 are back online. There's no spinner on any action: the UI reads and writes a
-local database and the network happens in the background.
-
-Three pieces make this work:
+local database and the network happens in the background. Three pieces make
+this work:
 
 - **PWA / service worker** (`vite-plugin-pwa`). The first online visit precaches
-  the app shell — including the ~1.5 MB SQLite WebAssembly — so the app _opens and
-  runs_ with no network. Installable ("Add to Home Screen") for a fullscreen,
-  app-like launch. GitHub Pages serves it over HTTPS, which service workers
-  require; no custom headers are needed (see the SQLite note below).
+  the app shell, SQLite WebAssembly included, so the app opens and runs with no
+  network, and it installs to the home screen. A new build is downloaded whole
+  and then waits: it goes in at boot or when the app leaves the screen, never
+  over a page that is running, and whoever never puts the app down is told on
+  the home screen (`src/lib/appUpdate.ts`). The app can therefore be a version
+  behind the database for a session, which costs nothing while a migration
+  only adds; a column is dropped one deploy after the code stopped reading it.
+- **Local SQLite** (`src/lib/offline/`). [SQLocal](https://sqlocal.dev) runs
+  SQLite in a Web Worker, persisted to the browser's OPFS through the SAH-pool
+  VFS — the header of `sahpoolWorker.ts` says why that one and not the default.
+  It allows a single connection per browser, so one tab owns the database and a
+  second shows an "already open in another tab" notice. `engine.ts` is what the
+  UI reads and writes.
+- **Sync engine** (`sync.ts`). On load, on reconnect, on app focus and after
+  every local change it pushes what is queued and pulls the server's state.
+  Rows carry a client-generated UUID, so one created offline has its identity
+  before it reaches the server, and conflicts are **last-write-wins** by an
+  `updated_at` set at edit time and enforced on both sides; a delete wins over
+  a concurrent edit. A row the server refuses for good is skipped, so it does
+  not hold up its table, and shown in Ajustes.
 
-### Updating
-
-A new build is downloaded whole and then **waits**: it never replaces the one a
-page is already running, which would leave a screen half of each. It goes in at
-one of two moments, both with nobody looking — at boot, before anything is
-drawn, and when the app leaves the screen, so coming back is coming back to the
-new one. Whoever never puts the app down is told on the home screen and can ask
-for it outright. `src/lib/appUpdate.ts` is the whole of it: it registers the
-worker itself (so the plugin injects no script), asks for a new one when the
-connection or the app comes back, and hands the page over.
-
-The app can therefore be a version behind the database for as long as one
-session. That costs nothing for a migration that **adds**: the pull asks for
-whole rows, and the reconcile keeps only what its spec declares. A column that
-goes away is the other case — add it, deploy, and drop it in a later migration.
-
-- **Local SQLite** (`src/lib/offline/`). [SQLocal](https://sqlocal.dev) runs SQLite
-  in a Web Worker, persisted to the browser's [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).
-  A custom worker (`sahpoolWorker.ts`) opens the database through the **OPFS
-  SAH-pool VFS**, which — unlike SQLocal's default OPFS VFS — reaches OPFS through
-  worker-only sync access handles, needing no `SharedArrayBuffer` and therefore no
-  `COOP`/`COEP` response headers, which **GitHub Pages can't set**. (SQLocal's
-  default would silently fall back to a throwaway in-memory database.) The trade is
-  one connection per browser: `singleTab.ts` grants it to one tab with a Web Lock,
-  and a second tab shows an "already open in another tab" notice. `engine.ts` is
-  the source of truth the UI reads/writes; every change is instant and offline-safe.
-
-- **Sync engine** (`src/lib/offline/sync.ts`). On load, on reconnect, on app
-  focus and after every local change it pushes queued local changes and pulls
-  the server state; a screen that opens asks for a run only when the last one
-  is older than a minute, so moving around the app doesn't sync at every tap. Conflicts use
-  **last-write-wins** by an `updated_at` timestamp set at edit time, enforced on
-  both sides: the pull applies only newer rows, and a trigger on every table
-  skips a pushed row older than the stored one, so devices converge instead of
-  overwriting each other. Deletes win over a concurrent edit. A row the server
-  refuses for good — a constraint it breaks, something the session may not do —
-  is skipped so it doesn't hold up the rest of its table, and written down
-  (table, id and the code, never the message, which quotes the row) for Ajustes
-  to show; the note goes when the row does. Each row carries a
-  client-generated UUID so an offline-created row has a stable identity before
-  it ever reaches the server.
-
-The membership check is also offline-tolerant: the verdict cached per user
-answers first — so a launch never waits on the server — and the live read then
-confirms or revokes it; with no signal the cached verdict stands, so a member
-isn't locked out. This is only a UI gate — the server's RLS is still the real
-authority (see `CLAUDE.md`).
-
-### Loading
-
-Nothing says "Cargando". A **splash** is painted before any script runs —
-static markup in `index.html`, hidden by a rule in `index.css` once React has
-drawn into `#root` — and a gate still resolving (session, membership, key)
-renders `null`, so the splash simply stays; the login screen shares its frame,
-so nothing moves when it takes over. `sync.ts` keeps a **sync status**
-(`useSyncStatus`): whether a run is on, and when one last went through whole on
-this device — every table and the after-sync file work — which is what
-`FirstSyncScreen` waits for and what the home screen quotes while offline. A
-wait is shown, never written: a list holds its place with `SkeletonRows`, and
-anything being fetched carries `LoadingLine`.
+The membership check is offline-tolerant too: the verdict cached per user
+answers first and the live read then confirms or revokes it, so no signal never
+locks a member out. This is only a UI gate — the server's RLS is the real
+authority (see `CLAUDE.md`). Local data is wiped on sign-out.
 
 ### Adding another offline table
 
@@ -144,135 +94,63 @@ anything being fetched carries `LoadingLine`.
 1. Migration: `alter table ... add column`. A `not null` column needs a **default**,
    or Postgres refuses it on a table that already holds rows. No new RLS/grant: a
    column inherits the table's.
-2. Add the column to the table's `TableSpec.columns`. The engine creates it for new
-   clients and brings each existing local database up to the spec on next load —
-   with `ADD COLUMN` where SQLite takes the column, and otherwise by making the
-   table again, which the next sync fills from the server (a deletion queued on
-   it is set aside and still pushed, so it isn't undone by that pull). Sync carries the column
-   automatically.
+2. Add the column to the table's `TableSpec.columns`. The engine brings every
+   local database up to the spec on next load, and sync carries the column.
 3. If you **backfill** existing rows, bump their `updated_at` in the same migration
    so the value reaches already-synced clients (their last-write-wins pull only
    takes a strictly newer row). Run it once every device has synced, so no unsynced
    offline edit predates the bump. (See `20260625000000_shopping_position.sql`.)
 
-### Caveats
-
-- **Last-write-wins** is per-row by client clock. Fine for 1–2 users; clock skew
-  could in theory misorder near-simultaneous edits on different devices. A delete
-  is pushed unconditionally ("delete wins"), so deleting an entry another device
-  just edited removes it — but a pull never drops a row this device has edited
-  and not yet pushed, and that edit then goes up, which brings the entry back
-  for everyone.
-- **One tab at a time.** The SAH-pool VFS allows a single connection per browser,
-  so only one tab uses the local database; a second tab shows an "already open in
-  another tab" notice (close it and reload to take over). No data is lost — every
-  tab still reconciles through the server.
-- **OPFS sync access handles** (what the SAH-pool VFS uses) need Chrome/Android or
-  desktop Firefox ≥ 111 — both target browsers qualify.
-- Local data is wiped on sign-out (shared-device hygiene).
-
 ## The apps
 
-Every one of these tables is offline-synced, so all of it works with no
-connection. What each app does with its rows is the code's to say; what follows
-is what the rows are and what may never change about them.
+Every table below is offline-synced. This is what each app is for and what its
+rows are; what may never change about them is in `CLAUDE.md`.
 
-**Tareas** — `chores`: a title, an optional due date (`due_on`, a plain date)
-and comments. A task is done or not.
+**Tareas** — `chores`: a title, an optional due date and comments. A chore can
+repeat, and marking one that does moves its date on instead of finishing it.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
-fractional index (`position`), so reordering the list writes one row.
+fractional `position`, so reordering the list writes one row.
 
-**Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever
-"done". `occurs_on` is the **anchor the user entered and the app never
-rewrites**: for a repeating entry (yearly, or every N months) the next
-occurrence is computed on read, so a birthday rolls over with no writes at all.
-`notice_days` decides how far ahead the entry reaches Próximo.
+**Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
+`occurs_on` is the anchor the user entered, a repeating entry's next occurrence
+is computed from it on read, and `notice_days` says how far ahead it reaches
+Próximo.
 
 **Recetas** — `recipes`: a title, an optional time and number of servings, and
-a markdown body in the dialect below. An `:::ingredients` block renders as a
-tickable list whose rows can be sent to Compras; the ticks are a reading aid
-for the session and are never saved.
+a markdown body in the dialect below, whose `:::ingredients` block is a
+tickable list that can be sent to Compras.
 
-**Documentos** — `documents`: a title, an optional expiry (`expires_on`) and
-its notice window. The content of a document is its attachments — the pictures
-of it, encrypted on the device. **Nothing else is typed in, deliberately**, so
-a number or a date of birth never reaches the server in the clear. Every
-document's files are kept on every device, so a document can be read with no
-connection wherever it was added.
+**Documentos** — `documents`: a title, an optional expiry and its notice
+window. The content of a document is its pictures, encrypted on the device;
+nothing else is typed in, so a number or a date of birth never reaches the
+server in the clear. Every document's files are kept on every device.
 
-**Gastos** — `statements`, read on the device from the PDF the bank sends. The
-row keeps in the clear only what lists it — the layout it was read with
-(`format`), its closing and due dates, its two totals, whether it was paid —
-while every purchase and installment travels in `payload`, gzipped and
-encrypted under the household key exactly like an attachment's file. **The PDF
-is never kept, and neither is who made a purchase**: the per-card totals the
-bank prints are checked against, and no name from the statement is stored.
-There is one parser per layout (`src/apps/gastos/parsers/`, Galicia Visa and
-Galicia Mastercard so far), reading the positioned words pdf.js extracts; an
-import whose lines do not add up to the printed totals, or whose layout none of
-them knows, saves nothing.
+**Gastos** — `statements`, read on the device from the PDF the bank sends (one
+parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
+row keeps in the clear only what lists it — the layout, its closing and due
+dates, its two totals, whether it was paid — while every purchase and
+installment travels in `payload`, gzipped and encrypted under the household key
+like an attachment's file. Purchases are filed into a fixed set of categories
+on display, by `merchant_rules`, an encrypted pattern each.
 
-A purchase is filed under one of a fixed set of categories by **merchant
-rules** (`merchant_rules`: an encrypted pattern, a category in the clear),
-longest match winning, the bank's own charges always `impuestos`. **There is no
-built-in list of merchants** — where the household shops is private, so every
-rule is the household's own, written from a line or pasted in bulk on the
-Categorización page — and **rules apply on display**, so a new rule refiles
-every statement at once. A line can be marked _puntual_, a mark kept inside the
-payload, and every view splits spending into base and one-offs. **Gastos
-contributes nothing to Buscar**: searching it would mean unsealing every
-statement on every keystroke.
-
-**Notas** — `notes`: a title and a body in the markdown dialect below. The
-body **never reaches the server in the clear** — it is compressed and encrypted
-under a key of its own, like a statement's payload — so the row is a title, two
-timestamps and an opaque blob. That is also why **Buscar matches a note's title
-and nothing else**: finding a word inside would mean opening every note on
-every keystroke. The list groups notes by when each was last written, since
-the note last touched is the one being looked for, and a note carries pictures
-like a chore does.
+**Notas** — `notes`: a title and a markdown body that never reaches the server
+in the clear — the row is a title, two timestamps and an opaque blob, which is
+why Buscar matches a note's title and nothing else.
 
 **Ideas** — `ideas`: a title, the group it is filed under (`group_name`, plain
 text such as «comer» or «películas») and a markdown body, all in the clear like
-a recipe: an idea is what to try and where to go, never a secret (that is a
-note).
-**A group is not a table**: it is whatever ideas name it, so it exists for
-exactly as long as one of them does and can never be left empty — deleting a
-group's last idea, or moving it elsewhere, is all there is to deleting the
-group. The list is the groups in name order, each a divider like a month in
-Fechas, with the idea last written on first; a new idea is filed from the form
-the add bar opens, into a group there is or one named right there. Buscar
-matches an idea's title, its group and its body.
+a recipe. A group is not a table: it is whatever ideas name it, and goes when
+the last of them does.
 
-**Viajes** — `trips` (a title and the days, both nullable: a trip exists long
-before its dates do, so they are stored rather than derived from what is booked)
-and `trip_items`, every row of a trip in one table, told apart by `kind`. The app
-is for the weeks **before** a trip — what is booked and what is still missing —
-and during it for looking up a booking code or an address. It is **never an
-agenda**: nothing is grouped by day, and only the pendientes are ticked. The five
-classes are fixed sections (Pendientes, Pasajes, Alojamiento, Reservas, Lugares)
-and an empty one is not drawn, so the pendientes head the screen while any
-remain and the bookings rise on their own once the last is ticked. Every class
-uses the same columns and leaves the ones it has no use for null; the class is
-chosen when a row is created and only stated afterwards. **Only a dated
-pendiente reaches Próximo.** Everything travels in the clear — a row's free text
-is `comments`, like a chore's — so Buscar matches a booking code, and a row
-carries pictures the way a chore does. Airport codes are typed by hand and
-offered from a curated few-KB list with the household's own codes first: no
-lookup is possible offline, and the full IATA set would be precached on every
-device. A confirmation email can also be **forwarded to the household's
-address**: a Cloudflare Email Worker (`worker/`, deployed on its own) accepts
-mail only from a member whose message passed DMARC, has a model extract the
-bookings, and stages one row per booking in `trip_inbox`. The rows of one email form a group under **Inbox** at the top of
-the list; opening it shows what arrived and a trip to put it in (the next trip
-suggested, or a new one named as the model named it), «Agregar» creates the real
-rows through the offline engine and deletes the staged ones, undoable for a
-moment from the trip, and «Descartar» only deletes them. The worker connects as
-a role that can insert there and read `members` and nothing else, never holds
-the service key, reads PDF attachments for extraction without storing them, and
-always replies to the sender. Staged rows reach neither Buscar nor Próximo: they
-are suggestions, not commitments.
+**Viajes** — `trips` (a title and its days, both optional) and `trip_items`,
+every row of a trip in one table told apart by `kind`: a pendiente to resolve
+before leaving, or a pasaje, an alojamiento, a reserva, a lugar. The app is for
+the weeks before a trip — what is booked and what is still missing — and,
+during it, for looking up a code or an address; it is not an agenda. A
+confirmation email forwarded to the household's address becomes staged rows in
+`trip_inbox`, by the worker in `worker/`, and the app shows them under Inbox to
+be added to a trip or discarded.
 
 **Guías** — `guides` / `guide_chapters`: imported content the app never writes
 (see Guides below), in the same markdown dialect.
@@ -300,43 +178,28 @@ Links to other guides or chapters are ordinary relative links
 
 ## Adjuntos
 
-A chore, a note or a document can carry attachments — pictures, up to
-`ATTACHMENT_MAX_BYTES` each — that are encrypted on the device before they
-leave it, so the server only ever stores ciphertext.
+A chore, a document, a note, an idea or a row of a trip can carry attachments —
+pictures — that are encrypted on the device before they leave it, so the server
+only ever stores ciphertext.
 
 - **Tables and bucket**: `attachments` (owner, optional name, mime, size, the
-  wrapped file key) is an ordinary offline-synced table; the file bytes live in
-  the private `attachments` storage bucket under the row's id, and on the device
-  in the local-only `attachment_files` table (a file added here waits there
-  until uploaded; one opened here is kept for offline reading). The bytes are
-  immutable: a different picture is a new attachment.
-- **Keys**: a six-word phrase (like a seed phrase, from the BIP-39 Spanish list)
-  derives, through PBKDF2, the key that wraps the household's master key
-  (stored wrapped in `household_key`, one row); the master key wraps one key per
-  file; the file key encrypts the file with AES-GCM. A device unwraps the master
-  key once, when the phrase is typed, and keeps it non-extractable in
-  IndexedDB. Everything the server holds is useless without the phrase, and the
-  phrase exists only on paper: losing it loses the documents.
+  wrapped file key) is an ordinary offline-synced table; the bytes live in the
+  private `attachments` bucket under the row's id, and on the device in a
+  local-only table. A file is immutable: a different picture is a new
+  attachment.
+- **Keys**: a six-word phrase (from the BIP-39 Spanish list) derives the key
+  that wraps the household's master key, stored wrapped in `household_key`; the
+  master key wraps one key per file; the file key encrypts the file with
+  AES-GCM. A device unwraps the master key once, when the phrase is typed, and
+  keeps it non-extractable in IndexedDB. The phrase exists only on paper:
+  losing it loses every attachment.
 - **The phrase gate**: a device without the master key stops right after login,
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
-- **In the app**: attachments are a grid on the entry's own page, added through
-  a dialog that turns, crops and names each picture, and opened in a lightbox.
-  A picture left as it came is stored byte for byte; an edited one is drawn
-  afresh as JPEG (a PNG stays PNG). The open picture is an optional
-  `:attachmentId` ending the entry's route, so it has a URL of its own — a
-  search hit links straight to it, and the phone's back gesture closes it. The
-  grid, dialog and lightbox are shared (`src/components/Attachment*`), so every
-  app that takes pictures takes them the same way.
-- **Sync**: files follow every table sync (`afterSync`): uploads go out, files
-  of deleted rows are dropped, every document's files this device lacks are
-  fetched and kept, and bucket objects no row refers to and older than
-  `ATTACHMENT_ORPHAN_MIN_AGE_MS` are removed — never against rows the run did
-  not bring down, and never against an empty table, since what the sweep cannot
-  tell from an orphan is a file this device has not heard of yet. A file the
-  bucket refuses for good (too large, wrong type) is marked failed and not
-  retried.
+- **Sync**: files follow every table sync — uploads go out, files of deleted
+  rows are dropped, every document's files this device lacks are fetched and
+  kept, and bucket objects no row refers to are swept.
 
 ## Guides
 
@@ -344,12 +207,11 @@ Guides are read-only reference documents (a guide → sections → chapters) tha
 members can read offline. They are never edited in the app: rows come from an
 import script, and the app only reads them.
 
-- **Tables**: `guides` and `guide_chapters` are ordinary offline-synced tables
-  (see above), so chapters land in the local SQLite and read with no connection.
-  `guide_images` is **not** synced — images are too large to pull wholesale on
-  every sync — so the app fetches each image the first time a chapter needs it
-  and keeps it in a local-only cache table (`guide_image_cache`); previously read
-  chapters render offline. All three are `select`-only for `authenticated`.
+- **Tables**: `guides` and `guide_chapters` are ordinary offline-synced tables,
+  so chapters read with no connection. `guide_images` is **not** synced — images
+  are too large to pull wholesale on every sync — so the app fetches each image
+  the first time a chapter needs it and keeps it in a local-only cache. All
+  three are `select`-only for `authenticated`.
 - **Chapter bodies** are written in the markdown dialect above.
 
 ### Importing guides
@@ -394,8 +256,7 @@ npm run preview  # serves the build, the one place the CSP is live locally
 
 The tests run on real SQLite in-process and a stand-in for the server, so they
 need nothing running; CI runs the same four checks on every push to `main`. The
-app won't
-authenticate until you wire up a Supabase project (below).
+app won't authenticate until you wire up a Supabase project (below).
 
 ## First-time setup
 

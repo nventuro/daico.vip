@@ -13,8 +13,6 @@
 // and verifies that chain against the uploaded `supabase/ca.crt`
 // (`npm run worker:cert`, which prints the certificate id).
 //
-// Run through `npm run worker:hyperdrive`, which sources `.env`
-// (SUPABASE_DB_PASSWORD for the database, CLOUDFLARE_API_TOKEN for wrangler):
 //   the first time:  npm run worker:hyperdrive -- <certificate id>
 //   rotating:        npm run worker:hyperdrive
 // =============================================================================

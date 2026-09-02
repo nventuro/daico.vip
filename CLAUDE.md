@@ -159,6 +159,9 @@ gate, what a sync does with the files. These are the rules on top of it.
   `src/components/Attachment*`, parametrized by the owner. There is no
   attachment page: an entry's route ends in an optional `:attachmentId`, so a
   picture has a URL of its own.
+- **A document is its pictures.** `documents` keeps a title, an expiry and its
+  notice window and nothing else: never add a column that holds what a document
+  says (a number, a date of birth) — that is what the sealed files are for.
 - **Two rules the `afterSync` work turns on.** Keeping every **document's**
   files on every device is the one exception to files being fetched on demand:
   never extend it to another owner kind, never pull files wholesale, and never
@@ -257,6 +260,33 @@ The README's "Ideas" says what an idea is. These are the rules on top of it.
   `grouping.ts`), and a new idea starts on the group of the idea last written
   on. An idea is written on save, from the form the add bar opens (`nuevo`,
   routed before `:id`), never from the bar itself.
+
+## Viajes — read before touching them
+
+The README's "Viajes" says what a trip and its rows are. These are the rules on
+top of it.
+
+- **Viajes is never an agenda.** Nothing is grouped by day and only a pendiente
+  is ever ticked. The kinds (`TRIP_KINDS`) are fixed sections in that order, an
+  empty one is not drawn, and every kind uses the same columns, leaving the ones
+  it has no use for null; a row's kind is chosen when it is created and never
+  changed. **Only a dated pendiente reaches Próximo.**
+- **Everything travels in the clear**: a row's free text is `comments`, like a
+  chore's, so Buscar matches a booking code, and a row carries pictures the way
+  a chore does. Airport codes are typed by hand and offered from the curated
+  list in `airports.ts` — never a lookup, which does not work offline, and never
+  the full IATA set, which would be precached on every device.
+- **`trip_inbox` is staged by the worker in `worker/`, never by the app**, which
+  only confirms a group of staged rows into real ones (through the offline
+  engine, undoable for a moment, which puts the staged rows back) or deletes
+  them. Staged rows reach neither Buscar nor Próximo: they are suggestions, not
+  commitments.
+- **The worker never holds the service key.** It connects as a role that can
+  insert into `trip_inbox` and read `members` and nothing else, lets through
+  only mail from a member that passed DMARC, reads attachments for extraction
+  without storing them, logs nothing of an email, and always replies to the
+  sender. Its header says what it holds and why; it is deployed on its own with
+  the `worker:*` scripts, never by the app's deploy.
 
 ## Privacy — the code is public, the data is private
 

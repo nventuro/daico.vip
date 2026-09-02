@@ -12,17 +12,8 @@
 // worker can stage junk and learn the member emails it already handles mail
 // for, but read or change nothing else.
 //
-// Setting it up is the `worker:*` scripts of the root package.json, which
-// source the root `.env` — CLOUDFLARE_API_TOKEN for wrangler, and
-// ANTHROPIC_API_KEY, a key from a workspace of its own with a spend limit —
-// in this order: `worker:cert` uploads the Supabase root certificate and
-// prints its id; `worker:hyperdrive -- <that id>` sets the role's password,
-// creates the Hyperdrive configuration and writes its id into
-// `wrangler.jsonc`; `worker:deploy` creates the worker, which needs that
-// binding to exist; `worker:secret` puts the key on it. Then, in the
-// Cloudflare dashboard, Email Routing → the household's address → action
-// «Send to a Worker» → `trips-inbox`. Cloudflare does not watch the
-// repository: every change is `worker:deploy` again.
+// Setting it up and deploying it is step 5 of the README's first-time setup;
+// Cloudflare does not watch the repository, so every change is a deploy.
 //
 // Nothing of an email is ever logged — not its text, its attachments, nor
 // what was extracted — only why a sender was turned away or what failed.

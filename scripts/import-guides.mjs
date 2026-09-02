@@ -1,19 +1,9 @@
 // =============================================================================
 // Import a guides dump into the database, replacing whatever guides are there.
+// The README's "Importing guides" says what the dump holds and what becomes of
+// it.
 //
 //   npm run guides:import -- --dump <dir> [--dry-run] [--preview <dir>]
-//
-// The dump directory holds `guides/<slug>.json` (metadata, sections, chapters
-// with the source site's markdown, and an image map), `images/`, `docs/`
-// (HTML exports of linked documents + index.json) and `decklists/` (text lists
-// + index.json). Chapter bodies are normalized to the app's markdown dialect,
-// linked documents and decklists become chapters in an "Adjuntos" section, and
-// images are recompressed to WebP. Ids derive from the source identifiers, so
-// re-running updates rows in place.
-//
-// `--dry-run` skips the database; `--preview <dir>` writes every normalized
-// chapter as a .md file for inspection. Connection details come from .env and
-// the linked project (see scripts/lib/db.mjs).
 // =============================================================================
 import fs from 'node:fs/promises';
 import path from 'node:path';
