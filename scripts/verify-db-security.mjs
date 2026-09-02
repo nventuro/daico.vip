@@ -36,6 +36,7 @@ const TABLE_PRIVILEGES = {
   statements: CRUD,
   merchant_rules: CRUD,
   notes: CRUD,
+  ideas: CRUD,
   trips: CRUD,
   trip_items: CRUD,
   attachments: CRUD,
