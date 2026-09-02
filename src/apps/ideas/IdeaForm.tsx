@@ -2,12 +2,12 @@ import { useState } from 'react';
 import type { Idea } from '../../lib/offline/specs';
 import FormField from '../../components/FormField';
 import FormFooter from '../../components/FormFooter';
+import GroupField from '../../components/GroupField';
 import TextArea from '../../components/TextArea';
 import TitleField from '../../components/TitleField';
 import { CONTROL_CLASS } from '../../components/controlClasses';
 import { entryForm } from '../../utils/formUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
-import GroupField from './GroupField';
 import { NEW_IDEA, type IdeaInput } from './useIdeas';
 
 interface IdeaFormProps {

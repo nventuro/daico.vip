@@ -182,11 +182,18 @@ export const SHOPPING_SPEC: TableSpec<ShoppingItem> = {
 
 // ─── Guías ───────────────────────────────────────────────────────────────────
 
-/** An imported reference document. Read-only in the app — rows come from an
- *  import script — but offline-synced like every other table. */
+/** An imported reference document, shelved under a group. The import brings
+ *  it in and owns its description and its chapters; the household owns where
+ *  it is shelved — its title, its group and whether it is archived out of the
+ *  list. Offline-synced like every other table. */
 export interface Guide extends SyncedRow {
   title: string;
   description: string | null;
+  /** The group it is shelved under: the author it came from, until a member
+   *  moves it. A group exists exactly while a guide names it. */
+  group_name: string;
+  /** Out of the way: listed under «Archivadas», left out of Buscar. */
+  archived: boolean;
 }
 
 export const GUIDES_SPEC: TableSpec<Guide> = {
@@ -194,6 +201,10 @@ export const GUIDES_SPEC: TableSpec<Guide> = {
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
     description: { ddl: 'TEXT' },
+    // The default only lets the column onto a local table that already has
+    // rows; the pull that follows names every guide's group.
+    group_name: { ddl: "TEXT NOT NULL DEFAULT ''" },
+    archived: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
   },
   orderBy: 'title COLLATE NOCASE ASC',
 };

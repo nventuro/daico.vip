@@ -1,8 +1,5 @@
 import type { Idea } from '../../lib/offline/specs';
-
-/** How group names are ordered: in the household's language, so an accented
- *  name sits where a person would look for it rather than after the z. */
-const collator = new Intl.Collator('es');
+import { groupByName } from '../../utils/listUtils';
 
 /** The ideas filed under one group. */
 export interface IdeaGroup {
@@ -13,15 +10,10 @@ export interface IdeaGroup {
 /** Every group in name order, each with its ideas in the order they were
  *  given — the idea last written on first, as the store lists them. */
 export function groupIdeas(ideas: Idea[]): IdeaGroup[] {
-  const byName = new Map<string, Idea[]>();
-  for (const idea of ideas) {
-    const group = byName.get(idea.group_name);
-    if (group) group.push(idea);
-    else byName.set(idea.group_name, [idea]);
-  }
-  return [...byName]
-    .map(([name, ideas]) => ({ name, ideas }))
-    .sort((a, b) => collator.compare(a.name, b.name));
+  return groupByName(ideas, (idea) => idea.group_name).map(({ name, items }) => ({
+    name,
+    ideas: items,
+  }));
 }
 
 /** The names of the groups there are, in name order. */

@@ -83,7 +83,7 @@ export default function TripsPage() {
         </section>
       )}
       <CompletedSection label="Pasados" count={past.length}>
-        {past.map(renderTrip)}
+        <ul>{past.map(renderTrip)}</ul>
       </CompletedSection>
     </ListPage>
   );

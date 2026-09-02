@@ -64,7 +64,7 @@ export default function DatesPage() {
         ))
       )}
       <CompletedSection label="Pasadas" count={past.length}>
-        {past.map(renderEntry)}
+        <ul>{past.map(renderEntry)}</ul>
       </CompletedSection>
     </ListPage>
   );

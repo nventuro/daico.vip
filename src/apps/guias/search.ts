@@ -11,16 +11,19 @@ import { entryPath, type SearchHit } from '../types';
 /**
  * Guides whose title mentions `query`, then chapters that mention it in their
  * title (shown under their guide's name) or body (shown with the matching
- * passage). A chapter whose guide is not in the store is left out.
+ * passage). An archived guide is out of the way, so neither it nor its
+ * chapters are found — like a chapter whose guide is not in the store, they
+ * are left out.
  */
 export async function searchGuides(query: string): Promise<SearchHit[]> {
   const [guides, chapters] = await Promise.all([
     engine.listVisible<Guide>(GUIDES_SPEC),
     engine.listVisible<GuideChapter>(GUIDE_CHAPTERS_SPEC),
   ]);
-  const guideTitles = new Map(guides.map((guide) => [guide.id, guide.title]));
+  const shelved = guides.filter((guide) => !guide.archived);
+  const guideTitles = new Map(shelved.map((guide) => [guide.id, guide.title]));
 
-  const guideHits = guides.flatMap((guide): SearchHit[] =>
+  const guideHits = shelved.flatMap((guide): SearchHit[] =>
     matches(guide.title, query) ? [{ title: guide.title, to: entryPath('guias', guide.id) }] : [],
   );
   const chapterHits = chapters.flatMap((chapter): SearchHit[] => {

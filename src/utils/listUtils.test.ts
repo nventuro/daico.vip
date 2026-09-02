@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupRuns } from './listUtils';
+import { groupByName, groupRuns } from './listUtils';
 
 const month = (date: string) => date.slice(0, 7);
 
@@ -17,5 +17,20 @@ describe('groupRuns', () => {
 
   it('has no runs for an empty list', () => {
     expect(groupRuns([], month)).toEqual([]);
+  });
+});
+
+describe('groupByName', () => {
+  const first = (s: string) => s[0];
+
+  it('heads every name in the order a person would look for it, items as given', () => {
+    expect(groupByName(['casa', 'árbol', 'comer', 'cortinas'], first)).toEqual([
+      { name: 'á', items: ['árbol'] },
+      { name: 'c', items: ['casa', 'comer', 'cortinas'] },
+    ]);
+  });
+
+  it('has no groups for an empty list', () => {
+    expect(groupByName([], first)).toEqual([]);
   });
 });

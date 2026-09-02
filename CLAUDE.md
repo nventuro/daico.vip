@@ -104,14 +104,19 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   (`src/lib/offline/*.test.ts`, over `testing/sqlocalInMemory.ts` and
   `testing/fakeSupabase.ts`). A change to CRUD, the sync order or the conflict
   policy must come with a test there.
-- **Guides are read-only imported content** (the README says how they get in):
-  the app never writes `guides` / `guide_chapters` and their grants are `select`
-  only. `guide_images` is deliberately **not** in `ALL_SPECS` — the sync engine
-  pulls whole tables on every sync, and images would make that pull megabytes;
-  they are fetched on demand into a local-only table. Keep any large blob table
-  out of `ALL_SPECS` the same way. Source-site specifics (token syntax, section
-  names) belong in `scripts/import-guides/`, never in the app. **Never commit a
-  guides dump** — it is private content, keep it outside the repo.
+- **Guides are imported content the household shelves** (the README says how
+  they get in): the app writes only a guide's `title`, `group_name` and
+  `archived` — `guides` is granted `select, insert, update`, never delete —
+  and never `guide_chapters`, whose grant is `select` only. The importer owns
+  a guide's contents, not its shelf: for a guide it already knows it keeps
+  those three columns as they are. A group is a column, never a table, for
+  the reason Ideas' is. `guide_images` is deliberately **not** in `ALL_SPECS`
+  — the sync engine pulls whole tables on every sync, and images would make
+  that pull megabytes; they are fetched on demand into a local-only table.
+  Keep any large blob table out of `ALL_SPECS` the same way. Source-site
+  specifics (token syntax, section names) belong in `scripts/import-guides/`,
+  never in the app. **Never commit a guides dump** — it is private content,
+  keep it outside the repo.
 - **The local database is opened by the custom SQLocal worker in
   `src/lib/offline/sahpoolWorker.ts`, never SQLocal's default** — the worker's
   own header says why. Keep passing it as SQLocal's `processor`, **never add

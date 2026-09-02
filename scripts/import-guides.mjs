@@ -3,7 +3,7 @@
 // The README's "Importing guides" says what the dump holds and what becomes of
 // it.
 //
-//   npm run guides:import -- --dump <dir> [--dry-run] [--preview <dir>]
+//   npm run guides:import -- --dump <dir> [--group <name>] [--dry-run] [--preview <dir>]
 // =============================================================================
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -39,10 +39,15 @@ const flag = (name) => {
   return true;
 };
 const dumpDir = opt('--dump');
+// The group every guide of the dump is shelved under; without it, each
+// guide's author.
+const groupName = opt('--group');
 const previewDir = opt('--preview');
 const dryRun = flag('--dry-run');
 if (!dumpDir) {
-  console.error('usage: import-guides.mjs --dump <dir> [--dry-run] [--preview <dir>]');
+  console.error(
+    'usage: import-guides.mjs --dump <dir> [--group <name>] [--dry-run] [--preview <dir>]',
+  );
   process.exit(1);
 }
 
@@ -83,14 +88,20 @@ const canonicalUrl = (url) => {
 };
 const docIdOf = (url) => (url.match(/docs\.google\.com\/document\/d\/([^/?#]+)/) || [])[1] ?? null;
 
-const guideRecords = new Map(); // product id suffix → { id, slug, title, description, dump }
+const guideRecords = new Map(); // product id suffix → { id, slug, title, description, group, dump }
 for (const g of dumps) {
   const id = stableId(`guide:${g.product.slug}`);
+  const group = groupName ?? g.author?.name ?? '';
+  if (group === '') {
+    console.error(`${g.product.name}: the dump names no author; pass --group <name>`);
+    process.exit(1);
+  }
   guideRecords.set(idSuffix(g.product.slug), {
     id,
     slug: g.product.slug,
     title: g.product.name,
     description: g.product.description ?? null,
+    group,
     dump: g,
   });
 }
@@ -194,6 +205,8 @@ for (const rec of guideRecords.values()) {
     id: rec.id,
     title: rec.title,
     description: rec.description,
+    group_name: rec.group,
+    archived: false,
     created_at: now,
     updated_at: now,
   });
@@ -283,11 +296,30 @@ if (!dryRun) {
   await client.connect();
   try {
     await client.query('begin');
+    // A guide's title, group and archived flag are the household's once it is
+    // in: a guide already there keeps them through the re-import, and only its
+    // contents are replaced. A guide with no group yet has never been shelved,
+    // so it takes the dump's.
+    const shelved = new Map(
+      (await client.query('select id, title, group_name, archived from guides')).rows.map((r) => [
+        r.id,
+        r,
+      ]),
+    );
     await client.query('delete from guides');
     for (const g of guides) {
+      const kept = shelved.get(g.id) ?? g;
       await client.query(
-        'insert into guides (id, title, description, created_at, updated_at) values ($1, $2, $3, $4, $5)',
-        [g.id, g.title, g.description, g.created_at, g.updated_at],
+        'insert into guides (id, title, description, group_name, archived, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)',
+        [
+          g.id,
+          kept.title,
+          g.description,
+          kept.group_name || g.group_name,
+          kept.archived,
+          g.created_at,
+          g.updated_at,
+        ],
       );
     }
     for (const c of chapters) {

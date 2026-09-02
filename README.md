@@ -152,8 +152,10 @@ confirmation email forwarded to the household's address becomes staged rows in
 `trip_inbox`, by the worker in `worker/`, and the app shows them under Inbox to
 be added to a trip or discarded.
 
-**Guías** — `guides` / `guide_chapters`: imported content the app never writes
-(see Guides below), in the same markdown dialect.
+**Guías** — `guides` / `guide_chapters`: imported content (see Guides below),
+in the same markdown dialect. A guide is shelved under a group (`group_name`,
+as an idea is) and can be archived out of the list; that much is the
+household's to change, the contents are the import's.
 
 ## Markdown dialect
 
@@ -203,21 +205,27 @@ only ever stores ciphertext.
 
 ## Guides
 
-Guides are read-only reference documents (a guide → sections → chapters) that
-members can read offline. They are never edited in the app: rows come from an
-import script, and the app only reads them.
+Guides are reference documents (a guide → sections → chapters) that members
+can read offline. Their contents come from an import script and are only read
+in the app; what the household decides about a guide — its title, the group
+it is shelved under and whether it is archived — is edited in the app.
 
 - **Tables**: `guides` and `guide_chapters` are ordinary offline-synced tables,
   so chapters read with no connection. `guide_images` is **not** synced — images
   are too large to pull wholesale on every sync — so the app fetches each image
-  the first time a chapter needs it and keeps it in a local-only cache. All
-  three are `select`-only for `authenticated`.
+  the first time a chapter needs it and keeps it in a local-only cache.
+  `guide_chapters` and `guide_images` are `select`-only for `authenticated`;
+  `guides` also takes `insert` and `update` — never `delete`, a guide is only
+  removed by the import.
+- **The list** groups guides by `group_name` (dividers in name order, as
+  Ideas), with the archived ones under a collapsed «Archivadas» at the foot.
+  Buscar leaves archived guides and their chapters out.
 - **Chapter bodies** are written in the markdown dialect above.
 
 ### Importing guides
 
 ```
-npm run guides:import -- --dump <dir> [--dry-run] [--preview <dir>]
+npm run guides:import -- --dump <dir> [--group <name>] [--dry-run] [--preview <dir>]
 ```
 
 The dump directory (kept **outside the repo** — it's private content) has:
@@ -236,9 +244,12 @@ documents and decklists into chapters in an "Adjuntos" section and rewrites link
 to them in-app, and recompresses images to WebP (≤ 1600 px). Everything
 source-specific stays in the importer; the app only knows the dialect above.
 
-Ids derive from the source identifiers (UUID v5), so re-running the import
-replaces the guides wholesale while keeping every id — clients update in place via
-the normal sync and links keep working. `--dry-run` skips the database;
+A guide is shelved under the author the dump names, or under `--group` for the
+whole dump. Ids derive from the source identifiers (UUID v5), so re-running the
+import replaces a guide's description, chapters and images while keeping every
+id — clients update in place via the normal sync and links keep working — and
+keeps the title, group and archived flag a guide already has, since those are
+the household's. `--dry-run` skips the database;
 `--preview <dir>` writes each chapter's normalized markdown as a file to inspect.
 Missing attachment files are reported and their links left external.
 

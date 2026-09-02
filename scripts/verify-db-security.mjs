@@ -20,8 +20,10 @@ import { Client, clientOptions } from './lib/db.mjs';
 const CRUD = ['select', 'insert', 'update', 'delete'];
 const TABLE_PRIVILEGES = {
   members: ['select'],
-  // Imported content the app only ever reads.
-  guides: ['select'],
+  // Imported content the household shelves: the app writes a guide's title,
+  // group and archived flag and never removes one; its chapters and images
+  // are only ever read.
+  guides: ['select', 'insert', 'update'],
   guide_chapters: ['select'],
   guide_images: ['select'],
   // Written once, when the first member sets the household's phrase: an update

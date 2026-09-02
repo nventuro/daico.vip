@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import FormField from '../../components/FormField';
-import Select from '../../components/Select';
-import TextInput from '../../components/TextInput';
+import FormField from './FormField';
+import Select from './Select';
+import TextInput from './TextInput';
 
 /** The option that stands for a group that does not exist yet. The others are
  *  told apart by position, since a group's name is whatever was typed. */
@@ -19,7 +19,7 @@ interface GroupFieldProps {
 }
 
 /**
- * The group an idea is filed under: one of those there are, or a new one
+ * The group an entry is filed under: one of those there are, or a new one
  * named right here — the last option of the list opens a field for its name.
  * With no groups yet there is nothing to choose from, and the name field
  * stands alone.

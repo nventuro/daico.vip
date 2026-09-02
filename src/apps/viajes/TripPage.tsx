@@ -134,7 +134,7 @@ export default function TripPage() {
               </section>
             ))}
             <CompletedSection label="Hechos" count={done.length}>
-              {done.map(renderItem)}
+              <ul>{done.map(renderItem)}</ul>
             </CompletedSection>
           </>
         )}

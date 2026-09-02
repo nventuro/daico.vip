@@ -11,7 +11,8 @@ interface CompletedSectionProps {
 
 /** Collapsible bottom section that holds completed items so they stay out of the
  *  way without being deleted. Collapsed by default; the heading names the section
- *  without counting it, since how many are done changes nothing. */
+ *  without counting it, since how many are done changes nothing. What it holds
+ *  is the caller's: a list of rows, or the same sections as above it. */
 export default function CompletedSection({ label, count, children }: CompletedSectionProps) {
   const [open, setOpen] = useState(false);
 
@@ -31,7 +32,7 @@ export default function CompletedSection({ label, count, children }: CompletedSe
         />
         {label}
       </button>
-      {open && <ul>{children}</ul>}
+      {open && children}
     </div>
   );
 }

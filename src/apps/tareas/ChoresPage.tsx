@@ -108,7 +108,7 @@ export default function ChoresPage() {
         </section>
       )}
       <CompletedSection label="Hechas" count={done.length}>
-        {done.map(renderChore)}
+        <ul>{done.map(renderChore)}</ul>
       </CompletedSection>
     </ListPage>
   );
