@@ -45,7 +45,6 @@ export default function DatePage() {
                 occurs_on: entry.occurs_on,
                 repeat_every: entry.repeat_every,
                 repeat_unit: entry.repeat_unit,
-                notice_days: entry.notice_days,
               }}
               onChange={(patch) => void save(entry.id, patch)}
               layout="form"

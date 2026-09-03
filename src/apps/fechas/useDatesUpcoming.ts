@@ -5,7 +5,11 @@ import { useDates } from './useDates';
 import { displayDate, isNear } from './recurrence';
 import { dateMarks } from './marks';
 
-/** The dates inside their notice window, for the home screen. */
+/** How many days ahead a date shows on the home screen: the week before, the
+ *  same for every date — a birthday and a renewal alike. */
+const DATE_NOTICE_DAYS = 7;
+
+/** The dates due within the week, for the home screen. */
 export function useDatesUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useDates();
   const today = todayIso();
@@ -13,7 +17,7 @@ export function useDatesUpcoming(): Upcoming[] | undefined {
     () =>
       upcomingFrom({ items, loading }, (entry) => {
         const on = displayDate(entry, today);
-        return isNear(on, entry.notice_days, today)
+        return isNear(on, DATE_NOTICE_DAYS, today)
           ? {
               title: entry.title,
               on,

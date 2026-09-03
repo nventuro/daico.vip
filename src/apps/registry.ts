@@ -7,6 +7,7 @@ import ideas from './ideas';
 import viajes from './viajes';
 import documentos from './documentos';
 import gastos from './gastos';
+import salud from './salud';
 import recetas from './recetas';
 import guias from './guias';
 
@@ -21,6 +22,7 @@ export const apps: readonly AppModule[] = [
   viajes,
   documentos,
   gastos,
+  salud,
   recetas,
   guias,
 ];

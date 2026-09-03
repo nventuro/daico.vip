@@ -13,6 +13,7 @@ export const APP_IDS = [
   'recetas',
   'documentos',
   'gastos',
+  'salud',
   'notas',
   'ideas',
   'viajes',

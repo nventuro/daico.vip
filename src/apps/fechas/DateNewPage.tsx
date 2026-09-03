@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { DATE_NOTICE_DAYS_DEFAULT } from '../../lib/offline/specs';
 import Body from '../../components/editor/Body';
 import ErrorLine from '../../components/ErrorLine';
 import FormField from '../../components/FormField';
@@ -24,7 +23,6 @@ export default function DateNewPage() {
     occurs_on: todayIso(),
     repeat_every: null,
     repeat_unit: null,
-    notice_days: DATE_NOTICE_DAYS_DEFAULT,
   });
   const [comments, setComments] = useState('');
   const name = lowercaseTrimmed(title);

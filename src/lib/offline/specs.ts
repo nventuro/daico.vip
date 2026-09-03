@@ -253,14 +253,9 @@ export interface DateEntry extends SyncedRow {
    *  when the date happens once. The pair is the same one chores carry. */
   repeat_every: number | null;
   repeat_unit: RepeatUnit | null;
-  /** How many days ahead the entry shows on the home screen (0 = only on the day). */
-  notice_days: number;
   /** Whatever else there is to say about the date. */
   comments: string | null;
 }
-
-/** Notice window (days ahead) a new date gets unless the user picks another. */
-export const DATE_NOTICE_DAYS_DEFAULT = 7;
 
 export const DATES_SPEC: TableSpec<DateEntry> = {
   table: 'dates',
@@ -270,7 +265,6 @@ export const DATES_SPEC: TableSpec<DateEntry> = {
     occurs_on: { ddl: 'TEXT NOT NULL' },
     repeat_every: { ddl: 'INTEGER' },
     repeat_unit: { ddl: 'TEXT' },
-    notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DATE_NOTICE_DAYS_DEFAULT}` },
     comments: { ddl: 'TEXT' },
   },
   orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
@@ -306,20 +300,15 @@ export const RECIPES_SPEC: TableSpec<Recipe> = {
 
 /**
  * A document — a passport, an ID, a policy — whose content is its attachments:
- * the pictures of it. The row holds only what lists it and announces its
- * expiry; anything sensitive (a number, a date of birth) stays inside the
+ * the pictures of it. The row holds only what lists it and says when it
+ * expires; anything sensitive (a number, a date of birth) stays inside the
  * encrypted files.
  */
 export interface DocumentEntry extends SyncedRow {
   title: string;
   /** When it stops being valid (yyyy-mm-dd), if it ever does. */
   expires_on: string | null;
-  /** How many days ahead of its expiry the document shows on the home screen. */
-  notice_days: number;
 }
-
-/** Notice window (days ahead of its expiry) a new document gets. */
-export const DOCUMENT_NOTICE_DAYS_DEFAULT = 30;
 
 export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
   table: 'documents',
@@ -327,7 +316,6 @@ export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
     title: { ddl: 'TEXT NOT NULL' },
     // yyyy-mm-dd; null for a document that never expires.
     expires_on: { ddl: 'TEXT' },
-    notice_days: { ddl: `INTEGER NOT NULL DEFAULT ${DOCUMENT_NOTICE_DAYS_DEFAULT}` },
   },
   orderBy: 'title COLLATE NOCASE ASC',
 };
@@ -418,6 +406,76 @@ export const MERCHANT_RULES_SPEC: TableSpec<MerchantRule> = {
     category: { ddl: 'TEXT NOT NULL' },
   },
   orderBy: 'created_at ASC',
+};
+
+// ─── Salud ───────────────────────────────────────────────────────────────────
+
+/**
+ * A health check to have done — the dentist every six months, the flu shot
+ * every year, a one-off appointment. A chore in all but two respects: it
+ * always comes back from the day it was marked, never from a fixed calendar,
+ * and it is one member's, whose id `owner` carries — the server hands each
+ * member only their own.
+ */
+export interface Checkup extends SyncedRow {
+  /** The auth user id of the member it belongs to. */
+  owner: string;
+  title: string;
+  /** Whatever else there is to say about it: where to book, what to bring. */
+  comments: string | null;
+  /** When it is next due (yyyy-mm-dd); for one that repeats, the day the next
+   *  one falls on. Null for one with no date, which never repeats. */
+  due_on: string | null;
+  /** The day it was last marked (yyyy-mm-dd), null if it never was. One that
+   *  does not repeat and carries it is done. */
+  last_done_on: string | null;
+  /** How many `repeat_unit`s go by between one and the next, counted from the
+   *  day it was marked; null when it does not repeat. */
+  repeat_every: number | null;
+  repeat_unit: RepeatUnit | null;
+}
+
+export const CHECKUPS_SPEC: TableSpec<Checkup> = {
+  table: 'checkups',
+  columns: {
+    owner: { ddl: 'TEXT NOT NULL' },
+    title: { ddl: 'TEXT NOT NULL' },
+    comments: { ddl: 'TEXT' },
+    // Dates as yyyy-mm-dd strings (date-only, no timezone).
+    due_on: { ddl: 'TEXT' },
+    last_done_on: { ddl: 'TEXT' },
+    repeat_every: { ddl: 'INTEGER' },
+    repeat_unit: { ddl: 'TEXT' },
+  },
+  // As chores: done last, then by date, undated last of the rest.
+  orderBy:
+    '(last_done_on IS NOT NULL AND repeat_every IS NULL) ASC, due_on ASC NULLS LAST, created_at ASC',
+};
+
+/**
+ * A study kept — a blood test, an X-ray, a vaccination certificate. Like a
+ * document, its content is its pictures: the row holds the title and the day
+ * it was done, which list it, and nothing that says what the study found.
+ * One member's, like a checkup.
+ */
+export interface HealthRecord extends SyncedRow {
+  /** The auth user id of the member it belongs to. */
+  owner: string;
+  title: string;
+  /** The day it was done (yyyy-mm-dd). */
+  on_date: string;
+}
+
+export const HEALTH_RECORDS_SPEC: TableSpec<HealthRecord> = {
+  table: 'health_records',
+  columns: {
+    owner: { ddl: 'TEXT NOT NULL' },
+    title: { ddl: 'TEXT NOT NULL' },
+    on_date: { ddl: 'TEXT NOT NULL' },
+  },
+  // Newest first: the same title comes back every year, and the day tells
+  // them apart.
+  orderBy: 'on_date DESC, created_at DESC',
 };
 
 // ─── Notas ───────────────────────────────────────────────────────────────────
@@ -624,6 +682,8 @@ export const ALL_SPECS: TableSpec[] = [
   DOCUMENTS_SPEC,
   STATEMENTS_SPEC,
   MERCHANT_RULES_SPEC,
+  CHECKUPS_SPEC,
+  HEALTH_RECORDS_SPEC,
   RECIPES_SPEC,
   GUIDES_SPEC,
   GUIDE_CHAPTERS_SPEC,

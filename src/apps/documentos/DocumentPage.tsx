@@ -5,13 +5,12 @@ import DeleteDialog from '../../components/DeleteDialog';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
 import FormField from '../../components/FormField';
-import NoticeDaysSelect from '../../components/NoticeDaysSelect';
 import SectionLabel from '../../components/SectionLabel';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
 import { appPath, entryPath } from '../types';
-import { DOCUMENT_NOTICE_DAYS_OPTIONS, useDocuments } from './useDocuments';
+import { useDocuments } from './useDocuments';
 
 /** A document, read and written on the same page: the title on blur, each
  *  control as it changes, and its pictures — which are what it says. */
@@ -47,16 +46,6 @@ export default function DocumentPage() {
               label="Vence"
             />
           </FormField>
-
-          {entry.expires_on && (
-            <FormField label="Aviso">
-              <NoticeDaysSelect
-                value={entry.notice_days}
-                onChange={(days) => void save(entry.id, { notice_days: days })}
-                options={DOCUMENT_NOTICE_DAYS_OPTIONS}
-              />
-            </FormField>
-          )}
 
           <div>
             <SectionLabel>Adjuntos</SectionLabel>

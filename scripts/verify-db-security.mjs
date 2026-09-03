@@ -37,6 +37,9 @@ const TABLE_PRIVILEGES = {
   documents: CRUD,
   statements: CRUD,
   merchant_rules: CRUD,
+  // One member's each: the owner policy below hands a member only their own.
+  checkups: CRUD,
+  health_records: CRUD,
   notes: CRUD,
   ideas: CRUD,
   trips: CRUD,
@@ -56,10 +59,21 @@ const WRITER_GRANTS = [
   ['members', 'SELECT'],
 ];
 
-// The one shape a policy may have: it grants the authenticated role what
-// private.is_member() says, and nothing else. A `for select` policy has no
-// with_check and a `for insert` one no qual, hence the null on either side.
+// The shape every policy has but for the exception below: it grants the
+// authenticated role what private.is_member() says, and nothing else. A `for
+// select` policy has no with_check and a `for insert` one no qual, hence the
+// null on either side.
 const MEMBER_POLICY = 'private.is_member()';
+
+// The one other shape, on the tables listed here alone: a member sees and
+// writes only the rows that are theirs — `owner` is the auth user id of
+// whoever created the row. Postgres prints the expression back in exactly this
+// form. A table here must carry this policy and no other: permissive policies
+// OR together, and the plain member one beside it would hand every member
+// every row.
+const OWNER_TABLES = ['checkups', 'health_records'];
+const OWNER_POLICY = '(private.is_member() AND (owner = auth.uid()))';
+const ownerTables = OWNER_TABLES.map((table) => `'${table}'`).join(', ');
 
 const expectedPrivileges = Object.entries(TABLE_PRIVILEGES)
   .map(([table, privileges]) => {
@@ -122,10 +136,10 @@ const CHECKS = [
   },
   {
     // Permissive policies OR together, so one policy that says something else
-    // opens the table however careful the others are. Two policies besides the
-    // member ones may exist: the email worker's, in exactly the shapes pinned
-    // here — anything else is drift.
-    name: 'every policy on a public table is the is_member() policy or a pinned writer policy',
+    // opens the table however careful the others are. Besides the member ones
+    // may exist the owner policy on the tables pinned for it, and the email
+    // worker's, in exactly the shapes pinned here — anything else is drift.
+    name: 'every policy on a public table is the is_member() policy, the owner policy on its tables, or a pinned writer policy',
     sql: `select p.tablename || ': ' || p.policyname as violation
           from pg_policies p
           where p.schemaname = 'public'
@@ -133,11 +147,29 @@ const CHECKS = [
                      and coalesce(p.qual, '${MEMBER_POLICY}') = '${MEMBER_POLICY}'
                      and coalesce(p.with_check, '${MEMBER_POLICY}') = '${MEMBER_POLICY}'
                      and not (p.qual is null and p.with_check is null))
+            and not (p.roles = '{authenticated}'::name[]
+                     and p.tablename in (${ownerTables})
+                     and coalesce(p.qual, '${OWNER_POLICY}') = '${OWNER_POLICY}'
+                     and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}'
+                     and not (p.qual is null and p.with_check is null))
             and not (p.roles = '{${WRITER_ROLE}}'::name[]
                      and ((p.tablename = 'trip_inbox' and p.cmd = 'INSERT'
                            and p.qual is null and p.with_check = 'true')
                           or (p.tablename = 'members' and p.cmd = 'SELECT'
                               and p.qual = 'true' and p.with_check is null)))`,
+  },
+  {
+    name: 'a per-member table carries the owner policy and no other',
+    sql: `select p.tablename || ': ' || p.policyname as violation
+          from pg_policies p
+          where p.schemaname = 'public' and p.tablename in (${ownerTables})
+            and not (coalesce(p.qual, '${OWNER_POLICY}') = '${OWNER_POLICY}'
+                     and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}')
+          union all
+          select t.table_name || ': no policy at all' as violation
+          from (values ${OWNER_TABLES.map((table) => `('${table}')`).join(', ')}) as t(table_name)
+          where not exists (select 1 from pg_policies p
+                            where p.schemaname = 'public' and p.tablename = t.table_name)`,
   },
   {
     name: `${WRITER_ROLE} holds exactly its listed privileges`,

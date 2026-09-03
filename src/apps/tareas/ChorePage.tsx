@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import AttachmentGrid from '../../components/AttachmentGrid';
 import DeleteDialog from '../../components/DeleteDialog';
+import DueDateChips from '../../components/DueDateChips';
 import Body from '../../components/editor/Body';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
@@ -12,7 +13,6 @@ import { useLeave } from '../../hooks/useLeave';
 import { useTextSave } from '../../hooks/useTextSave';
 import { todayIso } from '../../utils/dateUtils';
 import { appPath, entryPath } from '../types';
-import DueDateChips from './DueDateChips';
 import RepeatFields, { type RepeatValue } from './RepeatFields';
 import { useChores } from './useChores';
 

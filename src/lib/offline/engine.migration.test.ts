@@ -125,7 +125,6 @@ describe('table migration', () => {
       'occurs_on',
       'repeat_every',
       'repeat_unit',
-      'notice_days',
       'comments',
       'created_at',
       'updated_at',

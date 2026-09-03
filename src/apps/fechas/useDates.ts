@@ -11,7 +11,6 @@ export interface DateInput {
   occurs_on: string;
   repeat_every: number | null;
   repeat_unit: RepeatUnit | null;
-  notice_days: number;
   comments: string | null;
 }
 

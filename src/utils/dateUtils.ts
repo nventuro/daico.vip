@@ -198,21 +198,3 @@ export function monthName(yearMonth: string, style: 'long' | 'short'): string {
   const [year, month] = yearMonth.split('-').map(Number);
   return namePart(new Date(year, month - 1, 1), { month: style });
 }
-
-/** The notice windows the apps offer, by their label; any other count of
- *  days is spelled out. */
-const NOTICE_LABELS: Record<number, string> = {
-  0: 'Aviso: el día',
-  1: '1 día antes',
-  3: '3 días antes',
-  7: '1 semana antes',
-  14: '2 semanas antes',
-  30: '1 mes antes',
-  90: '3 meses antes',
-  180: '6 meses antes',
-};
-
-/** How far ahead an entry announces itself, as shown to the user. */
-export function noticeLabel(days: number): string {
-  return NOTICE_LABELS[days] ?? `${days} días antes`;
-}

@@ -1,7 +1,7 @@
 import { IconCalendarEvent } from '@tabler/icons-react';
-import Chip from '../../components/Chip';
-import NativeDatePicker from '../../components/NativeDatePicker';
-import { addDays, relativeDay } from '../../utils/dateUtils';
+import Chip from './Chip';
+import NativeDatePicker from './NativeDatePicker';
+import { addDays, relativeDay } from '../utils/dateUtils';
 
 interface DueDateChipsProps {
   /** yyyy-mm-dd, or null for no due date. */
@@ -9,7 +9,7 @@ interface DueDateChipsProps {
   onChange: (value: string | null) => void;
   /** yyyy-mm-dd; the day the chips are relative to. */
   today: string;
-  /** When set the date can be changed but never dropped — a chore that comes
+  /** When set the date can be changed but never dropped — an entry that comes
    *  back has to come back on a day. */
   required?: boolean;
 }
@@ -17,7 +17,7 @@ interface DueDateChipsProps {
 /**
  * A due date as one tap: Hoy, Mañana, Sin fecha, or a calendar chip that opens
  * the native picker for any other day and then reads as that day. `required`
- * drops the Sin fecha chip, for a chore that has to have one.
+ * drops the Sin fecha chip, for an entry that has to have one.
  */
 export default function DueDateChips({
   value,

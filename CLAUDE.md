@@ -42,6 +42,16 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   replacement: a role with a policy but no GRANT gets "permission denied for
   table ..." before the policy is ever evaluated. **Never grant to `anon`** —
   anon must stay fully locked out.
+- **Every policy is `private.is_member()` and nothing else, with one
+  exception: a table whose rows are one member's** (`checkups`,
+  `health_records`) carries `owner uuid`, the auth user id of whoever created
+  the row, under the policy `private.is_member() and owner = auth.uid()` on
+  both `using` and `with check`: a select hands each member only their own
+  rows and a write for another owner is refused. `db:verify` pins that second
+  shape to exactly the tables in its `OWNER_TABLES`, and a table there must
+  never also carry the plain policy — permissive policies OR together. Which
+  tables are per-member is a design decision (Salud's is written up below),
+  never a default.
 - SECURITY DEFINER helpers used by RLS live in the **non-exposed `private` schema**
   (e.g. `private.is_member()`), never in `public` — a SECURITY DEFINER function in
   `public` is callable by anyone via the PostgREST `/rpc` API (the security advisor
@@ -80,7 +90,7 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   `updated_at`), the values any enumerated column may take, and its `TableSpec`.
   `TableSpec<Row>`'s `columns` is keyed by column name, so a column missing from
   either the row type or the spec fails to compile; a column's DDL default lives
-  there too (`DATE_NOTICE_DAYS_DEFAULT`).
+  there too.
 - **Adding one is the three steps in the README**, with `SHELL_SPECS` in place of
   a module's `specs` when no single app owns the table, as with `attachments`.
   None of the steps is sync code: **never hand-write sync or SQL** — the generic
@@ -164,9 +174,9 @@ gate, what a sync does with the files. These are the rules on top of it.
   `src/components/Attachment*`, parametrized by the owner. There is no
   attachment page: an entry's route ends in an optional `:attachmentId`, so a
   picture has a URL of its own.
-- **A document is its pictures.** `documents` keeps a title, an expiry and its
-  notice window and nothing else: never add a column that holds what a document
-  says (a number, a date of birth) — that is what the sealed files are for.
+- **A document is its pictures.** `documents` keeps a title and an expiry and
+  nothing else: never add a column that holds what a document says (a number,
+  a date of birth) — that is what the sealed files are for.
 - **Two rules the `afterSync` work turns on.** Keeping every **document's**
   files on every device is the one exception to files being fetched on demand:
   never extend it to another owner kind, never pull files wholesale, and never
@@ -292,6 +302,45 @@ top of it.
   without storing them, logs nothing of an email, and always replies to the
   sender. Its header says what it holds and why; it is deployed on its own with
   the `worker:*` scripts, never by the app's deploy.
+
+## Salud — read before touching them
+
+The README's "Salud" says what a checkup and a health record are. These are
+the rules on top of it.
+
+- **Every row is one member's, and the server keeps it that way.** `checkups`
+  and `health_records` carry `owner` (the session's user id, stamped by the
+  hooks on create, read through `useSession`) under the per-member policy
+  above, so a device only ever holds the signed-in member's rows: Salud opens
+  on yours, Próximo and Buscar say yours, and there is no person picker and no
+  name anywhere. Never add a way to see or write another member's, and never
+  key `owner` to anything but `auth.uid()`.
+- **A curtain, not a vault.** A study's pictures are ordinary `attachments`
+  rows and bucket objects, shared under the household's one key: the other
+  member's screens never show them, but their device syncs the rows. Never
+  present it as more than that.
+- **A checkup is a chore that always comes back from the day it was marked.**
+  No `repeat_from`: the arithmetic is `addRepeats` from the day marked and
+  never from the day it was due — a check is worth nothing twice in a row. One
+  that does not repeat is done once marked; one that repeats stays overdue
+  until marked, like a chore and unlike a date. It reaches Próximo
+  `CHECKUP_NOTICE_DAYS` (a week) ahead, the same for every checkup: no
+  per-entry window, here or in any app.
+- **A checkup has comments and no pictures; a study has pictures and no
+  comments.** A checkup's row re-dates itself, so a picture pinned to it would
+  outlive the check it was about — what was done is a study, dated. A study
+  is its pictures, by Documentos' rule: never add a column that holds what a
+  study found. Its files are fetched on demand, never kept on every device —
+  that exception stays Documentos'.
+- **Nothing links a checkup to a study**, not a key and not a shortcut: the
+  title and the date already say which check a study came from, and a key
+  between rows has the offline race Ideas' groups avoid.
+- **The kind is chosen at birth (`/salud/nuevo`, two chips) and never
+  changed**; the entry page states it with a `StaticChip`. Both kinds share
+  the one route `/salud/:id/:attachmentId?`, the id looked up in both tables,
+  because `entryPath` is all Próximo and Buscar know how to write.
+  Attachments are pictures only: a lab's PDF is captured or photographed until
+  Adjuntos takes PDFs everywhere.
 
 ## Privacy — the code is public, the data is private
 

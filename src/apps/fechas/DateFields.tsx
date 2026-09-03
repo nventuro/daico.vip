@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { IconBell, IconCalendarEvent, IconRepeat } from '@tabler/icons-react';
+import { IconCalendarEvent, IconRepeat } from '@tabler/icons-react';
 import {
   REPEAT_UNITS,
   repeatIntervalLabel,
@@ -13,13 +13,9 @@ import {
   FIELD_CLASS,
 } from '../../components/controlClasses';
 import DatePicker from '../../components/DatePicker';
-import NoticeDaysSelect from '../../components/NoticeDaysSelect';
 import Select from '../../components/Select';
 import TextInput from '../../components/TextInput';
 import type { DateInput } from './useDates';
-
-/** Notice windows (days ahead) offered when adding or editing a date. */
-const DATE_NOTICE_DAYS_OPTIONS = [0, 1, 3, 7, 14, 30] as const;
 
 /** Interval a date gets when it is switched to repeating. */
 const DATE_REPEAT_EVERY_DEFAULT = 1;
@@ -31,11 +27,8 @@ const DATE_REPEAT_EVERY_MAX = 24;
 /** What the repeat select says for a date that only happens once. */
 const ONCE = 'none';
 
-/** The scheduling half of a date: when, how it repeats, and the notice window. */
-export type DateFieldsValue = Pick<
-  DateInput,
-  'occurs_on' | 'repeat_every' | 'repeat_unit' | 'notice_days'
->;
+/** The scheduling half of a date: when, and how it repeats. */
+export type DateFieldsValue = Pick<DateInput, 'occurs_on' | 'repeat_every' | 'repeat_unit'>;
 
 interface DateFieldsProps {
   fields: DateFieldsValue;
@@ -47,7 +40,7 @@ interface DateFieldsProps {
 const CHIP = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`;
 const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
 
-/** The date, repeat and notice controls a date is set by. Controlled: every
+/** The date and repeat controls a date is set by. Controlled: every
  *  change is reported as a patch of the value — except the interval, reported
  *  once it is left: half of a number is no interval at all. */
 export default function DateFields({ fields, onChange, layout }: DateFieldsProps) {
@@ -136,16 +129,6 @@ export default function DateFields({ fields, onChange, layout }: DateFieldsProps
             {chips && <span>{repeatUnitsLabel(fields.repeat_unit)}</span>}
           </span>,
         )}
-      {field(
-        'Aviso',
-        <IconBell size={18} stroke={1.5} />,
-        <NoticeDaysSelect
-          value={fields.notice_days}
-          onChange={(days) => onChange({ notice_days: days })}
-          options={DATE_NOTICE_DAYS_OPTIONS}
-          className={control}
-        />,
-      )}
     </>
   );
 }

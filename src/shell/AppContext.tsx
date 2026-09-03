@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { cachedVerdict, rememberVerdict } from '../lib/membershipCache';
 import { installSyncTriggers } from '../lib/offline/sync';
+import { SessionContext } from '../hooks/useSession';
 import { AppContext } from './appContext';
 
 export function AppProvider({
@@ -104,9 +105,13 @@ export function AppProvider({
   // Nothing drawn keeps the splash up.
   if (loading) return null;
 
+  // The session goes one layer down as well: an app whose rows are one
+  // member's stamps them with its user id.
   return (
-    <AppContext.Provider value={{ session, isMember, signIn, signOut }}>
-      {children}
-    </AppContext.Provider>
+    <SessionContext.Provider value={session}>
+      <AppContext.Provider value={{ session, isMember, signIn, signOut }}>
+        {children}
+      </AppContext.Provider>
+    </SessionContext.Provider>
   );
 }

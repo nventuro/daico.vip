@@ -127,9 +127,8 @@ from the bar and live in the list; there is no page.
 
 **Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
 `occurs_on` is the anchor the user entered, a repeating entry's next occurrence
-is computed from it on read, and `notice_days` says how far ahead it reaches
-Próximo. Born on a form with its day, repetition, notice and comments; edited
-in place on its page.
+is computed from it on read, and it reaches Próximo the week before. Born on a
+form with its day, repetition and comments; edited in place on its page.
 
 **Recetas** — `recipes`: a title, an optional time and number of servings, and
 a markdown body in the dialect below, whose `:::ingredients` block is a
@@ -152,6 +151,14 @@ installment travels in `payload`, gzipped and encrypted under the household key
 like an attachment's file. Purchases are filed into a fixed set of categories
 on display, by `merchant_rules`, an encrypted pattern each. A statement is born
 from its PDF and deleted from its page.
+
+**Salud** — `checkups` and `health_records`, each row one member's and hidden
+from the others by the server. A checkup is a health check to have done — a
+chore that always comes back from the day it was marked, or a one-off
+appointment — with comments and no pictures; it reaches Próximo the week
+before. A health record is a study kept: a title, the day it was done and its
+pictures, which hold everything the study says. Both are born on one form,
+where the kind is chosen, and edited in place on their page.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, two timestamps and an opaque blob, which is

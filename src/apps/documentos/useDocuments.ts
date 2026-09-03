@@ -9,12 +9,7 @@ export interface DocumentInput {
   title: string;
   /** yyyy-mm-dd, or null for a document that never expires. */
   expires_on: string | null;
-  notice_days: number;
 }
-
-/** Notice windows offered for a document's expiry — up to six months, the
- *  margin a passport is often required to have left. */
-export const DOCUMENT_NOTICE_DAYS_OPTIONS = [7, 30, 90, 180];
 
 /** Local-first documents: add / edit / delete, syncing in the background.
  *  Every action is instant and works offline. */

@@ -3,30 +3,29 @@ import type { DocumentEntry } from '../../lib/offline/specs';
 import { expiryLabel, isExpiring } from './expiry';
 
 const TODAY = '2026-08-27';
-const entry = (expires_on: string | null, notice_days = 30): DocumentEntry => ({
+const entry = (expires_on: string | null): DocumentEntry => ({
   id: 'd',
   title: 'pasaporte',
   expires_on,
-  notice_days,
   created_at: '',
   updated_at: '',
 });
 
 describe('isExpiring', () => {
-  it('is true inside the notice window and on the day', () => {
+  it('is true within six months and on the day', () => {
     expect(isExpiring(entry('2026-09-26'), TODAY)).toBe(true);
     expect(isExpiring(entry('2026-08-27'), TODAY)).toBe(true);
-    expect(isExpiring(entry('2027-02-14', 180), TODAY)).toBe(true);
+    expect(isExpiring(entry('2027-02-23'), TODAY)).toBe(true);
   });
 
-  it('is false while the expiry is further off than the window', () => {
-    expect(isExpiring(entry('2026-09-27'), TODAY)).toBe(false);
-    expect(isExpiring(entry('2027-02-14'), TODAY)).toBe(false);
+  it('is false while the expiry is further off than six months', () => {
+    expect(isExpiring(entry('2027-02-24'), TODAY)).toBe(false);
+    expect(isExpiring(entry('2028-01-01'), TODAY)).toBe(false);
   });
 
   it('stays true once the document has expired', () => {
     expect(isExpiring(entry('2026-01-01'), TODAY)).toBe(true);
-    expect(isExpiring(entry('2026-08-26', 0), TODAY)).toBe(true);
+    expect(isExpiring(entry('2026-08-26'), TODAY)).toBe(true);
   });
 
   it('is false for a document that never expires', () => {

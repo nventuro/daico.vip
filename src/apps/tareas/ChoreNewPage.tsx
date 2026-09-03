@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import DueDateChips from '../../components/DueDateChips';
 import Body from '../../components/editor/Body';
 import ErrorLine from '../../components/ErrorLine';
 import FormField from '../../components/FormField';
@@ -9,7 +10,6 @@ import { useLeave } from '../../hooks/useLeave';
 import { todayIso } from '../../utils/dateUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import { entryPath } from '../types';
-import DueDateChips from './DueDateChips';
 import RepeatFields, { type RepeatValue } from './RepeatFields';
 import { useChores } from './useChores';
 
