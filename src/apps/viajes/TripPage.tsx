@@ -4,6 +4,7 @@ import { IconPencil } from '@tabler/icons-react';
 import type { TripItem } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
+import { useLeave } from '../../hooks/useLeave';
 import { UNDO_MS, useUndo } from '../../hooks/useUndo';
 import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
@@ -41,6 +42,7 @@ export default function TripPage() {
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
   const navigate = useNavigate();
+  const leave = useLeave();
   const { state, pathname } = useLocation();
   const undo = useUndo<InboxUndo>(UNDO_MS);
 
@@ -63,7 +65,7 @@ export default function TripPage() {
     for (const row of added.staged) await restage(inboxRowInput(row));
     if (added.tripCreated) {
       await removeTrip(added.tripId);
-      navigate(appPath('viajes'));
+      leave(appPath('viajes'));
     }
   }
 

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import ErrorLine from '../../components/ErrorLine';
 import SkeletonRows from '../../components/SkeletonRows';
 import { useDraftTitle } from '../../hooks/useDraftTitle';
@@ -9,7 +9,7 @@ import { useIdeas, type IdeaInput } from './useIdeas';
 
 export default function IdeaNewPage() {
   const { items, loading, error, add } = useIdeas();
-  const navigate = useNavigate();
+  const leave = useLeave();
   const title = useDraftTitle();
 
   // The groups an idea can join come from the ideas there are: the form waits
@@ -25,7 +25,7 @@ export default function IdeaNewPage() {
         groups={groupNames(items)}
         onSave={async (input: IdeaInput) => {
           await add(input);
-          navigate(appPath('ideas'));
+          leave(appPath('ideas'));
         }}
       />
     </>

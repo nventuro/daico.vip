@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
 import { appPath, entryPath } from '../types';
@@ -8,7 +8,7 @@ import RecipeForm from './RecipeForm';
 export default function RecipeEditPage() {
   const { items, loading, error, save, remove } = useRecipes();
   const recipe = useEntry(items);
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={recipe} loading={loading} error={error} missing="Receta no encontrada.">
@@ -18,11 +18,11 @@ export default function RecipeEditPage() {
           recipe={recipe}
           onSave={async (input: RecipeInput) => {
             await save(recipe.id, input);
-            navigate(entryPath('recetas', recipe.id));
+            leave(entryPath('recetas', recipe.id));
           }}
           onRemove={async () => {
             await remove(recipe.id);
-            navigate(appPath('recetas'));
+            leave(appPath('recetas'));
           }}
         />
       )}

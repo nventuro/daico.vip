@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
@@ -12,7 +12,7 @@ export default function TripEditPage() {
   const trip = useEntry(items, 'tripId');
   const { items: rows, remove: removeItem } = useTripItems(trip?.id);
   const { items: attachments, remove: removeAttachment } = useAttachments();
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   /** A trip's rows have no meaning without it: the server cascades them, and
    *  this device must not be left listing rows whose trip is gone — they would
@@ -27,7 +27,7 @@ export default function TripEditPage() {
       await removeItem(row.id);
     }
     await remove(id);
-    navigate(appPath('viajes'));
+    leave(appPath('viajes'));
   }
 
   return (
@@ -38,7 +38,7 @@ export default function TripEditPage() {
           trip={trip}
           onSave={async (input: TripInput) => {
             await save(trip.id, input);
-            navigate(entryPath('viajes', trip.id));
+            leave(entryPath('viajes', trip.id));
           }}
           onRemove={() => void removeTrip(trip.id)}
         />

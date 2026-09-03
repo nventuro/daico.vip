@@ -132,7 +132,15 @@ export default defineConfig({
         // The Supabase client is the one large dependency in the startup bundle;
         // giving it its own chunk keeps the main one comfortably under the size
         // Rollup warns at, and lets the client's cache entry survive app updates.
-        manualChunks: { supabase: ['@supabase/supabase-js'] },
+        // ProseMirror is the bulk of the editor, which only a body loads: in a
+        // chunk of its own the editor's stays under that size too, and the
+        // part that never changes between builds keeps its cache entry.
+        manualChunks: (id) => {
+          if (id.includes('node_modules/@supabase/')) return 'supabase';
+          if (id.includes('node_modules/prosemirror-') || id.includes('node_modules/@tiptap/pm/'))
+            return 'prosemirror';
+          return undefined;
+        },
       },
     },
   },

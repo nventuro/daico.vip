@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TRIP_ITEMS_SPEC } from '../../lib/offline/specs';
+import { useLeave } from '../../hooks/useLeave';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { relativeDayTime, todayIso } from '../../utils/dateUtils';
 import EntryPage from '../../components/EntryPage';
@@ -42,6 +43,7 @@ export default function InboxReviewPage() {
   // rows' own `add`, which lower-cases what is typed into an add bar.
   const { insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
   const navigate = useNavigate();
+  const leave = useLeave();
 
   const today = todayIso();
   const group = groups.find((candidate) => candidate.importId === importId);
@@ -58,7 +60,7 @@ export default function InboxReviewPage() {
 
   async function discard(group: InboxGroup) {
     await discardInbox(group, { removeStaged: remove });
-    navigate(appPath('viajes'));
+    leave(appPath('viajes'));
   }
 
   return (

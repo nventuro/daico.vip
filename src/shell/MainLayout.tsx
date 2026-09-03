@@ -1,7 +1,8 @@
-import { lazy, Suspense, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { IconSearch, IconSettings } from '@tabler/icons-react';
 import IconButton from '../components/IconButton';
+import { recordVisit } from '../lib/visited';
 import { useAppContext } from './appContext';
 import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
@@ -20,6 +21,11 @@ export default function MainLayout() {
   const masterKey = useMasterKey();
   const sync = useSyncStatus();
   const [enteredEarly, setEnteredEarly] = useState(false);
+  // Every screen's way out reads this record, so every screen is told to it —
+  // whichever gate below the layout stops at.
+  const { key, pathname } = useLocation();
+  const navigationType = useNavigationType();
+  useEffect(() => recordVisit(key, pathname, navigationType), [key, pathname, navigationType]);
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccessScreen />;
@@ -44,7 +50,9 @@ export default function MainLayout() {
       <header className="sticky top-0 z-30 h-(--header-height) border-b-2 border-on-surface bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-full max-w-2xl items-center justify-between px-4">
           <span className="flex items-center gap-2.5">
-            <span className="font-display text-2xl font-black tracking-tight">daico</span>
+            <Link to="/" title="Inicio" className="font-display text-2xl font-black tracking-tight">
+              daico
+            </Link>
             {sync.syncing && (
               <span
                 role="status"

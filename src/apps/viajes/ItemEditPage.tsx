@@ -1,4 +1,5 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
@@ -11,7 +12,7 @@ export default function ItemEditPage() {
   const { items, loading, error, save, remove } = useTripItems(tripId);
   const entry = useEntry(items, 'itemId');
   const attachments = useAttachments({ kind: 'trip_item', id: entry?.id ?? '' });
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={entry} loading={loading} error={error} missing="No se encontró en el viaje.">
@@ -21,13 +22,13 @@ export default function ItemEditPage() {
           item={entry}
           onSave={async (input: TripItemFields) => {
             await save(entry.id, input);
-            navigate(entryPath('viajes', tripId));
+            leave(entryPath('viajes', tripId));
           }}
           onRemove={async () => {
             // The row's pictures go with it; nothing else would ever list them.
             await attachments.removeAll();
             await remove(entry.id);
-            navigate(entryPath('viajes', tripId));
+            leave(entryPath('viajes', tripId));
           }}
         />
       )}

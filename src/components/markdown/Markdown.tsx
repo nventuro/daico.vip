@@ -3,14 +3,12 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import { Link } from 'react-router-dom';
+import { MARKDOWN_CLASS } from './classes';
 import { directivesToElements } from './directives';
 import Video from './Video';
 import Spoiler from './Spoiler';
 
 const remarkPlugins = [remarkGfm, remarkDirective, directivesToElements];
-
-const linkClass =
-  'text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary';
 
 // Custom element names come from the directive plugin; react-markdown's
 // `Components` type only knows HTML tags, hence the cast.
@@ -19,11 +17,11 @@ const baseComponents = {
   // — that is another origin, however much it reads like a path.
   a: ({ href = '', children }: { href?: string; children?: ReactNode }) =>
     href.startsWith('/') && !href.startsWith('//') ? (
-      <Link to={href} className={linkClass}>
+      <Link to={href} className={MARKDOWN_CLASS.a}>
         {children}
       </Link>
     ) : (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+      <a href={href} target="_blank" rel="noopener noreferrer" className={MARKDOWN_CLASS.a}>
         {children}
       </a>
     ),
@@ -37,33 +35,19 @@ const baseComponents = {
   // Only a screen that can offer to add what is missing renders the list;
   // anywhere else the directive renders nothing rather than a dead checklist.
   ingredients: () => null,
-  h1: ({ children }: { children?: ReactNode }) => (
-    <h2 className="mt-8 mb-3 font-display text-2xl font-black">{children}</h2>
-  ),
-  h2: ({ children }: { children?: ReactNode }) => (
-    <h3 className="mt-6 mb-2 font-display text-xl font-black">{children}</h3>
-  ),
-  h3: ({ children }: { children?: ReactNode }) => (
-    <h4 className="mt-5 mb-2 text-lg font-semibold">{children}</h4>
-  ),
-  p: ({ children }: { children?: ReactNode }) => <p className="my-3 leading-relaxed">{children}</p>,
-  ul: ({ children }: { children?: ReactNode }) => (
-    <ul className="my-3 list-disc pl-5">{children}</ul>
-  ),
-  ol: ({ children }: { children?: ReactNode }) => (
-    <ol className="my-3 list-decimal pl-5">{children}</ol>
-  ),
-  li: ({ children }: { children?: ReactNode }) => (
-    <li className="my-1 leading-relaxed">{children}</li>
-  ),
+  h1: ({ children }: { children?: ReactNode }) => <h2 className={MARKDOWN_CLASS.h1}>{children}</h2>,
+  h2: ({ children }: { children?: ReactNode }) => <h3 className={MARKDOWN_CLASS.h2}>{children}</h3>,
+  h3: ({ children }: { children?: ReactNode }) => <h4 className={MARKDOWN_CLASS.h3}>{children}</h4>,
+  p: ({ children }: { children?: ReactNode }) => <p className={MARKDOWN_CLASS.p}>{children}</p>,
+  ul: ({ children }: { children?: ReactNode }) => <ul className={MARKDOWN_CLASS.ul}>{children}</ul>,
+  ol: ({ children }: { children?: ReactNode }) => <ol className={MARKDOWN_CLASS.ol}>{children}</ol>,
+  li: ({ children }: { children?: ReactNode }) => <li className={MARKDOWN_CLASS.li}>{children}</li>,
   blockquote: ({ children }: { children?: ReactNode }) => (
-    <blockquote className="my-3 border-l-4 border-primary pl-3 text-muted-strong">
-      {children}
-    </blockquote>
+    <blockquote className={MARKDOWN_CLASS.blockquote}>{children}</blockquote>
   ),
-  hr: () => <hr className="my-6 border-border" />,
+  hr: () => <hr className={MARKDOWN_CLASS.hr} />,
   code: ({ children }: { children?: ReactNode }) => (
-    <code className="bg-border-subtle px-1 font-mono text-sm">{children}</code>
+    <code className={MARKDOWN_CLASS.code}>{children}</code>
   ),
   table: ({ children }: { children?: ReactNode }) => (
     <div className="my-4 overflow-x-auto">

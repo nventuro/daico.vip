@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
@@ -10,7 +10,7 @@ export default function DocumentEditPage() {
   const { items, loading, error, save, remove } = useDocuments();
   const entry = useEntry(items);
   const attachments = useAttachments({ kind: 'document', id: entry?.id ?? '' });
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={entry} loading={loading} error={error} missing="Documento no encontrado.">
@@ -20,13 +20,13 @@ export default function DocumentEditPage() {
           entry={entry}
           onSave={async (input: DocumentInput) => {
             await save(entry.id, input);
-            navigate(appPath('documentos'));
+            leave(appPath('documentos'));
           }}
           onRemove={async () => {
             // The document's files go with it; nothing else would ever list them.
             await attachments.removeAll();
             await remove(entry.id);
-            navigate(appPath('documentos'));
+            leave(appPath('documentos'));
           }}
         />
       )}

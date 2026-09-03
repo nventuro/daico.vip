@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
-import { useMasterKey } from '../../hooks/useMasterKey';
+import { draftTitleState } from '../../hooks/useDraftTitle';
 import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
@@ -16,20 +16,12 @@ import { noteMarks } from './marks';
 import { useNotes } from './useNotes';
 
 export default function NotesPage() {
-  const { items, loading, error, add } = useNotes();
+  const { items, loading, error } = useNotes();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'note'), [attachments]);
-  const masterKey = useMasterKey();
   const navigate = useNavigate();
 
   const groups = useMemo(() => groupNotes(items, todayIso()), [items]);
-
-  async function addNote(title: string) {
-    if (masterKey.status !== 'unlocked') return;
-    const id = await add(title, masterKey.key);
-    // A new note is just a title: go straight to writing it.
-    if (id) navigate(entryPath('notas', id, 'editar'));
-  }
 
   return (
     <ListPage
@@ -38,7 +30,11 @@ export default function NotesPage() {
       skeleton={<SkeletonRows />}
       bar={
         <AddBar
-          onAdd={(title) => void addNote(title)}
+          // The note is written on save: the title goes on to the form, and
+          // nothing is written until it is saved there.
+          onAdd={(title) =>
+            navigate(entryPath('notas', 'nuevo'), { state: draftTitleState(title) })
+          }
           placeholder="Agregar una nota..."
           inputLabel="Nueva nota"
         />

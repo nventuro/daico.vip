@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, MouseEventHandler } from 'react';
 import { Link } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 
@@ -14,13 +14,19 @@ interface IconButtonBase {
    *  hover can only be told by fading. */
   tone?: 'surface' | 'band';
   className?: string;
+  /** For a link, a tap that means more than following it — stepping back to
+   *  where it leads, say; the link stays a link for the browser's own gestures. */
+  onClick?: MouseEventHandler<HTMLElement>;
 }
 
 /** Either a link somewhere or a button that does something — never both, so
  *  a button's own attributes can't be handed to a link and quietly dropped. */
 type IconButtonProps =
   | (IconButtonBase & { to: string })
-  | (IconButtonBase & { to?: undefined } & ButtonHTMLAttributes<HTMLButtonElement>);
+  | (IconButtonBase & { to?: undefined } & Omit<
+        ButtonHTMLAttributes<HTMLButtonElement>,
+        'onClick'
+      >);
 
 const TONE_CLASS = {
   surface: 'text-muted transition-colors hover:bg-border-subtle hover:text-on-surface',
@@ -36,6 +42,7 @@ export default function IconButton({
   to,
   tone = 'surface',
   className = 'p-2',
+  onClick,
   ...rest
 }: IconButtonProps) {
   const look = `flex shrink-0 items-center ${TONE_CLASS[tone]} ${className}`;
@@ -43,13 +50,20 @@ export default function IconButton({
 
   if (to !== undefined) {
     return (
-      <Link to={to} aria-label={label} title={title} className={look}>
+      <Link to={to} aria-label={label} title={title} className={look} onClick={onClick}>
         {glyph}
       </Link>
     );
   }
   return (
-    <button type="button" aria-label={label} title={title} className={look} {...rest}>
+    <button
+      type="button"
+      aria-label={label}
+      title={title}
+      className={look}
+      onClick={onClick}
+      {...rest}
+    >
       {glyph}
     </button>
   );

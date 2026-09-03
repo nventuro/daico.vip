@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import EntryPage from '../../components/EntryPage';
 import { useEntry } from '../../hooks/useEntry';
 import { entryPath } from '../types';
@@ -9,7 +9,7 @@ import { useGuides, type GuideInput } from './useGuides';
 export default function GuideEditPage() {
   const { guides, loading, error, save } = useGuides();
   const guide = useEntry(guides, 'guideId');
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={guide} loading={loading} error={error} missing="Guía no encontrada.">
@@ -20,7 +20,7 @@ export default function GuideEditPage() {
           groups={guideGroupNames(guides)}
           onSave={async (input: GuideInput) => {
             await save(guide.id, input);
-            navigate(entryPath('guias', guide.id));
+            leave(entryPath('guias', guide.id));
           }}
         />
       )}

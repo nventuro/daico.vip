@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
 import { appPath } from '../types';
@@ -8,7 +8,7 @@ import DateForm from './DateForm';
 export default function DateEditPage() {
   const { items, loading, error, save, remove } = useDates();
   const entry = useEntry(items);
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={entry} loading={loading} error={error} missing="Fecha no encontrada.">
@@ -18,11 +18,11 @@ export default function DateEditPage() {
           entry={entry}
           onSave={async (input: DateInput) => {
             await save(entry.id, input);
-            navigate(appPath('fechas'));
+            leave(appPath('fechas'));
           }}
           onRemove={async () => {
             await remove(entry.id);
-            navigate(appPath('fechas'));
+            leave(appPath('fechas'));
           }}
         />
       )}

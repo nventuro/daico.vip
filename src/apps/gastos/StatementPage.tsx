@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { useEntry } from '../../hooks/useEntry';
@@ -48,7 +48,7 @@ export default function StatementPage() {
   const rules = useMemo(() => rulesStore.rules ?? [], [rulesStore.rules]);
   const masterKey = useMasterKey();
   const { select, dialog } = useRuleDialog(rulesStore);
-  const navigate = useNavigate();
+  const leave = useLeave();
   const today = todayIso();
 
   const statement = useEntry(items);
@@ -126,7 +126,7 @@ export default function StatementPage() {
   async function handleRemove() {
     if (!statement) return;
     await remove(statement.id);
-    navigate(STATEMENTS_PATH);
+    leave(STATEMENTS_PATH);
   }
 
   // A statement that will not open is said and nothing else.

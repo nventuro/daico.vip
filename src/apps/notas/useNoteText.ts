@@ -22,32 +22,35 @@ function versionOf(note: Note): string {
  * What a note says, opened with the household's master key. Undefined until it
  * is open — reading a note is decrypting it — and again for a note whose body
  * has not been opened yet, so a screen never shows one note's body under
- * another's title.
+ * another's title. A note already open stays open while a newer version of
+ * it is read, so a screen writing on it never sees it blink out.
  */
 export function useNoteText(note: Note | undefined): NoteText {
   const masterKey = useMasterKey();
-  const [opened, setOpened] = useState<(NoteText & { version: string }) | null>(null);
+  const [opened, setOpened] = useState<(NoteText & { id: string; version: string }) | null>(null);
 
+  const id = note?.id;
   const version = note && versionOf(note);
   const body = note?.body;
   const wrappedKey = note?.wrapped_key;
 
   useEffect(() => {
-    if (version === undefined || body === undefined || wrappedKey === undefined) return;
+    if (id === undefined || version === undefined || body === undefined || wrappedKey === undefined)
+      return;
     if (masterKey.status !== 'unlocked') return;
     let active = true;
     openBody(masterKey.key, { body, wrapped_key: wrappedKey }).then(
       (text) => {
-        if (active) setOpened({ version, text, error: null });
+        if (active) setOpened({ id, version, text, error: null });
       },
       (e: unknown) => {
-        if (active) setOpened({ version, text: undefined, error: errorMessage(e) });
+        if (active) setOpened({ id, version, text: undefined, error: errorMessage(e) });
       },
     );
     return () => {
       active = false;
     };
-  }, [version, body, wrappedKey, masterKey]);
+  }, [id, version, body, wrappedKey, masterKey]);
 
-  return opened !== null && opened.version === version ? opened : NOT_OPEN;
+  return opened !== null && opened.id === id ? opened : NOT_OPEN;
 }

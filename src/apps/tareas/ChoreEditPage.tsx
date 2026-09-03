@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLeave } from '../../hooks/useLeave';
 import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { appPath } from '../types';
@@ -10,7 +10,7 @@ export default function ChoreEditPage() {
   const { items, loading, error, save, remove } = useChores();
   const chore = useEntry(items);
   const attachments = useAttachments({ kind: 'chore', id: chore?.id ?? '' });
-  const navigate = useNavigate();
+  const leave = useLeave();
 
   return (
     <EntryPage entry={chore} loading={loading} error={error} missing="Tarea no encontrada.">
@@ -20,13 +20,13 @@ export default function ChoreEditPage() {
           chore={chore}
           onSave={async (input: ChoreInput) => {
             await save(chore.id, input);
-            navigate(appPath('tareas'));
+            leave(appPath('tareas'));
           }}
           onRemove={async () => {
             // The chore's attachments go with it; nothing else would ever list them.
             await attachments.removeAll();
             await remove(chore.id);
-            navigate(appPath('tareas'));
+            leave(appPath('tareas'));
           }}
         />
       )}
