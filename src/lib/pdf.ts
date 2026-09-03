@@ -2,10 +2,17 @@
 // The one way into pdf.js: opening a document and drawing a page of it. The
 // library and its worker are the size of the rest of the app, so this module
 // is only ever imported on demand — when a statement is read, or when a PDF
-// attachment is first drawn.
+// attachment is first drawn. It is pdf.js's legacy build, on both sides: the
+// modern one leans on language features a browser a few months behind lacks
+// and fails at the first page drawn, where the legacy build carries them.
 // =============================================================================
-import { getDocument, PDFWorker, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist';
-import PdfWorkerScript from 'pdfjs-dist/build/pdf.worker.min.mjs?worker';
+import {
+  getDocument,
+  PDFWorker,
+  type PDFDocumentProxy,
+  type PDFPageProxy,
+} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import PdfWorkerScript from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker';
 
 export type PdfDocument = PDFDocumentProxy;
 export type PdfPage = PDFPageProxy;
