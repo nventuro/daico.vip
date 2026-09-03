@@ -17,7 +17,6 @@ const RECIPE_QUANTITY_MIN = 1;
 interface RecipeFormProps {
   recipe: Recipe;
   onSave: (input: RecipeInput) => void;
-  onRemove: () => void;
 }
 
 /** An empty ingredients block, ready for the first item. */
@@ -30,8 +29,9 @@ function parseQuantity(raw: string): number | null {
 }
 
 /** Edits every field of one recipe. Keyed by the recipe's id by its caller, so
- *  the local draft starts from the recipe once and never chases it afterwards. */
-export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps) {
+ *  the local draft starts from the recipe once and never chases it afterwards.
+ *  The recipe is deleted from its own page, like every entry. */
+export default function RecipeForm({ recipe, onSave }: RecipeFormProps) {
   const [title, setTitle] = useState(recipe.title);
   const [minutes, setMinutes] = useState(recipe.minutes?.toString() ?? '');
   const [servings, setServings] = useState(recipe.servings?.toString() ?? '');
@@ -94,12 +94,7 @@ export default function RecipeForm({ recipe, onSave, onRemove }: RecipeFormProps
         </Button>
       </div>
 
-      <FormFooter
-        removeLabel="Eliminar receta"
-        confirmQuestion="¿Eliminar la receta?"
-        onRemove={onRemove}
-        submitDisabled={!canSave}
-      />
+      <FormFooter submitDisabled={!canSave} />
     </form>
   );
 }

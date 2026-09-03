@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { DOCUMENTS_SPEC, DOCUMENT_NOTICE_DAYS_DEFAULT } from '../../lib/offline/specs';
+import { DOCUMENTS_SPEC } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
@@ -12,23 +12,23 @@ export interface DocumentInput {
   notice_days: number;
 }
 
+/** Notice windows offered for a document's expiry — up to six months, the
+ *  margin a passport is often required to have left. */
+export const DOCUMENT_NOTICE_DAYS_OPTIONS = [7, 30, 90, 180];
+
 /** Local-first documents: add / edit / delete, syncing in the background.
  *  Every action is instant and works offline. */
 export function useDocuments() {
   const { items, loading, error, insert, update, remove } = useOfflineTable(DOCUMENTS_SPEC);
 
-  /** Creates a document with just its title, resolving the new id so the
-   *  caller can open it to attach its files; undefined for a blank title or a
-   *  failed write. */
+  /** Creates a document from everything decided about it, resolving the new
+   *  id so the caller can open it to attach its files; undefined for a blank
+   *  title or a failed write. */
   const add = useCallback(
-    (title: string): Promise<string | undefined> => {
-      const value = lowercaseTrimmed(title);
-      if (!value) return Promise.resolve(undefined);
-      return insert({
-        title: value,
-        expires_on: null,
-        notice_days: DOCUMENT_NOTICE_DAYS_DEFAULT,
-      });
+    (input: DocumentInput): Promise<string | undefined> => {
+      const title = lowercaseTrimmed(input.title);
+      if (!title) return Promise.resolve(undefined);
+      return insert({ ...input, title });
     },
     [insert],
   );

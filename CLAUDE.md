@@ -239,7 +239,7 @@ The README's "Notas" says what a note is. These are the rules on top of it.
 - **The list is grouped by `updated_at`** (`grouping.ts`) and has no pinned
   column: the note last written on is the one being looked for.
 - **What is written about a chore or a date is `comments`** («Comentarios»,
-  `CommentsField`), and the mark drawn on any listed entry is `'comments'` —
+  written through the shared editor), and the mark drawn on any listed entry is `'comments'` —
   Notas is the app called notes. In Notas that mark can only mean the entry has
   pictures.
 
@@ -372,8 +372,28 @@ top of it.
   its `useUpcoming` sets them on each `Upcoming`, so Próximo shows the same marks.
   Never draw an ad-hoc icon on a row: a mark that is not in `marks.ts` is missing
   from Próximo. A new kind of mark is a new `EntryMark` member plus its icon.
-- **Nothing is destroyed on a single tap**: a delete goes through `FormFooter`'s
-  confirm, or is reversible for a moment through `UndoBar` (`useUndo`).
+- **Nothing is destroyed on a single tap**: a delete goes through
+  `DeleteDialog`, from the trash in the entry's head; `UndoBar` (`useUndo`) is
+  for marks and clears, never for a delete.
+- **A form creates, a page edits.** The add bar's + carries the typed title to
+  `/<app>/nuevo` (`draftTitleState` / `useDraftTitle`); nothing is written
+  before Guardar, the only submit button in the app, and Guardar opens the new
+  entry through `useLeave`. An entry page never has a save button: every
+  control saves on change and every text through `useTextSave`. Compras is the
+  one exception (born from the bar, lives in the list); Recetas keeps its form
+  until the editor has an ingredients block.
+- **Every free text is `Body`** (`src/components/editor/`), never a
+  `TextArea`, never a second markdown renderer; its placeholder is the field's
+  name («Contenido», «Comentarios»). The editor and `Markdown` share
+  `src/components/markdown/classes.ts` so they look the same, and the editor's
+  round trip is tested headlessly in `BodyEditor.test.ts`. It models neither
+  GFM tables nor the directives: a table is kept as the text it is.
+- **A page is left, never stacked on**: `useLeave` for every Guardar, every
+  delete and the header's arrow; a plain link or `navigate` only going down,
+  from a list to an entry. `src/lib/visited.ts` is the record it reads, and a
+  change to it comes with a test in `visited.test.ts`.
+- **The title is the heading** (`EntryHead`): normalised on blur, never saved
+  empty, with the trash at its right and the app's chips under it.
 - **A wait is shown, never written**: no «Cargando...» text. A list still being
   read holds its place with `SkeletonRows` in the shape of its rows; anything
   being fetched (a picture, a guide image) carries `LoadingLine`; a gate still

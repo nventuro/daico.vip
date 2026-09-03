@@ -21,9 +21,11 @@ export default function RecipesPage() {
   const { items, loading, error, add } = useRecipes();
   const navigate = useNavigate();
 
+  // The one app still born from the bar and edited on a form: a recipe is
+  // written in a textarea until the editor has an ingredients block of its
+  // own, so a new one is just a title that goes straight to writing.
   async function addRecipe(title: string) {
     const id = await add(title);
-    // A new recipe is just a title: go straight to writing it.
     if (id) navigate(entryPath('recetas', id, 'editar'));
   }
 

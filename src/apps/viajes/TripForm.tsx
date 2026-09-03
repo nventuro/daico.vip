@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { Trip } from '../../lib/offline/specs';
 import { entryForm } from '../../utils/formUtils';
 import DatePicker from '../../components/DatePicker';
 import FormField from '../../components/FormField';
@@ -8,19 +7,15 @@ import TitleField from '../../components/TitleField';
 import { NEW_TRIP, type TripInput } from './useTrips';
 
 interface TripFormProps {
-  /** The trip being edited, or a new one carrying only its title. A trip is
-   *  written on save, so one being created has no id yet and nothing to
-   *  delete. */
-  trip: Trip | TripInput;
+  /** What the trip starts from: the title the add bar typed, and no days. */
+  trip: TripInput;
   onSave: (input: TripInput) => void;
-  /** The trip's own delete; a trip that does not exist yet has none. */
-  onRemove?: () => void;
 }
 
-/** Edits a trip: its title and the days it covers, which are stored rather
- *  than derived from what is booked on it. Keyed by the trip's id by its
- *  caller, so the local draft starts from it once and never chases it. */
-export default function TripForm({ trip, onSave, onRemove }: TripFormProps) {
+/** Where a trip is born: its title and the days it covers, which are stored
+ *  rather than derived from what is booked on it. Written nowhere until
+ *  Guardar, so backing out leaves nothing behind. */
+export default function TripForm({ trip, onSave }: TripFormProps) {
   const [title, setTitle] = useState(trip.title);
   const [startsOn, setStartsOn] = useState(trip.starts_on);
   const [endsOn, setEndsOn] = useState(trip.ends_on);
@@ -32,12 +27,11 @@ export default function TripForm({ trip, onSave, onRemove }: TripFormProps) {
   };
   // A trip being created is compared against nothing stored, so any title at
   // all is worth saving.
-  const saved = 'id' in trip ? trip : NEW_TRIP;
-  const { canSave, onSubmit } = entryForm(input, saved, onSave, input.title !== '');
+  const { canSave, onSubmit } = entryForm(input, NEW_TRIP, onSave, input.title !== '');
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <TitleField value={title} onChange={setTitle} />
+      <TitleField value={title} onChange={setTitle} autoCapitalize="sentences" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Desde">
@@ -48,12 +42,7 @@ export default function TripForm({ trip, onSave, onRemove }: TripFormProps) {
         </FormField>
       </div>
 
-      <FormFooter
-        removeLabel={onRemove && 'Eliminar viaje'}
-        confirmQuestion={onRemove && '¿Eliminar el viaje?'}
-        onRemove={onRemove}
-        submitDisabled={!canSave}
-      />
+      <FormFooter submitDisabled={!canSave} />
     </form>
   );
 }

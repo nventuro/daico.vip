@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Chore } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
+import { draftTitleState } from '../../hooks/useDraftTitle';
 import { useChores } from './useChores';
 import { formatDayMonth, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
 import { UNDO_MS, useUndo } from '../../hooks/useUndo';
@@ -13,27 +15,19 @@ import UndoBar from '../../components/UndoBar';
 import EmptyState from '../../components/EmptyState';
 import ListPage from '../../components/ListPage';
 import SkeletonRows from '../../components/SkeletonRows';
-import DueDateChips from './DueDateChips';
 import { entryPath } from '../types';
 import { choreMarks } from './marks';
 import { dueAfterMarking, groupChores, isDone } from './recurrence';
 
 export default function ChoresPage() {
-  const { items: chores, loading, error, add, mark, unmark, restore } = useChores();
+  const { items: chores, loading, error, mark, unmark, restore } = useChores();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'chore'), [attachments]);
   const undo = useUndo<Chore>(UNDO_MS);
+  const navigate = useNavigate();
 
   const today = todayIso();
   const { soon, later, done } = useMemo(() => groupChores(chores, today), [chores, today]);
-
-  // The next chore is rarely due the same day as the last one.
-  const [dueOn, setDueOn] = useState<string | null>(null);
-
-  function addChore(title: string) {
-    void add(title, dueOn);
-    setDueOn(null);
-  }
 
   function toggle(chore: Chore) {
     if (isDone(chore)) {
@@ -84,7 +78,11 @@ export default function ChoresPage() {
       skeleton={<SkeletonRows leading="check" subtitle />}
       bar={
         <AddBar
-          onAdd={addChore}
+          // The chore is written on save: the title goes on to the form, where
+          // its day is picked, and nothing is written until it is saved there.
+          onAdd={(title) =>
+            navigate(entryPath('tareas', 'nuevo'), { state: draftTitleState(title) })
+          }
           placeholder="Agregar una tarea..."
           inputLabel="Nueva tarea"
           notice={
@@ -92,9 +90,7 @@ export default function ChoresPage() {
               <UndoBar message={markMessage(justDone)} onAction={() => undoMark(justDone)} />
             )
           }
-        >
-          <DueDateChips value={dueOn} onChange={setDueOn} today={today} />
-        </AddBar>
+        />
       }
     >
       {soon.length === 0 && later.length === 0 && (

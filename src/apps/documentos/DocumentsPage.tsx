@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { draftTitleState } from '../../hooks/useDraftTitle';
 import { isPast, todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
@@ -10,15 +11,9 @@ import { useDocuments } from './useDocuments';
 import { expiryLabel } from './expiry';
 
 export default function DocumentsPage() {
-  const { items, loading, error, add } = useDocuments();
+  const { items, loading, error } = useDocuments();
   const navigate = useNavigate();
   const today = todayIso();
-
-  async function addDocument(title: string) {
-    const id = await add(title);
-    // A new document is just a title: go straight to attaching its files.
-    if (id) navigate(entryPath('documentos', id));
-  }
 
   return (
     <ListPage
@@ -27,7 +22,11 @@ export default function DocumentsPage() {
       skeleton={<SkeletonRows subtitle />}
       bar={
         <AddBar
-          onAdd={(title) => void addDocument(title)}
+          // The document is written on save: the title goes on to the form,
+          // and nothing is written until it is saved there.
+          onAdd={(title) =>
+            navigate(entryPath('documentos', 'nuevo'), { state: draftTitleState(title) })
+          }
           placeholder="Agregar un documento..."
           inputLabel="Nuevo documento"
         />

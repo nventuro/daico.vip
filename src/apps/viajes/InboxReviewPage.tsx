@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { IconTrash } from '@tabler/icons-react';
 import { TRIP_ITEMS_SPEC } from '../../lib/offline/specs';
 import { useLeave } from '../../hooks/useLeave';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { relativeDayTime, todayIso } from '../../utils/dateUtils';
+import DeleteDialog from '../../components/DeleteDialog';
 import EntryPage from '../../components/EntryPage';
 import FormField from '../../components/FormField';
 import FormFooter from '../../components/FormFooter';
 import Heading from '../../components/Heading';
+import IconButton from '../../components/IconButton';
 import SectionLabel from '../../components/SectionLabel';
 import Select from '../../components/Select';
 import { appPath, entryPath } from '../types';
@@ -44,6 +47,7 @@ export default function InboxReviewPage() {
   const { insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
   const navigate = useNavigate();
   const leave = useLeave();
+  const [discarding, setDiscarding] = useState(false);
 
   const today = todayIso();
   const group = groups.find((candidate) => candidate.importId === importId);
@@ -78,10 +82,15 @@ export default function InboxReviewPage() {
           }}
           className="flex flex-col gap-4"
         >
-          <div>
-            <Heading>{group.tripTitle}</Heading>
-            <p className="mt-1 text-sm text-muted">{inboxSourceLabel(group.emailSubject)}</p>
-            <p className="text-sm text-muted">{relativeDayTime(today, group.receivedAt)}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Heading>{group.tripTitle}</Heading>
+              <p className="mt-1 text-sm text-muted">{inboxSourceLabel(group.emailSubject)}</p>
+              <p className="text-sm text-muted">{relativeDayTime(today, group.receivedAt)}</p>
+            </div>
+            {/* Discarding is the group's delete: from the head, behind the
+                question, the way an entry's is. */}
+            <IconButton label="Descartar" icon={IconTrash} onClick={() => setDiscarding(true)} />
           </div>
 
           <FormField label="Viaje">
@@ -104,11 +113,14 @@ export default function InboxReviewPage() {
             </ul>
           </section>
 
-          <FormFooter
-            removeLabel="Descartar"
-            confirmQuestion="¿Descartar lo que llegó?"
-            onRemove={() => void discard(group)}
-            submitLabel={addInboxLabel(group.items.length)}
+          <FormFooter submitLabel={addInboxLabel(group.items.length)} />
+
+          <DeleteDialog
+            open={discarding}
+            question="¿Descartar lo que llegó?"
+            confirmLabel="Descartar"
+            onCancel={() => setDiscarding(false)}
+            onConfirm={() => void discard(group)}
           />
         </form>
       )}

@@ -16,8 +16,8 @@ export default function ItemNewPage() {
       item={{ ...NEW_TRIP_ITEM, title }}
       onSave={async (input: TripItemFields) => {
         // Nothing is written until here, so backing out leaves nothing behind.
-        await add(tripId, { ...input, done: false });
-        leave(entryPath('viajes', tripId));
+        const id = await add(tripId, { ...input, done: false });
+        if (id) leave(entryPath('viajes', tripId, id));
       }}
     />
   );

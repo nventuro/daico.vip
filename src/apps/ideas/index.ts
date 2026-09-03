@@ -7,7 +7,7 @@ import { searchIdeas } from './search';
 const IdeasPage = lazy(() => import('./IdeasPage'));
 const IdeaNewPage = lazy(() => import('./IdeaNewPage'));
 const IdeaPage = lazy(() => import('./IdeaPage'));
-const IdeaEditPage = lazy(() => import('./IdeaEditPage'));
+const EditRedirect = lazy(() => import('../../components/EditRedirect'));
 
 // No `useUpcoming`: an idea has no date, so there is nothing of it that is
 // coming up.
@@ -21,7 +21,9 @@ const ideas: AppModule = {
   routes: [
     { index: true, Component: IdeasPage },
     { path: 'nuevo', Component: IdeaNewPage },
-    { path: ':id/editar', Component: IdeaEditPage },
+    // An idea is written on its own page; the address it used to be edited
+    // at still leads to it.
+    { path: ':id/editar', Component: EditRedirect },
     // The optional segment is one of the idea's attachments, open in the lightbox.
     { path: ':id/:attachmentId?', Component: IdeaPage },
   ],

@@ -27,3 +27,16 @@ describe('the group field', () => {
     expect(html).toContain('placeholder="Nombre del grupo"');
   });
 });
+
+describe('the group field as a chip', () => {
+  it('offers the groups there are on the chip, the entry’s own chosen, and a new one last', () => {
+    const html = renderToStaticMarkup(
+      <GroupField groups={['casa', 'películas']} value="casa" onChange={() => {}} look="chip" />,
+    );
+    expect(html).toContain('aria-label="Grupo"');
+    expect(html).toContain(
+      '<option value="0" selected="">casa</option><option value="1">películas</option><option value="new">Nuevo grupo…</option>',
+    );
+    expect(html).not.toContain('Nombre del grupo');
+  });
+});

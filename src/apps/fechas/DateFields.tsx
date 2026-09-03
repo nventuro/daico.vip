@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { IconBell, IconCalendarEvent, IconRepeat } from '@tabler/icons-react';
 import {
   REPEAT_UNITS,
@@ -40,19 +40,22 @@ export type DateFieldsValue = Pick<
 interface DateFieldsProps {
   fields: DateFieldsValue;
   onChange: (patch: Partial<DateFieldsValue>) => void;
-  /** `chips`: compact pills for the add bar; `form`: labelled stacked fields. */
+  /** `chips`: compact pills for a bar; `form`: labelled stacked fields. */
   layout: 'chips' | 'form';
 }
 
 const CHIP = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`;
 const CHIP_CONTROL = 'bg-transparent text-sm text-muted-strong outline-none';
 
-/** The date, repeat and notice controls shared by the add bar and the edit
- *  form. Controlled: every change is reported as a patch of the value. */
+/** The date, repeat and notice controls a date is set by. Controlled: every
+ *  change is reported as a patch of the value — except the interval, reported
+ *  once it is left: half of a number is no interval at all. */
 export default function DateFields({ fields, onChange, layout }: DateFieldsProps) {
   const chips = layout === 'chips';
   const control = chips ? CHIP_CONTROL : CONTROL_CLASS;
   const every = fields.repeat_every ?? DATE_REPEAT_EVERY_DEFAULT;
+  // The interval as it is being typed; null while it is not.
+  const [typed, setTyped] = useState<string | null>(null);
 
   function field(label: string, icon: ReactNode, input: ReactNode) {
     return (
@@ -70,6 +73,15 @@ export default function DateFields({ fields, onChange, layout }: DateFieldsProps
     }
     const unit = REPEAT_UNITS.find((u) => u === value);
     if (unit) onChange({ repeat_every: every, repeat_unit: unit });
+  }
+
+  function leaveInterval() {
+    if (typed === null) return;
+    setTyped(null);
+    const n = Number.parseInt(typed, 10);
+    if (Number.isInteger(n) && n >= DATE_REPEAT_EVERY_MIN) {
+      onChange({ repeat_every: Math.min(n, DATE_REPEAT_EVERY_MAX) });
+    }
   }
 
   return (
@@ -115,11 +127,9 @@ export default function DateFields({ fields, onChange, layout }: DateFieldsProps
               min={DATE_REPEAT_EVERY_MIN}
               max={DATE_REPEAT_EVERY_MAX}
               required
-              value={fields.repeat_every ?? ''}
-              onChange={(e) => {
-                const n = e.target.valueAsNumber;
-                onChange({ repeat_every: Number.isFinite(n) ? n : null });
-              }}
+              value={typed ?? fields.repeat_every ?? ''}
+              onChange={(e) => setTyped(e.target.value)}
+              onBlur={leaveInterval}
               aria-label={repeatIntervalLabel(fields.repeat_unit)}
               className={`${control} ${chips ? 'w-12' : 'w-24'}`}
             />

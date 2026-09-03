@@ -1,6 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { IconPencil } from '@tabler/icons-react';
 import type { TripItem } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
@@ -9,10 +8,12 @@ import { UNDO_MS, useUndo } from '../../hooks/useUndo';
 import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
+import DatePicker from '../../components/DatePicker';
+import DeleteDialog from '../../components/DeleteDialog';
 import EmptyState from '../../components/EmptyState';
+import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
-import Heading from '../../components/Heading';
-import IconButton from '../../components/IconButton';
+import FormField from '../../components/FormField';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
@@ -22,14 +23,13 @@ import ItemRow from './ItemRow';
 import { draftTitleState } from '../../hooks/useDraftTitle';
 import { tripSections } from './grouping';
 import { inboxRowInput, inboxUndoOf, type InboxUndo } from './inboxUndo';
-import { tripDatesLabel } from './labels';
 import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
 
 export default function TripPage() {
   const { tripId = '' } = useParams();
-  const { items: trips, loading, error, remove: removeTrip } = useTrips();
+  const { items: trips, loading, error, save: saveTrip, remove: removeTrip } = useTrips();
   const trip = useEntry(trips, 'tripId');
   const {
     items,
@@ -39,12 +39,13 @@ export default function TripPage() {
     remove: removeItem,
   } = useTripItems(tripId);
   const { insert: restage } = useTripInbox();
-  const { items: attachments } = useAttachments();
+  const { items: attachments, remove: removeAttachment } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
   const navigate = useNavigate();
   const leave = useLeave();
   const { state, pathname } = useLocation();
   const undo = useUndo<InboxUndo>(UNDO_MS);
+  const [deleting, setDeleting] = useState(false);
 
   // What the review just put in arrives with the navigation and is offered
   // for a moment; the navigation is then replaced without it, so coming
@@ -67,6 +68,22 @@ export default function TripPage() {
       await removeTrip(added.tripId);
       leave(appPath('viajes'));
     }
+  }
+
+  /** A trip's rows have no meaning without it: the server cascades them, and
+   *  this device must not be left listing rows whose trip is gone — they would
+   *  still be found by Buscar and still announce themselves on Inicio. */
+  async function removeWithRows(id: string) {
+    for (const row of items) {
+      for (const file of attachments) {
+        if (file.owner_kind === 'trip_item' && file.owner_id === row.id) {
+          await removeAttachment(file);
+        }
+      }
+      await removeItem(row.id);
+    }
+    await removeTrip(id);
+    leave(appPath('viajes'));
   }
 
   const today = todayIso();
@@ -112,18 +129,30 @@ export default function TripPage() {
       <EntryPage entry={trip} loading={loading} missing="Viaje no encontrado.">
         {(trip) => (
           <>
-            <div className="mb-6 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <Heading>{trip.title}</Heading>
-                <p className="mt-1 text-sm text-muted">
-                  {tripDatesLabel(trip, today) ?? 'Sin fechas'}
-                </p>
-              </div>
-              <IconButton
-                label="Editar viaje"
-                icon={IconPencil}
-                to={entryPath('viajes', trip.id, 'editar')}
+            <div key={trip.id} className="mb-6 flex flex-col gap-4">
+              <EntryHead
+                title={trip.title}
+                onTitle={(title) => void saveTrip(trip.id, { title })}
+                autoCapitalize="sentences"
+                onDelete={() => setDeleting(true)}
+                deleteLabel="Eliminar viaje"
               />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="Desde">
+                  <DatePicker
+                    value={trip.starts_on}
+                    onChange={(day) => void saveTrip(trip.id, { starts_on: day })}
+                    label="Desde"
+                  />
+                </FormField>
+                <FormField label="Hasta">
+                  <DatePicker
+                    value={trip.ends_on}
+                    onChange={(day) => void saveTrip(trip.id, { ends_on: day })}
+                    label="Hasta"
+                  />
+                </FormField>
+              </div>
             </div>
 
             {sections.length === 0 && done.length === 0 && (
@@ -138,6 +167,13 @@ export default function TripPage() {
             <CompletedSection label="Hechos" count={done.length}>
               <ul>{done.map(renderItem)}</ul>
             </CompletedSection>
+
+            <DeleteDialog
+              open={deleting}
+              question="¿Eliminar el viaje?"
+              onCancel={() => setDeleting(false)}
+              onConfirm={() => void removeWithRows(trip.id)}
+            />
           </>
         )}
       </EntryPage>

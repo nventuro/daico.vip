@@ -6,16 +6,20 @@ import { useDatesUpcoming } from './useDatesUpcoming';
 import { searchDates } from './search';
 
 const DatesPage = lazy(() => import('./DatesPage'));
-const DateEditPage = lazy(() => import('./DateEditPage'));
+const DateNewPage = lazy(() => import('./DateNewPage'));
+const DatePage = lazy(() => import('./DatePage'));
 
 const fechas: AppModule = {
   id: 'fechas',
   name: 'Fechas',
   icon: IconCalendarEvent,
   specs: [DATES_SPEC],
+  // Static segments outrank dynamic ones, which is what keeps `nuevo` from
+  // being read as an id.
   routes: [
     { index: true, Component: DatesPage },
-    { path: ':id', Component: DateEditPage },
+    { path: 'nuevo', Component: DateNewPage },
+    { path: ':id', Component: DatePage },
   ],
   useUpcoming: useDatesUpcoming,
   search: searchDates,

@@ -1,8 +1,8 @@
-import { useLeave } from '../../hooks/useLeave';
 import ErrorLine from '../../components/ErrorLine';
 import SkeletonRows from '../../components/SkeletonRows';
 import { useDraftTitle } from '../../hooks/useDraftTitle';
-import { appPath } from '../types';
+import { useLeave } from '../../hooks/useLeave';
+import { entryPath } from '../types';
 import IdeaForm from './IdeaForm';
 import { groupNames, lastEditedGroup } from './grouping';
 import { useIdeas, type IdeaInput } from './useIdeas';
@@ -20,12 +20,11 @@ export default function IdeaNewPage() {
     <>
       <ErrorLine error={error} className="mb-4" />
       <IdeaForm
-        idea={null}
         start={{ title, group_name: lastEditedGroup(items) ?? '', body: '' }}
         groups={groupNames(items)}
         onSave={async (input: IdeaInput) => {
-          await add(input);
-          leave(appPath('ideas'));
+          const id = await add(input);
+          if (id) leave(entryPath('ideas', id));
         }}
       />
     </>

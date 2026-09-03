@@ -19,6 +19,8 @@ interface EntryHeadProps {
   subtitle?: ReactNode;
   /** A row of chips under it: the group an entry is filed under, its class. */
   chips?: ReactNode;
+  /** Controls beside the trash, for an entry with a switch of its own. */
+  actions?: ReactNode;
   /** What the trash does; left out for an entry that is never deleted here. */
   onDelete?: () => void;
   /** What the trash is called, e.g. "Eliminar nota". */
@@ -42,6 +44,7 @@ export default function EntryHead({
   autoCapitalize = 'none',
   subtitle,
   chips,
+  actions,
   onDelete,
   deleteLabel = 'Eliminar',
   onEnter,
@@ -80,10 +83,15 @@ export default function EntryHead({
           autoCapitalize={autoCapitalize}
           className={TITLE_CLASS}
         />
-        {subtitle !== undefined && <span className="text-xs text-muted">{subtitle}</span>}
+        {subtitle !== undefined && <div className="text-xs text-muted">{subtitle}</div>}
         {chips !== undefined && <div className="mt-1.5 flex flex-wrap gap-2">{chips}</div>}
       </div>
-      {onDelete && <IconButton label={deleteLabel} icon={IconTrash} onClick={onDelete} />}
+      {(actions !== undefined || onDelete) && (
+        <div className="flex shrink-0 items-center gap-1">
+          {actions}
+          {onDelete && <IconButton label={deleteLabel} icon={IconTrash} onClick={onDelete} />}
+        </div>
+      )}
     </div>
   );
 }

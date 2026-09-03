@@ -31,19 +31,13 @@ function withRepeat<T extends Partial<ChoreInput>>(patch: T, every: number | nul
 export function useChores() {
   const { items, loading, error, insert, update, remove } = useOfflineTable(CHORES_SPEC);
 
+  /** Creates a chore from everything decided about it, resolving the new id
+   *  so the caller can open it; undefined for a blank title or a failed write. */
   const add = useCallback(
-    (title: string, dueOn: string | null) => {
-      const value = lowercaseTrimmed(title);
-      if (!value) return Promise.resolve(undefined);
-      return insert({
-        title: value,
-        comments: null,
-        due_on: dueOn || null,
-        last_done_on: null,
-        repeat_every: null,
-        repeat_unit: null,
-        repeat_from: null,
-      });
+    (input: ChoreInput): Promise<string | undefined> => {
+      const title = lowercaseTrimmed(input.title);
+      if (!title) return Promise.resolve(undefined);
+      return insert(withRepeat({ ...input, title, last_done_on: null }, input.repeat_every));
     },
     [insert],
   );

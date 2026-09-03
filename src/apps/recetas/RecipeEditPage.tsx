@@ -1,12 +1,12 @@
 import { useLeave } from '../../hooks/useLeave';
 import { useEntry } from '../../hooks/useEntry';
 import EntryPage from '../../components/EntryPage';
-import { appPath, entryPath } from '../types';
+import { entryPath } from '../types';
 import { useRecipes, type RecipeInput } from './useRecipes';
 import RecipeForm from './RecipeForm';
 
 export default function RecipeEditPage() {
-  const { items, loading, error, save, remove } = useRecipes();
+  const { items, loading, error, save } = useRecipes();
   const recipe = useEntry(items);
   const leave = useLeave();
 
@@ -19,10 +19,6 @@ export default function RecipeEditPage() {
           onSave={async (input: RecipeInput) => {
             await save(recipe.id, input);
             leave(entryPath('recetas', recipe.id));
-          }}
-          onRemove={async () => {
-            await remove(recipe.id);
-            leave(appPath('recetas'));
           }}
         />
       )}

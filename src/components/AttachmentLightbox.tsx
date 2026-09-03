@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode, type TouchEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   IconChevronLeft,
@@ -7,6 +7,7 @@ import {
   IconCloudUpload,
   IconDeviceMobileCheck,
   IconShare,
+  IconTrash,
   IconX,
 } from '@tabler/icons-react';
 import type { Attachment } from '../lib/offline/specs';
@@ -15,7 +16,8 @@ import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
 import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
 import Button from './Button';
-import FormFooter from './FormFooter';
+import DeleteDialog from './DeleteDialog';
+import IconButton from './IconButton';
 import ModalDialog from './ModalDialog';
 import LoadingLine from './LoadingLine';
 
@@ -65,6 +67,7 @@ export default function AttachmentLightbox({
   const uploadState = useAttachmentUploadState(attachment.id);
   const online = useOnline();
   const touchStartX = useRef<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const close = useCallback(() => {
     // Opened from the entry's page, that page is the previous history entry;
@@ -225,19 +228,22 @@ export default function AttachmentLightbox({
               )}
             </div>
           )}
-          <FormFooter
-            removeLabel="Eliminar foto"
-            confirmQuestion="¿Eliminar la foto?"
-            onRemove={handleRemove}
-            action={
-              <Button onClick={open} disabled={!file} className="flex items-center gap-2">
-                <IconShare size={18} stroke={1.75} />
-                {canShare ? 'Compartir' : 'Descargar'}
-              </Button>
-            }
-          />
+          <div className="flex items-center justify-between gap-3">
+            <IconButton label="Eliminar foto" icon={IconTrash} onClick={() => setDeleting(true)} />
+            <Button onClick={open} disabled={!file} className="flex items-center gap-2">
+              <IconShare size={18} stroke={1.75} />
+              {canShare ? 'Compartir' : 'Descargar'}
+            </Button>
+          </div>
         </div>
       </div>
+
+      <DeleteDialog
+        open={deleting}
+        question="¿Eliminar la foto?"
+        onCancel={() => setDeleting(false)}
+        onConfirm={handleRemove}
+      />
     </ModalDialog>
   );
 }

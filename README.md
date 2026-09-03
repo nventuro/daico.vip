@@ -13,7 +13,9 @@ GitHub Pages · a Cloudflare Email Worker for the one thing that arrives by mail
 
 Daico is one app made of several small ones. The **shell** (`src/shell/`) owns
 sign-in, membership, the home screen (a grid of app tiles) and the per-app frame
-(a header with the app's name in its colour and a back link one level up). Each
+(a header with the app's name in its colour and an arrow one level up, which
+steps back to that screen when it is behind rather than stacking it on; the
+wordmark «daico» is the way home). Each
 feature is a **module** in `src/apps/<id>/` — its pages, hooks and the offline
 tables it owns — described by an `AppModule` object (contract in
 `src/apps/types.ts`) and listed in `src/apps/registry.ts`. The router and the
@@ -106,25 +108,41 @@ authority (see `CLAUDE.md`). Local data is wiped on sign-out.
 Every table below is offline-synced. This is what each app is for and what its
 rows are; what may never change about them is in `CLAUDE.md`.
 
+An entry is born on a form and lives on a page. The add bar's + opens the
+app's creation form at `/<app>/nuevo` with the typed title, and nothing is
+written until its Guardar, which opens the new entry; from then on the entry
+is edited where it is read — the title is the heading, every control saves
+as it changes, every free text is the shared editor saving a moment after
+typing stops and on leaving — and deleted from the trash in its head, behind
+a question. Compras is the one exception, and Recetas is not there yet.
+
 **Tareas** — `chores`: a title, an optional due date and comments. A chore can
 repeat, and marking one that does moves its date on instead of finishing it.
+Born on a form with its day, its repetition and its comments; edited in place
+on its page.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
-fractional `position`, so reordering the list writes one row.
+fractional `position`, so reordering the list writes one row. Items are born
+from the bar and live in the list; there is no page.
 
 **Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
 `occurs_on` is the anchor the user entered, a repeating entry's next occurrence
 is computed from it on read, and `notice_days` says how far ahead it reaches
-Próximo.
+Próximo. Born on a form with its day, repetition, notice and comments; edited
+in place on its page.
 
 **Recetas** — `recipes`: a title, an optional time and number of servings, and
 a markdown body in the dialect below, whose `:::ingredients` block is a
-tickable list that can be sent to Compras.
+tickable list that can be sent to Compras. Still born from the bar and written
+on a form of its own, until the editor has an ingredients block; deleted from
+its page.
 
 **Documentos** — `documents`: a title, an optional expiry and its notice
 window. The content of a document is its pictures, encrypted on the device;
 nothing else is typed in, so a number or a date of birth never reaches the
-server in the clear. Every document's files are kept on every device.
+server in the clear. Every document's files are kept on every device. Born on
+a form with its expiry and notice; its pictures are added on its page, where
+the rest is edited in place.
 
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
 parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
@@ -132,16 +150,19 @@ row keeps in the clear only what lists it — the layout, its closing and due
 dates, its two totals, whether it was paid — while every purchase and
 installment travels in `payload`, gzipped and encrypted under the household key
 like an attachment's file. Purchases are filed into a fixed set of categories
-on display, by `merchant_rules`, an encrypted pattern each.
+on display, by `merchant_rules`, an encrypted pattern each. A statement is born
+from its PDF and deleted from its page.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, two timestamps and an opaque blob, which is
-why Buscar matches a note's title and nothing else.
+why Buscar matches a note's title and nothing else. Born on a form with its
+text; written on its page, the title on blur and the text as it goes.
 
 **Ideas** — `ideas`: a title, the group it is filed under (`group_name`, plain
 text such as «comer» or «películas») and a markdown body, all in the clear like
 a recipe. A group is not a table: it is whatever ideas name it, and goes when
-the last of them does.
+the last of them does. Born on a form with its group and text; edited in place
+on its page, the group a chip under the title.
 
 **Viajes** — `trips` (a title and its days, both optional) and `trip_items`,
 every row of a trip in one table told apart by `kind`: a pendiente to resolve
@@ -150,12 +171,15 @@ the weeks before a trip — what is booked and what is still missing — and,
 during it, for looking up a code or an address; it is not an agenda. A
 confirmation email forwarded to the household's address becomes staged rows in
 `trip_inbox`, by the worker in `worker/`, and the app shows them under Inbox to
-be added to a trip or discarded.
+be added to a trip or discarded. A trip and each of its rows are born on a
+form — a row's class is chosen there and never changed — and edited in place
+on their pages; deleting a trip takes its rows with it.
 
 **Guías** — `guides` / `guide_chapters`: imported content (see Guides below),
 in the same markdown dialect. A guide is shelved under a group (`group_name`,
 as an idea is) and can be archived out of the list; that much is the
-household's to change, the contents are the import's.
+household's to change, the contents are the import's. There is no form and
+no delete: the title and the group are edited in place on the guide's page.
 
 ## Markdown dialect
 
@@ -177,6 +201,11 @@ components:
 
 Links to other guides or chapters are ordinary relative links
 (`/guias/<guide>/<chapter>`).
+
+The editor (`src/components/editor/`) writes the same dialect and draws it with
+the reader's own classes, so a body looks the same read or written. It does
+not model GFM tables or the directives: they stay as the text they are, and
+are kept unchanged unless written on.
 
 ## Adjuntos
 

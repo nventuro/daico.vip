@@ -9,9 +9,9 @@ const TripsPage = lazy(() => import('./TripsPage'));
 const TripNewPage = lazy(() => import('./TripNewPage'));
 const InboxReviewPage = lazy(() => import('./InboxReviewPage'));
 const TripPage = lazy(() => import('./TripPage'));
-const TripEditPage = lazy(() => import('./TripEditPage'));
 const ItemNewPage = lazy(() => import('./ItemNewPage'));
-const ItemEditPage = lazy(() => import('./ItemEditPage'));
+const ItemPage = lazy(() => import('./ItemPage'));
+const EditRedirect = lazy(() => import('../../components/EditRedirect'));
 
 const viajes: AppModule = {
   id: 'viajes',
@@ -31,10 +31,12 @@ const viajes: AppModule = {
     // One email's suggestions, reviewed as a group.
     { path: 'inbox/:importId', Component: InboxReviewPage },
     { path: ':tripId', Component: TripPage },
-    { path: ':tripId/editar', Component: TripEditPage },
+    // A trip is written on its own page; the address it used to be edited at
+    // still leads to it.
+    { path: ':tripId/editar', Component: EditRedirect },
     { path: ':tripId/nuevo', Component: ItemNewPage },
     // The optional segment is one of the row's pictures, open in the lightbox.
-    { path: ':tripId/:itemId/:attachmentId?', Component: ItemEditPage },
+    { path: ':tripId/:itemId/:attachmentId?', Component: ItemPage },
   ],
   useUpcoming: useTripsUpcoming,
   search: searchTrips,

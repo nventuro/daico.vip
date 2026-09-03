@@ -1,4 +1,5 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { IconTrash } from '@tabler/icons-react';
 import { useLeave } from '../../hooks/useLeave';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
@@ -6,10 +7,11 @@ import { useEntry } from '../../hooks/useEntry';
 import { capitalize } from '../../utils/textUtils';
 import { dueWord, formatDateCompact, isPast, todayIso } from '../../utils/dateUtils';
 import CheckRow from '../../components/CheckRow';
+import DeleteDialog from '../../components/DeleteDialog';
 import EntryPage from '../../components/EntryPage';
 import ErrorLine from '../../components/ErrorLine';
+import IconButton from '../../components/IconButton';
 import SectionLabel from '../../components/SectionLabel';
-import FormFooter from '../../components/FormFooter';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementsContents';
 import { useMerchantRules } from './useMerchantRules';
@@ -50,6 +52,7 @@ export default function StatementPage() {
   const { select, dialog } = useRuleDialog(rulesStore);
   const leave = useLeave();
   const today = todayIso();
+  const [deleting, setDeleting] = useState(false);
 
   const statement = useEntry(items);
   // The statement before this one of the same card: what "vs." compares with.
@@ -167,40 +170,47 @@ export default function StatementPage() {
 
         return (
           <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm text-muted">
-                {FORMAT_LABELS[contents.format]} · {periodLabel(contents)}
-              </span>
-              <span className="font-display text-4xl font-black tracking-tight">
-                {formatArs(toPay, contents.total_usd_cents === 0)}
-              </span>
-              {contents.total_usd_cents !== 0 && (
-                <span className="text-lg tabular-nums">
-                  {formatArs(contents.total_ars_cents, true)} +{' '}
-                  {formatUsd(contents.total_usd_cents)}
-                </span>
-              )}
-              {contents.total_usd_cents !== 0 && contents.usd_rate !== null && (
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm text-muted">
-                  Total estimado al cambio del resumen (
-                  {formatArs(Math.round(contents.usd_rate * 100), true)}).
+                  {FORMAT_LABELS[contents.format]} · {periodLabel(contents)}
                 </span>
-              )}
-              {contents.total_usd_cents !== 0 && contents.usd_rate === null && (
-                <span className="text-sm text-muted">
-                  El resumen no dice el cambio; los dólares van aparte.
+                <span className="font-display text-4xl font-black tracking-tight">
+                  {formatArs(toPay, contents.total_usd_cents === 0)}
                 </span>
-              )}
-              {contents.pending_ars_cents !== 0 && (
-                <span className="text-sm text-muted">
-                  {carriedLabel(contents.pending_ars_cents)}
-                </span>
-              )}
-              {previousContents && sinceLast !== null && (
-                <Delta value={sinceLast} className="mt-1 text-sm">
-                  {formatPercentDelta(sinceLast)} vs. {monthShort(monthOf(previousContents))}
-                </Delta>
-              )}
+                {contents.total_usd_cents !== 0 && (
+                  <span className="text-lg tabular-nums">
+                    {formatArs(contents.total_ars_cents, true)} +{' '}
+                    {formatUsd(contents.total_usd_cents)}
+                  </span>
+                )}
+                {contents.total_usd_cents !== 0 && contents.usd_rate !== null && (
+                  <span className="text-sm text-muted">
+                    Total estimado al cambio del resumen (
+                    {formatArs(Math.round(contents.usd_rate * 100), true)}).
+                  </span>
+                )}
+                {contents.total_usd_cents !== 0 && contents.usd_rate === null && (
+                  <span className="text-sm text-muted">
+                    El resumen no dice el cambio; los dólares van aparte.
+                  </span>
+                )}
+                {contents.pending_ars_cents !== 0 && (
+                  <span className="text-sm text-muted">
+                    {carriedLabel(contents.pending_ars_cents)}
+                  </span>
+                )}
+                {previousContents && sinceLast !== null && (
+                  <Delta value={sinceLast} className="mt-1 text-sm">
+                    {formatPercentDelta(sinceLast)} vs. {monthShort(monthOf(previousContents))}
+                  </Delta>
+                )}
+              </div>
+              <IconButton
+                label="Eliminar resumen"
+                icon={IconTrash}
+                onClick={() => setDeleting(true)}
+              />
             </div>
 
             <CheckRow
@@ -253,11 +263,11 @@ export default function StatementPage() {
               </section>
             )}
 
-            <FormFooter
-              removeLabel="Eliminar resumen"
-              confirmQuestion="¿Eliminar el resumen?"
-              onRemove={() => void handleRemove()}
-              action={null}
+            <DeleteDialog
+              open={deleting}
+              question="¿Eliminar el resumen?"
+              onCancel={() => setDeleting(false)}
+              onConfirm={() => void handleRemove()}
             />
 
             {dialog}
