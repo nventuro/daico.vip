@@ -5,6 +5,8 @@ import { IconChevronRight } from '@tabler/icons-react';
 interface LinkRowProps {
   /** Where the row opens; without it the row only shows what it says. */
   to?: string;
+  /** What tapping the row does, for a row that is a choice rather than a place. */
+  onClick?: () => void;
   title: string;
   /** The smaller line under the title: a date, what it came to. */
   subtitle?: ReactNode;
@@ -19,11 +21,13 @@ interface LinkRowProps {
   chevron?: boolean;
 }
 
-/** One entry in a list: a hairline row that opens it, or — with nowhere to
- *  go — that only says what it says. The rows a list is made of, wherever
- *  nothing on the row is a control of its own. */
+/** One entry in a list: a hairline row that opens it, that does one thing
+ *  when tapped, or — with nowhere to go — that only says what it says. The
+ *  rows a list is made of, wherever nothing on the row is a control of its
+ *  own. */
 export default function LinkRow({
   to,
+  onClick,
   title,
   subtitle,
   overdue = false,
@@ -49,7 +53,15 @@ export default function LinkRow({
   const shape = 'flex min-w-0 flex-1 items-center gap-2 py-3';
   return (
     <li className="flex items-stretch border-b border-border">
-      {to === undefined ? (
+      {onClick !== undefined ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className={`${shape} text-left transition-colors hover:bg-border-subtle`}
+        >
+          {body}
+        </button>
+      ) : to === undefined ? (
         <span className={shape}>{body}</span>
       ) : (
         <Link to={to} className={`${shape} transition-colors hover:bg-border-subtle`}>

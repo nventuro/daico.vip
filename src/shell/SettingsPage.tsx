@@ -24,11 +24,11 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /** What signing out would take with it, or null when it would take nothing:
- *  the changes and the pictures this device is the only one to hold. */
+ *  the changes and the attachments this device is the only one to hold. */
 function unsavedWork({ pending, files }: DeviceStatus): string | null {
   const parts = [
     pending > 0 ? plural(pending, 'cambio', 'cambios') : null,
-    files.waiting > 0 ? plural(files.waiting, 'foto', 'fotos') : null,
+    files.waiting > 0 ? plural(files.waiting, 'adjunto', 'adjuntos') : null,
   ].filter((part) => part !== null);
   if (parts.length === 0) return null;
   return `Hay ${parts.join(' y ')} sin subir. Este dispositivo es el único que los tiene: se pierden.`;
@@ -97,8 +97,8 @@ export default function SettingsPage() {
             />
           )}
           <ValueRow
-            label="Fotos sin subir"
-            value={files.waiting === 0 ? 'Ninguna' : files.waiting}
+            label="Adjuntos sin subir"
+            value={files.waiting === 0 ? 'Ninguno' : files.waiting}
             bad={files.waiting > 0}
             note={files.failed > 0 ? plural(files.failed, 'falló', 'fallaron') : undefined}
           />
@@ -147,7 +147,7 @@ export default function SettingsPage() {
         <ul className="mt-2">
           <ValueRow label="Base de datos" value={formatBytes(storage.database)} />
           <ValueRow
-            label="Fotos"
+            label="Adjuntos"
             value={formatBytes(storage.files)}
             note={
               storage.documentFiles > 0
@@ -167,8 +167,8 @@ export default function SettingsPage() {
           </Button>
         </div>
         <p className="mt-2 text-sm text-muted">
-          Se eliminan las imágenes de guías y las fotos que no son de documentos. Vuelven a bajarse
-          cuando hagan falta.
+          Se eliminan las imágenes de guías y los adjuntos que no son de documentos. Vuelven a
+          bajarse cuando hagan falta.
         </p>
       </section>
 

@@ -137,10 +137,10 @@ on a form of its own, until the editor has an ingredients block; deleted from
 its page.
 
 **Documentos** — `documents`: a title, an optional expiry and its notice
-window. The content of a document is its pictures, encrypted on the device;
+window. The content of a document is its files — pictures, PDFs — encrypted on the device;
 nothing else is typed in, so a number or a date of birth never reaches the
 server in the clear. Every document's files are kept on every device. Born on
-a form with its expiry and notice; its pictures are added on its page, where
+a form with its expiry and notice; its files are added on its page, where
 the rest is edited in place.
 
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
@@ -155,9 +155,9 @@ from its PDF and deleted from its page.
 **Salud** — `checkups` and `health_records`, each row one member's and hidden
 from the others by the server. A checkup is a health check to have done — a
 chore that always comes back from the day it was marked, or a one-off
-appointment — with comments and no pictures; it reaches Próximo the week
+appointment — with comments and no attachments; it reaches Próximo the week
 before. A health record is a study kept: a title, the day it was done and its
-pictures, which hold everything the study says. Both are born on one form,
+files, which hold everything the study says. Both are born on one form,
 where the kind is chosen, and edited in place on their page.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
@@ -217,8 +217,8 @@ are kept unchanged unless written on.
 ## Adjuntos
 
 A chore, a document, a note, an idea or a row of a trip can carry attachments —
-pictures — that are encrypted on the device before they leave it, so the server
-only ever stores ciphertext.
+pictures and PDFs — that are encrypted on the device before they leave it, so
+the server only ever stores ciphertext.
 
 - **Tables and bucket**: `attachments` (owner, optional name, mime, size, the
   wrapped file key) is an ordinary offline-synced table; the bytes live in the
@@ -235,6 +235,13 @@ only ever stores ciphertext.
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
+- **In the app**: an entry's page shows its attachments as a grid. Agregar
+  asks for pictures or a PDF, each through the device's own picker — on a
+  phone, the photo picker for pictures and the file chooser for a PDF — and
+  each file picked goes through the add dialog: a picture cropped and turned
+  if wanted, a PDF as it is, with an optional name. A tile opens the lightbox;
+  a PDF is drawn there page by page (its first page is its tile) and only
+  leaves the app through Compartir / Descargar.
 - **Sync**: files follow every table sync — uploads go out, files of deleted
   rows are dropped, every document's files this device lacks are fetched and
   kept, and bucket objects no row refers to are swept.

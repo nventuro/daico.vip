@@ -44,14 +44,14 @@ interface TableSearch<Row extends SyncedRow> {
   fields: (keyof Row & string)[];
   /** What a matching row reads like, told which of its fields matched. */
   hit: (row: Row, matched: keyof Row & string) => SearchHit;
-  /** Set when the app's entries take pictures: attachments named like the
+  /** Set when the app's entries take attachments: those named like the
    *  query follow the entries, each under the entry it belongs to. */
   attachments?: AttachmentOwnerKind;
 }
 
 /**
  * The rows of `spec` that mention `query` in one of `fields`, as hits — then,
- * for an app whose entries take pictures, the attachments named so. Nothing
+ * for an app whose entries take attachments, those named so. Nothing
  * is capped here: how many results an app contributes is the shell's to say.
  */
 export async function searchTable<Row extends SyncedRow>(

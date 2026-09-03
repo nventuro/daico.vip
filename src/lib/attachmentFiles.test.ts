@@ -11,9 +11,12 @@ import * as engine from './offline/engine';
 import { afterSync, syncAll } from './offline/sync';
 import {
   attachmentFileUsage,
+  attachmentProblem,
+  attachmentType,
   attachmentUploadState,
   dropCachedFiles,
   fetchAttachmentFile,
+  isPdf,
   localAttachmentFile,
   putAttachmentFile,
   syncAttachmentFiles,
@@ -409,5 +412,23 @@ describe('making room', () => {
     server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await attachmentFileUsage()).toMatchObject({ waiting: 1, failed: 1 });
+  });
+});
+
+describe('what may be attached', () => {
+  it('takes a picture or a PDF, by its type or by its extension alone', () => {
+    expect(attachmentType(new File([], 'x.pdf', { type: 'application/pdf' }))).toBe(
+      'application/pdf',
+    );
+    expect(attachmentType(new File([], 'RESULTADOS.PDF'))).toBe('application/pdf');
+    expect(attachmentType(new File([], 'x.jpg', { type: 'image/jpg' }))).toBe('image/jpeg');
+    expect(isPdf('application/pdf')).toBe(true);
+    expect(isPdf('image/jpeg')).toBe(false);
+  });
+
+  it('refuses any other kind of file, saying what is taken', () => {
+    const file = new File([], 'x.docx', { type: 'application/msword' });
+    expect(attachmentType(file)).toBeNull();
+    expect(attachmentProblem(file)).toContain('PDF');
   });
 });

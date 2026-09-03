@@ -11,15 +11,19 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import type { Attachment } from '../lib/offline/specs';
+import { isPdf } from '../lib/attachmentFiles';
 import { useOnline } from '../hooks/useOnline';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
 import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
+import { usePdf } from '../hooks/usePdf';
+import { countLabel } from '../utils/textUtils';
 import Button from './Button';
 import DeleteDialog from './DeleteDialog';
 import IconButton from './IconButton';
 import ModalDialog from './ModalDialog';
 import LoadingLine from './LoadingLine';
+import PdfPage from './PdfPage';
 
 /** How far a finger must travel across the lightbox to change picture, in pixels. */
 const LIGHTBOX_SWIPE_MIN_PX = 50;
@@ -47,11 +51,12 @@ interface AttachmentLightboxProps {
 }
 
 /**
- * One attachment full-screen, with the entry's others a swipe (or an arrow
- * key) away. Which one is open is the `:attachmentId` ending the URL, so a
- * picture can be linked to and the phone's back gesture closes it. Under the
- * picture: its name, where its file stands, a way to get it out of the app,
- * and its deletion behind the usual confirm.
+ * One attachment full-screen — a picture, or a PDF's pages one under the
+ * other — with the entry's others a swipe (or an arrow key) away. Which one
+ * is open is the `:attachmentId` ending the URL, so an attachment can be
+ * linked to and the phone's back gesture closes it. Under it: its name,
+ * where its file stands, a way to get it out of the app, and its deletion
+ * behind the usual confirm.
  */
 export default function AttachmentLightbox({
   attachments,
@@ -63,7 +68,10 @@ export default function AttachmentLightbox({
   const navigate = useNavigate();
   const location = useLocation();
   const view = useAttachmentFile(attachment);
-  const url = useObjectUrl(view.status === 'ready' ? view.file : null);
+  const file = view.status === 'ready' ? view.file : null;
+  const pdf = isPdf(attachment.mime);
+  const url = useObjectUrl(pdf ? null : file);
+  const pdfView = usePdf(pdf ? file : null);
   const uploadState = useAttachmentUploadState(attachment.id);
   const online = useOnline();
   const touchStartX = useRef<number | null>(null);
@@ -101,9 +109,8 @@ export default function AttachmentLightbox({
     if (delta < -LIGHTBOX_SWIPE_MIN_PX && hasNext) show(index + 1);
   }
 
-  const file = view.status === 'ready' ? view.file : null;
   // The device's share sheet takes files on Android; desktop Firefox has none,
-  // so there the picture is saved.
+  // so there the file is saved.
   const canShare = file !== null && navigator.canShare?.({ files: [file] }) === true;
 
   function open() {
@@ -141,16 +148,18 @@ export default function AttachmentLightbox({
   } else if (view.status === 'unavailable') {
     hint = online
       ? 'Todavía no se subió desde el dispositivo donde se agregó.'
-      : 'Sin conexión, y esta foto no está guardada en este dispositivo.';
+      : `Sin conexión, y ${pdf ? 'este PDF no está guardado' : 'esta foto no está guardada'} en este dispositivo.`;
   } else if (attachment.owner_kind === 'document' && uploadState === 'uploaded') {
     // Said only of a document: being readable with no connection is what it
     // is kept here for, not a side effect of having been opened once.
     hint = (
       <span className="inline-flex items-center gap-1.5">
         <IconDeviceMobileCheck size={16} stroke={1.5} className="shrink-0" />
-        Guardada en este dispositivo: se ve sin conexión.
+        {pdf ? 'Guardado' : 'Guardada'} en este dispositivo: se ve sin conexión.
       </span>
     );
+  } else if (pdf && pdfView.status === 'ready') {
+    hint = countLabel(pdfView.pdf.numPages, 'página', 'páginas');
   }
 
   return (
@@ -180,17 +189,32 @@ export default function AttachmentLightbox({
           }}
           onTouchEnd={touchEnd}
         >
-          {url ? (
+          {pdf && pdfView.status === 'ready' ? (
+            <div className="absolute inset-0 overflow-y-auto">
+              <div className="flex flex-col gap-2 px-4 pb-4">
+                {Array.from({ length: pdfView.pdf.numPages }, (_, i) => (
+                  <PdfPage
+                    key={i}
+                    pdf={pdfView.pdf}
+                    number={i + 1}
+                    alt={`Página ${i + 1}`}
+                    className="w-full"
+                    inverse
+                  />
+                ))}
+              </div>
+            </div>
+          ) : url ? (
             <img
               src={url}
               alt={attachment.name}
               className="absolute inset-0 h-full w-full object-contain"
             />
-          ) : view.status === 'loading' ? (
+          ) : view.status === 'loading' || (pdf && file && pdfView.status === 'loading') ? (
             <LoadingLine inverse className="absolute inset-x-0 bottom-0" />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-sm opacity-70">
-              No disponible
+              {pdf && file ? 'No se pudo leer el PDF.' : 'No disponible'}
             </span>
           )}
           {hasPrev && (
@@ -229,7 +253,11 @@ export default function AttachmentLightbox({
             </div>
           )}
           <div className="flex items-center justify-between gap-3">
-            <IconButton label="Eliminar foto" icon={IconTrash} onClick={() => setDeleting(true)} />
+            <IconButton
+              label={pdf ? 'Eliminar PDF' : 'Eliminar foto'}
+              icon={IconTrash}
+              onClick={() => setDeleting(true)}
+            />
             <Button onClick={open} disabled={!file} className="flex items-center gap-2">
               <IconShare size={18} stroke={1.75} />
               {canShare ? 'Compartir' : 'Descargar'}
@@ -240,7 +268,7 @@ export default function AttachmentLightbox({
 
       <DeleteDialog
         open={deleting}
-        question="¿Eliminar la foto?"
+        question={pdf ? '¿Eliminar el PDF?' : '¿Eliminar la foto?'}
         onCancel={() => setDeleting(false)}
         onConfirm={handleRemove}
       />

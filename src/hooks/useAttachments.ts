@@ -14,7 +14,7 @@ import { useOfflineTable } from './useOfflineTable';
 import { lowercaseTrimmed } from '../utils/textUtils';
 
 /** The entries of `kind` that have at least one attachment — what tells a row
- *  with pictures from one without, wherever it is listed. */
+ *  with attachments from one without, wherever it is listed. */
 export function ownersWithAttachments(
   attachments: Attachment[],
   kind: AttachmentOwnerKind,
@@ -32,7 +32,7 @@ async function removeAttachment(attachment: Attachment): Promise<void> {
 
 /**
  * Local-first attachments: every entry's when `owner` is not given, one
- * entry's otherwise. Adding (to `owner`) encrypts the picture under
+ * entry's otherwise. Adding (to `owner`) encrypts the file under
  * `masterKey` and keeps it here until the next sync uploads it; removing
  * takes the row, the local file and (best effort) the bucket's object.
  */

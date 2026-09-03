@@ -77,8 +77,8 @@ export const HOUSEHOLD_KEY_SPEC: TableSpec<HouseholdKey> = {
 };
 
 /**
- * A picture attached to an entry. Only this metadata is a synced row; the
- * picture itself lives encrypted in the attachments bucket under the row's
+ * A picture or a PDF attached to an entry. Only this metadata is a synced
+ * row; the file itself lives encrypted in the attachments bucket under the row's
  * id, and only ever changes by being replaced with a new attachment.
  */
 export interface Attachment extends SyncedRow {

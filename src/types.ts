@@ -24,7 +24,7 @@ export interface SyncedRow {
  * entry is listed — in its app and on the home screen alike. `comments` also
  * stands for attachments: to the row, something written and something attached
  * are the same thing — which is why in Notas, where the writing is the entry
- * itself, it can only mean a picture.
+ * itself, it can only mean an attachment.
  */
 export type EntryMark = 'comments' | 'repeat';
 

@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
 
 interface HiddenFileInputProps {
   /** What the device may offer, e.g. 'image/*' or 'application/pdf'. */
@@ -8,6 +8,9 @@ interface HiddenFileInputProps {
   label: string;
   /** The files picked; never empty. */
   onPick: (files: File[]) => void;
+  /** Called when the picker was closed without picking, where the browser
+   *  says so. */
+  onCancel?: () => void;
   /** The visible control: calling `pick` brings the device's picker up. */
   children: (pick: () => void) => ReactNode;
 }
@@ -23,9 +26,16 @@ export default function HiddenFileInput({
   multiple = false,
   label,
   onPick,
+  onCancel,
   children,
 }: HiddenFileInputProps) {
   const [input, setInput] = useState<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!input || !onCancel) return;
+    input.addEventListener('cancel', onCancel);
+    return () => input.removeEventListener('cancel', onCancel);
+  }, [input, onCancel]);
 
   function picked(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);

@@ -167,14 +167,22 @@ gate, what a sync does with the files. These are the rules on top of it.
   Never delete the row and never add a key-rotation path lightly — with the row
   gone or replaced, every attachment is unreadable.
 - **Files travel outside the tables, through `src/lib/attachmentFiles.ts`
-  only.** Attachments are pictures (`ATTACHMENT_FILE_TYPES`) and their blobs are
-  immutable: replacing one is a new attachment. The `attachments` row is an
-  ordinary synced table shared by every app whose entries take pictures
-  (`owner_kind`), so it lives in `SHELL_SPECS` and is drawn by the shared
-  `src/components/Attachment*`, parametrized by the owner. There is no
-  attachment page: an entry's route ends in an optional `:attachmentId`, so a
-  picture has a URL of its own.
-- **A document is its pictures.** `documents` keeps a title and an expiry and
+  only.** Attachments are pictures and PDFs (`ATTACHMENT_FILE_TYPES`) and
+  their blobs are immutable: replacing one is a new attachment. The
+  `attachments` row is an ordinary synced table shared by every app whose
+  entries take attachments (`owner_kind`), so it lives in `SHELL_SPECS` and is
+  drawn by the shared `src/components/Attachment*`, parametrized by the owner.
+  There is no attachment page: an entry's route ends in an optional
+  `:attachmentId`, so an attachment has a URL of its own.
+- **A PDF is drawn in the app, never handed to the system.** `src/lib/pdf.ts`
+  is the only way into pdf.js, imported on demand; a PDF attachment is drawn
+  page by page — its first page as its tile, every page in the lightbox as it
+  is scrolled to — and leaves the app only through Compartir / Descargar.
+  Agregar asks pictures or PDF, and each answer is a file input of its own:
+  on Android, any type besides images in an input's `accept` turns the photo
+  picker, which hands over a readable copy, into the file chooser, whose
+  picks Chrome can drop. Keep them two.
+- **A document is its files.** `documents` keeps a title and an expiry and
   nothing else: never add a column that holds what a document says (a number,
   a date of birth) — that is what the sealed files are for.
 - **Two rules the `afterSync` work turns on.** Keeping every **document's**
@@ -338,9 +346,8 @@ the rules on top of it.
 - **The kind is chosen at birth (`/salud/nuevo`, two chips) and never
   changed**; the entry page states it with a `StaticChip`. Both kinds share
   the one route `/salud/:id/:attachmentId?`, the id looked up in both tables,
-  because `entryPath` is all Próximo and Buscar know how to write.
-  Attachments are pictures only: a lab's PDF is captured or photographed until
-  Adjuntos takes PDFs everywhere.
+  because `entryPath` is all Próximo and Buscar know how to write. A lab's
+  PDF goes in as an attachment, like a picture.
 
 ## Privacy — the code is public, the data is private
 

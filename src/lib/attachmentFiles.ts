@@ -17,14 +17,24 @@ export const ATTACHMENTS_BUCKET = 'attachments';
 /** Largest file accepted as an attachment, in bytes. */
 const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-/** Picture types accepted as attachments — what both supported browsers can
- *  show — and the extension a file of each gets when it leaves the app. */
+/** The type of a PDF attachment; every other type accepted is a picture. */
+export const PDF_TYPE = 'application/pdf';
+
+/** File types accepted as attachments — the pictures both supported browsers
+ *  can show, and PDFs, drawn page by page — and the extension a file of each
+ *  gets when it leaves the app. */
 export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
+  [PDF_TYPE]: 'pdf',
 };
+
+/** Whether an attachment of type `mime` is a PDF rather than a picture. */
+export function isPdf(mime: string): boolean {
+  return mime === PDF_TYPE;
+}
 
 /**
  * How old a bucket object with no attachment row must be before the orphan
@@ -42,7 +52,7 @@ const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
  * The attachment MIME type for `file`, or null when it is not one we take.
  * Trusts `file.type` when it is one of ours; otherwise falls back to the
  * filename extension, since some devices report `image/jpg` or no type at all
- * for a perfectly good picture.
+ * for a perfectly good file.
  */
 export function attachmentType(file: File): string | null {
   if (file.type in ATTACHMENT_FILE_TYPES) return file.type;
@@ -54,7 +64,7 @@ export function attachmentType(file: File): string | null {
 /** Why `file` cannot be attached, in the user's words, or null when it can. */
 export function attachmentProblem(file: File): string | null {
   if (!attachmentType(file)) {
-    return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF).';
+    return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) o PDF.';
   }
   if (file.size > ATTACHMENT_MAX_BYTES) {
     return tooLargeMessage(file.size, ATTACHMENT_MAX_BYTES);
