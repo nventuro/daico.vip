@@ -70,7 +70,8 @@ export default function AttachmentLightbox({
   const view = useAttachmentFile(attachment);
   const file = view.status === 'ready' ? view.file : null;
   const pdf = isPdf(attachment.mime);
-  const url = useObjectUrl(pdf ? null : file);
+  // Shown for a picture, saved from for either.
+  const url = useObjectUrl(file);
   const pdfView = usePdf(pdf ? file : null);
   const uploadState = useAttachmentUploadState(attachment.id);
   const online = useOnline();
@@ -204,7 +205,7 @@ export default function AttachmentLightbox({
                 ))}
               </div>
             </div>
-          ) : url ? (
+          ) : url && !pdf ? (
             <img
               src={url}
               alt={attachment.name}

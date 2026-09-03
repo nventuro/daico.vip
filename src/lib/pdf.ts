@@ -10,9 +10,6 @@ import PdfWorkerScript from 'pdfjs-dist/build/pdf.worker.min.mjs?worker';
 export type PdfDocument = PDFDocumentProxy;
 export type PdfPage = PDFPageProxy;
 
-/** Encoder quality of a page drawn as a picture; text stays sharp at it. */
-const PDF_PAGE_JPEG_QUALITY = 0.9;
-
 // One worker serves every document open at once, handed to each explicitly:
 // a document given a worker of its own would take it down when closed, and a
 // grid may hold several PDFs open at a time.
@@ -43,20 +40,26 @@ export function pageRatio(page: PdfPage): number {
   return width / height;
 }
 
-/** `page` drawn `width` pixels wide, as a picture the screen can show. */
-export async function renderPdfPage(page: PdfPage, width: number): Promise<Blob> {
+/** A page being drawn, which can be called off once the page is not wanted. */
+export interface PdfDrawing {
+  promise: Promise<void>;
+  cancel(): void;
+}
+
+/**
+ * `page` drawn onto `canvas`, `width` pixels wide and as tall as the page is.
+ * The canvas is the picture and is never read back: a browser set to guard
+ * against fingerprinting blanks or refuses what is read out of a canvas, and
+ * a page that is only ever drawn into one is shown all the same.
+ */
+export function drawPdfPage(page: PdfPage, canvas: HTMLCanvasElement, width: number): PdfDrawing {
   const viewport = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
-  const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(viewport.width));
   canvas.height = Math.max(1, Math.round(viewport.height));
   const canvasContext = canvas.getContext('2d');
-  if (!canvasContext) throw new Error('No canvas context');
-  await page.render({ canvas, canvasContext, viewport }).promise;
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Could not encode the page'))),
-      'image/jpeg',
-      PDF_PAGE_JPEG_QUALITY,
-    ),
-  );
+  if (!canvasContext) {
+    return { promise: Promise.reject(new Error('No canvas context')), cancel() {} };
+  }
+  const task = page.render({ canvas, canvasContext, viewport });
+  return { promise: task.promise, cancel: () => task.cancel() };
 }
