@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Chore } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import { useChores } from './useChores';
 import { formatDayMonth, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
 import { UNDO_MS, useUndo } from '../../hooks/useUndo';
@@ -20,7 +19,7 @@ import { choreMarks } from './marks';
 import { dueAfterMarking, groupChores, isDone } from './recurrence';
 
 export default function ChoresPage() {
-  const { items: chores, loading, error, mark, unmark, restore } = useChores();
+  const { items: chores, loading, error, add, mark, unmark, restore } = useChores();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'chore'), [attachments]);
   const undo = useUndo<Chore>(UNDO_MS);
@@ -53,6 +52,20 @@ export default function ChoresPage() {
 
   const justDone = undo.value;
 
+  /** A chore is born from its title alone, undated and done once, and opened
+   *  to have the rest said about it. */
+  async function addChore(title: string) {
+    const id = await add({
+      title,
+      due_on: null,
+      comments: null,
+      repeat_every: null,
+      repeat_unit: null,
+      repeat_from: null,
+    });
+    if (id) navigate(entryPath('tareas', id));
+  }
+
   function renderChore(chore: Chore) {
     const finished = isDone(chore);
     const overdue = !finished && chore.due_on != null && isPast(chore.due_on, today);
@@ -78,11 +91,7 @@ export default function ChoresPage() {
       skeleton={<SkeletonRows leading="check" subtitle />}
       bar={
         <AddBar
-          // The chore is written on save: the title goes on to the form, where
-          // its day is picked, and nothing is written until it is saved there.
-          onAdd={(title) =>
-            navigate(entryPath('tareas', 'nuevo'), { state: draftTitleState(title) })
-          }
+          onAdd={(title) => void addChore(title)}
           placeholder="Agregar una tarea..."
           inputLabel="Nueva tarea"
           notice={

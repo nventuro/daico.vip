@@ -40,7 +40,7 @@ export default function AttachmentPickDialog({ onPick, onClose }: AttachmentPick
             onCancel={onClose}
           >
             {(pickPdfs) => (
-              <ul className="-my-1">
+              <ul className="-my-1 [&>li:last-child]:border-b-0">
                 <LinkRow
                   title="Fotos"
                   leading={<IconPhoto size={20} stroke={1.5} className="shrink-0 text-muted" />}

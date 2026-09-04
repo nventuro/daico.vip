@@ -293,9 +293,11 @@ The README's "Ideas" says what an idea is. These are the rules on top of it.
   does.
 - **Groups are dividers, nothing more**: no group page, no count, no collapse.
   Their order is the household's language (`Intl.Collator('es')` in
-  `grouping.ts`), and a new idea starts on the group of the idea last written
-  on. An idea is written on save, from the form the add bar opens (`nuevo`,
-  routed before `:id`), never from the bar itself.
+  `grouping.ts`), with the ideas filed under none — `group_name` empty,
+  `NO_GROUP` — ahead of them all and under no divider. A new idea is born
+  from the bar in the group of the idea last written on, none while there
+  are no ideas, and is moved from the chip on its page, «Sin grupo»
+  included.
 
 ## Viajes — read before touching them
 
@@ -305,8 +307,8 @@ top of it.
 - **Viajes is never an agenda.** Nothing is grouped by day and only a pendiente
   is ever ticked. The kinds (`TRIP_KINDS`) are fixed sections in that order, an
   empty one is not drawn, and every kind uses the same columns, leaving the ones
-  it has no use for null; a row's kind is chosen when it is created and never
-  changed. **Only a dated pendiente reaches Próximo.**
+  it has no use for null; a row's kind is asked by the bar's + when it is
+  created and never changed. **Only a dated pendiente reaches Próximo.**
 - **Everything travels in the clear**: a row's free text is `comments`, like a
   chore's, so Buscar matches a booking code, and a row carries pictures the way
   a chore does. Airport codes are typed by hand and offered from the curated
@@ -365,8 +367,9 @@ the rules on top of it.
 - **Nothing links a checkup to a study**, not a key and not a shortcut: the
   title and the date already say which check a study came from, and a key
   between rows has the offline race Ideas' groups avoid.
-- **The kind is chosen at birth (`/salud/nuevo`, two chips) and never
-  changed**; the entry page states it with a `StaticChip`. Both kinds share
+- **The kind is chosen at birth (the question the bar's + asks, through
+  `KindPickDialog`) and never changed**; the entry page states it with a
+  `StaticChip`. Both kinds share
   the one route `/salud/:id/:attachmentId?`, the id looked up in both tables,
   because `entryPath` is all Próximo and Buscar know how to write. A lab's
   PDF goes in as an attachment, like a picture.
@@ -453,21 +456,25 @@ the rules on top of it.
 - **Nothing is destroyed on a single tap**: a delete goes through
   `DeleteDialog`, from the trash in the entry's head; `UndoBar` (`useUndo`) is
   for marks and clears, never for a delete.
-- **A form creates, a page edits.** The add bar's + carries the typed title to
-  `/<app>/nuevo` (`draftTitleState` / `useDraftTitle`); nothing is written
-  before Guardar, the only submit button in the app, and Guardar opens the new
-  entry through `useLeave`. An entry page never has a save button: every
-  control saves on change and every text through `useTextSave`. Compras is the
-  one exception (born from the bar, lives in the list); Recetas keeps its form
-  until the editor has an ingredients block.
+- **An entry is born from the bar and edited on its page.** The add bar's +
+  writes the row with the typed title and the defaults, then opens it with a
+  plain `navigate`; there is no creation form and no Guardar. An entry page
+  never has a save button: every control saves on change and every text
+  through `useTextSave`. Where one column can never be changed once the row
+  exists (Salud's kind picks the table, a trip row's kind is fixed), the +
+  asks it first through `KindPickDialog`, its `onAdd` returning false so the
+  bar keeps the title for a dismissed question; nothing else is ever asked at
+  birth — a column with no sensible default is a design question, never a
+  form. Compras lives in the list; Recetas keeps its edit form until the
+  editor has an ingredients block.
 - **Every free text is `Body`** (`src/components/editor/`), never a
   `TextArea`, never a second markdown renderer; its placeholder is the field's
   name («Contenido», «Comentarios»). The editor and `Markdown` share
   `src/components/markdown/classes.ts` so they look the same, and the editor's
   round trip is tested headlessly in `BodyEditor.test.ts`. It models neither
   GFM tables nor the directives: a table is kept as the text it is.
-- **A page is left, never stacked on**: `useLeave` for every Guardar, every
-  delete and the header's arrow; a plain link or `navigate` only going down,
+- **A page is left, never stacked on**: `useLeave` for every delete and the
+  header's arrow; a plain link or `navigate` only going down,
   from a list to an entry. `src/lib/visited.ts` is the record it reads, and a
   change to it comes with a test in `visited.test.ts`.
 - **The title is the heading** (`EntryHead`): normalised on blur, never saved

@@ -5,7 +5,6 @@ import type { AppModule } from '../types';
 import { searchNotes } from './search';
 
 const NotesPage = lazy(() => import('./NotesPage'));
-const NoteNewPage = lazy(() => import('./NoteNewPage'));
 const NotePage = lazy(() => import('./NotePage'));
 const EditRedirect = lazy(() => import('../../components/EditRedirect'));
 
@@ -16,11 +15,8 @@ const notas: AppModule = {
   name: 'Notas',
   icon: IconNotes,
   specs: [NOTES_SPEC],
-  // Static segments outrank dynamic ones, which is what keeps `nuevo` from
-  // being read as an id.
   routes: [
     { index: true, Component: NotesPage },
-    { path: 'nuevo', Component: NoteNewPage },
     // A note is written on its own page now; the address it used to be
     // edited at still leads to it.
     { path: ':id/editar', Component: EditRedirect },

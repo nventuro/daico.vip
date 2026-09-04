@@ -3,8 +3,10 @@ import { IconPlus } from '@tabler/icons-react';
 import { ADD_BAR_BUTTON_CLASS, ADD_BAR_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
 
 interface AddBarProps {
-  /** Called with what was typed, never blank; the bar clears itself. */
-  onAdd: (text: string) => void;
+  /** Called with what was typed, never blank. The bar then clears itself,
+   *  unless this returns false: a bar whose + first asks something keeps the
+   *  text for the question to come back to. */
+  onAdd: (text: string) => boolean | void;
   placeholder: string;
   /** Accessible label for the text input. */
   inputLabel: string;
@@ -35,10 +37,7 @@ export default function AddBar({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const text = value.trim();
-    if (text) {
-      setValue('');
-      onAdd(text);
-    }
+    if (text && onAdd(text) !== false) setValue('');
     // Keep focus so several items can be added in a row without re-tapping the
     // input — on mobile this also keeps the keyboard open between adds.
     inputRef.current?.focus();

@@ -49,9 +49,9 @@ describe('the record of visits', () => {
 
   it('overwrites the open screen on a replace', () => {
     visited.recordVisit('a', '/', NavigationType.Pop);
-    visited.recordVisit('b', '/notas/nuevo', NavigationType.Push);
+    visited.recordVisit('b', '/notas/1/editar', NavigationType.Push);
     visited.recordVisit('c', '/notas/1', NavigationType.Replace);
-    expect(visited.stepsBackTo('/notas/nuevo')).toBeNull();
+    expect(visited.stepsBackTo('/notas/1/editar')).toBeNull();
     expect(visited.stepsBackTo('/')).toBe(-1);
   });
 

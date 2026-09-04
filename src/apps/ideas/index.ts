@@ -5,7 +5,6 @@ import type { AppModule } from '../types';
 import { searchIdeas } from './search';
 
 const IdeasPage = lazy(() => import('./IdeasPage'));
-const IdeaNewPage = lazy(() => import('./IdeaNewPage'));
 const IdeaPage = lazy(() => import('./IdeaPage'));
 const EditRedirect = lazy(() => import('../../components/EditRedirect'));
 
@@ -16,11 +15,8 @@ const ideas: AppModule = {
   name: 'Ideas',
   icon: IconBulb,
   specs: [IDEAS_SPEC],
-  // Static segments outrank dynamic ones, which is what keeps `nuevo` from
-  // being read as an id.
   routes: [
     { index: true, Component: IdeasPage },
-    { path: 'nuevo', Component: IdeaNewPage },
     // An idea is written on its own page; the address it used to be edited
     // at still leads to it.
     { path: ':id/editar', Component: EditRedirect },

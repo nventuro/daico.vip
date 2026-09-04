@@ -46,7 +46,6 @@ export default function GuidePage() {
               chips={
                 <>
                   <GroupField
-                    look="chip"
                     groups={guideGroupNames(guides)}
                     value={guide.group_name}
                     onChange={(group) => void save(guide.id, { group_name: group.trim() })}

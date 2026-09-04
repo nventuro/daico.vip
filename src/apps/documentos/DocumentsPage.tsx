@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import { isPast, todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
@@ -11,9 +10,16 @@ import { useDocuments } from './useDocuments';
 import { expiryLabel } from './expiry';
 
 export default function DocumentsPage() {
-  const { items, loading, error } = useDocuments();
+  const { items, loading, error, add } = useDocuments();
   const navigate = useNavigate();
   const today = todayIso();
+
+  /** A document is born from its title alone, never expiring, and opened to
+   *  have its files added. */
+  async function addDocument(title: string) {
+    const id = await add({ title, expires_on: null });
+    if (id) navigate(entryPath('documentos', id));
+  }
 
   return (
     <ListPage
@@ -22,11 +28,7 @@ export default function DocumentsPage() {
       skeleton={<SkeletonRows subtitle />}
       bar={
         <AddBar
-          // The document is written on save: the title goes on to the form,
-          // and nothing is written until it is saved there.
-          onAdd={(title) =>
-            navigate(entryPath('documentos', 'nuevo'), { state: draftTitleState(title) })
-          }
+          onAdd={(title) => void addDocument(title)}
           placeholder="Agregar un documento..."
           inputLabel="Nuevo documento"
         />

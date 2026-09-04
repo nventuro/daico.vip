@@ -10,16 +10,15 @@ import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import InboxRow from './InboxRow';
 import { pendingCounts, splitTrips } from './grouping';
 import { tripSubtitle } from './labels';
 import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
-import { useTrips } from './useTrips';
+import { NEW_TRIP, useTrips } from './useTrips';
 
 export default function TripsPage() {
-  const { items: trips, loading, error } = useTrips();
+  const { items: trips, loading, error, add } = useTrips();
   const { items } = useTripItems();
   const { groups } = useTripInbox();
   const navigate = useNavigate();
@@ -27,6 +26,13 @@ export default function TripsPage() {
   const today = todayIso();
   const pending = useMemo(() => pendingCounts(items), [items]);
   const { upcoming, undated, past } = useMemo(() => splitTrips(trips, today), [trips, today]);
+
+  /** A trip is born from its title alone, its days not yet known, and opened
+   *  to be filled. */
+  async function addTrip(title: string) {
+    const id = await add({ ...NEW_TRIP, title });
+    if (id) navigate(entryPath('viajes', id));
+  }
 
   function renderTrip(trip: Trip) {
     return (
@@ -46,11 +52,7 @@ export default function TripsPage() {
       skeleton={<SkeletonRows subtitle />}
       bar={
         <AddBar
-          // The trip is written on save: its days are picked on the form it
-          // opens, and backing out leaves nothing behind.
-          onAdd={(title) =>
-            navigate(entryPath('viajes', 'nuevo'), { state: draftTitleState(title) })
-          }
+          onAdd={(title) => void addTrip(title)}
           placeholder="Agregar un viaje..."
           inputLabel="Nuevo viaje"
           autoCapitalize="sentences"

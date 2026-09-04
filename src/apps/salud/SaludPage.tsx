@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Checkup } from '../../lib/offline/specs';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import { UNDO_MS, useUndo } from '../../hooks/useUndo';
 import {
   formatDateShort,
@@ -15,13 +14,14 @@ import ChecklistItem from '../../components/ChecklistItem';
 import CompletedSection from '../../components/CompletedSection';
 import EmptyState from '../../components/EmptyState';
 import EntryMarks from '../../components/EntryMarks';
+import KindPickDialog from '../../components/KindPickDialog';
 import LinkRow from '../../components/LinkRow';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import UndoBar from '../../components/UndoBar';
 import { entryPath } from '../types';
-import { SALUD_KIND_LABELS } from './kinds';
+import { SALUD_KINDS, SALUD_KIND_LABELS, type SaludKind } from './kinds';
 import { checkupMarks } from './marks';
 import { dueAfterMarking, groupCheckups, isDone } from './recurrence';
 import { useCheckups } from './useCheckups';
@@ -30,11 +30,16 @@ import { useHealthRecords } from './useHealthRecords';
 /** The signed-in member's health, in two fixed sections: the checkups still
  *  to have done, then the studies kept, newest first. An empty section is not
  *  drawn; a checkup done for good folds into «Hechos» at the end. */
+/** The two kinds an entry can be born as. */
+const KIND_OPTIONS = SALUD_KINDS.map((kind) => ({ kind, label: SALUD_KIND_LABELS[kind].one }));
+
 export default function SaludPage() {
   const checkups = useCheckups();
   const records = useHealthRecords();
   const undo = useUndo<Checkup>(UNDO_MS);
   const navigate = useNavigate();
+  // The title typed into the bar, while its kind is being asked.
+  const [naming, setNaming] = useState<string | null>(null);
 
   const today = todayIso();
   const { pending, done } = useMemo(() => groupCheckups(checkups.items), [checkups.items]);
@@ -83,6 +88,24 @@ export default function SaludPage() {
 
   const empty = pending.length === 0 && done.length === 0 && records.items.length === 0;
 
+  /** An entry is born from its title and its kind, chosen now and never
+   *  again: a checkup undated and done once, a study on today. Either is
+   *  opened to have the rest said about it. */
+  async function addEntry(title: string, kind: SaludKind) {
+    setNaming(null);
+    const id =
+      kind === 'checkup'
+        ? await checkups.add({
+            title,
+            due_on: null,
+            comments: null,
+            repeat_every: null,
+            repeat_unit: null,
+          })
+        : await records.add({ title, on_date: today });
+    if (id) navigate(entryPath('salud', id));
+  }
+
   return (
     <ListPage
       loading={checkups.loading || records.loading}
@@ -90,11 +113,11 @@ export default function SaludPage() {
       skeleton={<SkeletonRows leading="check" subtitle />}
       bar={
         <AddBar
-          // The row is written on save: the title goes on to the form, where
-          // its kind is chosen, and nothing is written until it is saved there.
-          onAdd={(title) =>
-            navigate(entryPath('salud', 'nuevo'), { state: draftTitleState(title) })
-          }
+          // The kind is asked first, and the bar keeps the title while it is.
+          onAdd={(title) => {
+            setNaming(title);
+            return false;
+          }}
           placeholder="Agregar un control o estudio..."
           inputLabel="Nuevo control o estudio"
           notice={
@@ -130,6 +153,14 @@ export default function SaludPage() {
       <CompletedSection label="Hechos" count={done.length}>
         <ul>{done.map(renderCheckup)}</ul>
       </CompletedSection>
+      {naming !== null && (
+        <KindPickDialog
+          title={naming}
+          options={KIND_OPTIONS}
+          onPick={(kind) => void addEntry(naming, kind)}
+          onClose={() => setNaming(null)}
+        />
+      )}
     </ListPage>
   );
 }

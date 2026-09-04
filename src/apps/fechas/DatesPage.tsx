@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DateEntry } from '../../lib/offline/specs';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import { todayIso } from '../../utils/dateUtils';
 import CompletedSection from '../../components/CompletedSection';
 import SectionLabel from '../../components/SectionLabel';
@@ -15,13 +14,26 @@ import { groupByMonth, splitByToday } from './recurrence';
 import DateRow from './DateRow';
 
 export default function DatesPage() {
-  const { items, loading, error } = useDates();
+  const { items, loading, error, add } = useDates();
   const navigate = useNavigate();
 
   const today = todayIso();
 
   const { upcoming, past } = useMemo(() => splitByToday(items, today), [items, today]);
   const groups = useMemo(() => groupByMonth(upcoming, today), [upcoming, today]);
+
+  /** A date is born from its title alone, on today and once, and opened to
+   *  have its day and the rest said about it. */
+  async function addDate(title: string) {
+    const id = await add({
+      title,
+      occurs_on: today,
+      repeat_every: null,
+      repeat_unit: null,
+      comments: null,
+    });
+    if (id) navigate(entryPath('fechas', id));
+  }
 
   function renderEntry(entry: DateEntry) {
     return <DateRow key={entry.id} entry={entry} today={today} />;
@@ -34,11 +46,7 @@ export default function DatesPage() {
       skeleton={<SkeletonRows subtitle />}
       bar={
         <AddBar
-          // The date is written on save: the title goes on to the form, where
-          // its day is picked, and nothing is written until it is saved there.
-          onAdd={(title) =>
-            navigate(entryPath('fechas', 'nuevo'), { state: draftTitleState(title) })
-          }
+          onAdd={(title) => void addDate(title)}
           placeholder="Agregar una fecha..."
           inputLabel="Nueva fecha"
         />

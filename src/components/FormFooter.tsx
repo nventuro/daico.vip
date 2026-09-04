@@ -10,8 +10,8 @@ interface FormFooterProps {
   action?: ReactNode;
 }
 
-/** The bottom row of a creation form: its submit at the right, or the
- *  screen's own `action`. No delete is ever here — an entry is deleted from
+/** The bottom row of a form: its submit at the right, or the screen's own
+ *  `action`. No delete is ever here — an entry is deleted from
  *  its page, through `DeleteDialog`. */
 export default function FormFooter({
   submitLabel = 'Guardar',

@@ -46,9 +46,9 @@ export default function IdeaPage() {
             subtitle={`Editada ${relativeDayTime(todayIso(), idea.updated_at)}`}
             chips={
               <GroupField
-                look="chip"
                 groups={groupNames(items)}
                 value={idea.group_name}
+                optional
                 onChange={(group) => void save(idea.id, { group_name: lowercaseTrimmed(group) })}
               />
             }

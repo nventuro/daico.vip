@@ -22,7 +22,3 @@ export const SALUD_KIND_LABELS: Record<
     question: '¿Eliminar el estudio?',
   },
 };
-
-/** The kind a new entry starts as: what is typed into the bar is more often
- *  something to have done than something already done and kept. */
-export const SALUD_KIND_DEFAULT: SaludKind = 'checkup';

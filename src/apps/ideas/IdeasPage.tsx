@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
 import EntryMarks from '../../components/EntryMarks';
@@ -10,17 +9,24 @@ import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
-import { groupIdeas } from './grouping';
+import { NO_GROUP, groupIdeas, lastEditedGroup } from './grouping';
 import { ideaMarks } from './marks';
 import { useIdeas } from './useIdeas';
 
 export default function IdeasPage() {
-  const { items, loading, error } = useIdeas();
+  const { items, loading, error, add } = useIdeas();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'idea'), [attachments]);
   const navigate = useNavigate();
 
   const groups = useMemo(() => groupIdeas(items), [items]);
+
+  /** An idea is born from its title alone, in the group of the idea last
+   *  written on, and opened to be written on. */
+  async function addIdea(title: string) {
+    const id = await add({ title, group_name: lastEditedGroup(items), body: '' });
+    if (id) navigate(entryPath('ideas', id));
+  }
 
   return (
     <ListPage
@@ -29,11 +35,7 @@ export default function IdeasPage() {
       skeleton={<SkeletonRows />}
       bar={
         <AddBar
-          // An idea is filed under a group before it exists: the title goes on
-          // to the form, and nothing is written until it is saved there.
-          onAdd={(title) =>
-            navigate(entryPath('ideas', 'nuevo'), { state: draftTitleState(title) })
-          }
+          onAdd={(title) => void addIdea(title)}
           placeholder="Agregar una idea..."
           inputLabel="Nueva idea"
         />
@@ -44,7 +46,7 @@ export default function IdeasPage() {
       ) : (
         groups.map((group) => (
           <section key={group.name} className="mb-6">
-            <SectionLabel>{group.name}</SectionLabel>
+            {group.name !== NO_GROUP && <SectionLabel>{group.name}</SectionLabel>}
             <ul>
               {group.ideas.map((idea) => (
                 <LinkRow

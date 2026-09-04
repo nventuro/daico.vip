@@ -108,17 +108,19 @@ authority (see `CLAUDE.md`). Local data is wiped on sign-out.
 Every table below is offline-synced. This is what each app is for and what its
 rows are; what may never change about them is in `CLAUDE.md`.
 
-An entry is born on a form and lives on a page. The add bar's + opens the
-app's creation form at `/<app>/nuevo` with the typed title, and nothing is
-written until its Guardar, which opens the new entry; from then on the entry
-is edited where it is read — the title is the heading, every control saves
-as it changes, every free text is the shared editor saving a moment after
-typing stops and on leaving — and deleted from the trash in its head, behind
-a question. Compras is the one exception, and Recetas is not there yet.
+An entry is born from the bar and lives on a page. The add bar's + writes
+the row with the typed title and nothing else decided, and opens it; from
+then on the entry is edited where it is read — the title is the heading,
+every control saves as it changes, every free text is the shared editor
+saving a moment after typing stops and on leaving — and deleted from the
+trash in its head, behind a question. Where one thing about an entry can
+never be changed once it exists, the + asks it first, in a dialog that
+leaves the typed title in the bar if dismissed. Compras has no page, and
+Recetas is not there yet.
 
 **Tareas** — `chores`: a title, an optional due date and comments. A chore can
 repeat, and marking one that does moves its date on instead of finishing it.
-Born on a form with its day, its repetition and its comments; edited in place
+Born from the bar undated; its day, its repetition and its comments are set
 on its page.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
@@ -127,21 +129,21 @@ from the bar and live in the list; there is no page.
 
 **Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
 `occurs_on` is the anchor the user entered, a repeating entry's next occurrence
-is computed from it on read, and it reaches Próximo the week before. Born on a
-form with its day, repetition and comments; edited in place on its page.
+is computed from it on read, and it reaches Próximo the week before. Born
+from the bar on today; its day, repetition and comments are set on its page.
 
 **Recetas** — `recipes`: a title, an optional time and number of servings, and
 a markdown body in the dialect below, whose `:::ingredients` block is a
-tickable list that can be sent to Compras. Still born from the bar and written
+tickable list that can be sent to Compras. Born from the bar and still written
 on a form of its own, until the editor has an ingredients block; deleted from
 its page.
 
 **Documentos** — `documents`: a title, an optional expiry and its notice
 window. The content of a document is its files — pictures, PDFs — encrypted on the device;
 nothing else is typed in, so a number or a date of birth never reaches the
-server in the clear. Every document's files are kept on every device. Born on
-a form with its expiry and notice; its files are added on its page, where
-the rest is edited in place.
+server in the clear. Every document's files are kept on every device. Born
+from the bar with no expiry; its files are added on its page, where the rest
+is edited in place.
 
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
 parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
@@ -157,19 +159,21 @@ from the others by the server. A checkup is a health check to have done — a
 chore that always comes back from the day it was marked, or a one-off
 appointment — with comments and no attachments; it reaches Próximo the week
 before. A health record is a study kept: a title, the day it was done and its
-files, which hold everything the study says. Both are born on one form,
-where the kind is chosen, and edited in place on their page.
+files, which hold everything the study says. Both are born from one bar,
+whose + asks which of the two, and edited in place on their page.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, two timestamps and an opaque blob, which is
-why Buscar matches a note's title and nothing else. Born on a form with its
-text; written on its page, the title on blur and the text as it goes.
+why Buscar matches a note's title and nothing else. Born from the bar with
+nothing written; written on its page, the title on blur and the text as it
+goes.
 
 **Ideas** — `ideas`: a title, the group it is filed under (`group_name`, plain
 text such as «comer» or «películas») and a markdown body, all in the clear like
 a recipe. A group is not a table: it is whatever ideas name it, and goes when
-the last of them does. Born on a form with its group and text; edited in place
-on its page, the group a chip under the title.
+the last of them does; an idea can also be filed under none, and those are
+listed ahead of the groups. Born from the bar in the group of the idea last
+written on; edited in place on its page, the group a chip under the title.
 
 **Viajes** — `trips` (a title and its days, both optional) and `trip_items`,
 every row of a trip in one table told apart by `kind`: a pendiente to resolve
@@ -182,9 +186,9 @@ be added to a trip or discarded. A PDF the email carries is sealed by the
 worker to a key the household publishes (`inbox_key`), waits beside the staged
 rows in `trip_inbox_files`, and becomes the confirmed rows' attachment; every
 device fetches the staged files after a sync, so a group is confirmed with no
-connection. A trip and each of its rows are born on a
-form — a row's class is chosen there and never changed — and edited in place
-on their pages; deleting a trip takes its rows with it.
+connection. A trip and each of its rows are born from the bar — a row's
+class is asked by the + and never changed — and edited in place on their
+pages; deleting a trip takes its rows with it.
 
 **Guías** — `guides` / `guide_chapters`: imported content (see Guides below),
 in the same markdown dialect. A guide is shelved under a group (`group_name`,

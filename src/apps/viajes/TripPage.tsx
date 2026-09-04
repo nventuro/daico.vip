@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { TripItem } from '../../lib/offline/specs';
+import { TRIP_KINDS, type TripItem, type TripKind } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
@@ -13,6 +13,7 @@ import DeleteDialog from '../../components/DeleteDialog';
 import EmptyState from '../../components/EmptyState';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
+import KindPickDialog from '../../components/KindPickDialog';
 import FormField from '../../components/FormField';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
@@ -20,13 +21,21 @@ import SkeletonRows from '../../components/SkeletonRows';
 import UndoBar from '../../components/UndoBar';
 import { appPath, entryPath } from '../types';
 import ItemRow from './ItemRow';
-import { draftTitleState } from '../../hooks/useDraftTitle';
 import { tripSections } from './grouping';
+import { TRIP_KIND_SHAPES } from './kinds';
+import { TRIP_KIND_LABELS } from './labels';
 import { deleteInboxFiles } from './inboxFiles';
 import { inboxRowInput, inboxUndoOf, settleInboxUndo, type InboxUndo } from './inboxUndo';
 import { useTripInbox } from './useTripInbox';
-import { useTripItems } from './useTripItems';
+import { NEW_TRIP_ITEM, useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
+
+/** The classes a row can be born as, each with the icon its section wears. */
+const KIND_OPTIONS = TRIP_KINDS.map((kind) => ({
+  kind,
+  label: TRIP_KIND_LABELS[kind],
+  icon: TRIP_KIND_SHAPES[kind].icon,
+}));
 
 export default function TripPage() {
   const { tripId = '' } = useParams();
@@ -36,6 +45,7 @@ export default function TripPage() {
     items,
     loading: itemsLoading,
     error: itemsError,
+    add,
     save,
     remove: removeItem,
   } = useTripItems(tripId);
@@ -49,6 +59,8 @@ export default function TripPage() {
   // The offer the undo was taken on, so its end is told from every other.
   const taken = useRef<InboxUndo | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // The title typed into the bar, while its class is being asked.
+  const [naming, setNaming] = useState<string | null>(null);
 
   // What the review just put in arrives with the navigation and is offered
   // for a moment; the navigation is then replaced without it, so coming
@@ -108,6 +120,14 @@ export default function TripPage() {
   const { sections, done } = useMemo(() => tripSections(items), [items]);
   const justAdded = undo.value;
 
+  /** A row is born from its title and its class, chosen now and never again,
+   *  and opened to have the rest said about it. */
+  async function addItem(title: string, kind: TripKind) {
+    setNaming(null);
+    const id = await add(tripId, { ...NEW_TRIP_ITEM, kind, title, done: false });
+    if (id) navigate(entryPath('viajes', tripId, id));
+  }
+
   function renderItem(item: TripItem) {
     return (
       <ItemRow
@@ -127,11 +147,12 @@ export default function TripPage() {
       skeleton={<SkeletonRows subtitle />}
       bar={
         <AddBar
-          // The row is written on save, so what is typed here only travels to
-          // the form, where its class is chosen.
-          onAdd={(title) =>
-            navigate(entryPath('viajes', tripId, 'nuevo'), { state: draftTitleState(title) })
-          }
+          // A row's class is asked first, and the bar keeps the title while
+          // it is.
+          onAdd={(title) => {
+            setNaming(title);
+            return false;
+          }}
           placeholder="Agregar al viaje..."
           inputLabel="Agregar al viaje"
           notice={
@@ -192,6 +213,14 @@ export default function TripPage() {
               onCancel={() => setDeleting(false)}
               onConfirm={() => void removeWithRows(trip.id)}
             />
+            {naming !== null && (
+              <KindPickDialog
+                title={naming}
+                options={KIND_OPTIONS}
+                onPick={(kind) => void addItem(naming, kind)}
+                onClose={() => setNaming(null)}
+              />
+            )}
           </>
         )}
       </EntryPage>
