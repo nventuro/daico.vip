@@ -251,8 +251,10 @@ the server only ever stores ciphertext.
   a PDF is drawn there page by page (its first page is its tile) and only
   leaves the app through Compartir / Descargar.
 - **Sync**: files follow every table sync — uploads go out, files of deleted
-  rows are dropped, every document's and every trip row's files this device
-  lacks are fetched and kept, and bucket objects no row refers to are swept.
+  rows are dropped, every document's files and those of the trips not yet over
+  (a week past their last day) that this device lacks are fetched and kept, and
+  bucket objects no row refers to are swept. A past trip's files are fetched on
+  demand from then on, and «Liberar espacio» lets them go.
 
 ## Guides
 

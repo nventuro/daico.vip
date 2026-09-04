@@ -7,10 +7,11 @@ import { supabase } from './supabase';
 import { isPermanentStatus } from './refusals';
 import * as engine from './offline/engine';
 import { ATTACHMENT_FILES } from './offline/localTables';
-import { ATTACHMENTS_SPEC, type Attachment } from './offline/specs';
+import { ATTACHMENTS_SPEC, TRIP_ITEMS_SPEC, TRIPS_SPEC, type Attachment } from './offline/specs';
 import { reportFiles } from './offline/sync';
 import type { AttachmentOwnerKind } from '../types';
 import { tooLargeMessage } from '../utils/textUtils';
+import { addDays, todayIso } from '../utils/dateUtils';
 
 /** The storage bucket holding the encrypted attachment files. */
 export const ATTACHMENTS_BUCKET = 'attachments';
@@ -45,13 +46,32 @@ export function isPdf(mime: string): boolean {
  */
 export const KEPT_OWNER_KINDS: readonly AttachmentOwnerKind[] = ['document', 'trip_item'];
 
-/** Whether `attachment`'s file is one every device keeps. */
-function isKept(attachment: Pick<Attachment, 'owner_kind'>): boolean {
-  return KEPT_OWNER_KINDS.includes(attachment.owner_kind);
-}
+/**
+ * How many days after a trip's last day its rows' files are still kept. Once
+ * the trip is over they are no longer needed at hand: from then on they are
+ * fetched on demand like a chore's, and «Liberar espacio» lets them go. Nothing
+ * drops them on its own — a copy a device already holds stays until then.
+ */
+export const TRIP_FILES_KEPT_DAYS = 7;
 
 /** The kept kinds as SQL takes them: fixed names, never anything typed. */
 const keptKindsSql = KEPT_OWNER_KINDS.map((kind) => `'${kind}'`).join(', ');
+
+/**
+ * SQL: whether the attachment aliased `a` is one every device keeps — a kept
+ * kind's, and for a trip row's, only while its trip is not over. Takes one
+ * parameter, the day (yyyy-mm-dd) a trip's last day must be before to count it
+ * over; a trip with no last day, or one this device does not know, is not.
+ */
+const keptSql = `(a.owner_kind IN (${keptKindsSql})
+  AND NOT EXISTS (
+    SELECT 1 FROM ${TRIP_ITEMS_SPEC.table} i JOIN ${TRIPS_SPEC.table} t ON t.id = i.trip_id
+     WHERE a.owner_kind = 'trip_item' AND i.id = a.owner_id AND t.ends_on < ?))`;
+
+/** The day `keptSql` takes, as of today. */
+function tripsOverBefore(): string {
+  return addDays(todayIso(), -TRIP_FILES_KEPT_DAYS);
+}
 
 /**
  * How old a bucket object with no attachment row must be before the orphan
@@ -166,29 +186,30 @@ export async function attachmentFileUsage(): Promise<AttachmentFileUsage> {
   const rows = await engine.localQuery<AttachmentFileUsage & Record<string, unknown>>(
     `SELECT
        coalesce(sum(length(f.data)), 0) AS bytes,
-       coalesce(sum(CASE WHEN a.owner_kind IN (${keptKindsSql}) THEN length(f.data) ELSE 0 END), 0)
-         AS keptBytes,
+       coalesce(sum(CASE WHEN ${keptSql} THEN length(f.data) ELSE 0 END), 0) AS keptBytes,
        coalesce(sum(CASE WHEN f.uploaded = 0 THEN 1 ELSE 0 END), 0) AS waiting,
        coalesce(sum(CASE WHEN f.uploaded = 0 AND f.upload_error IS NOT NULL THEN 1 ELSE 0 END), 0)
          AS failed
      FROM ${ATTACHMENT_FILES.table} f
      LEFT JOIN ${ATTACHMENTS_SPEC.table} a ON a.id = f.id`,
+    tripsOverBefore(),
   );
   return rows[0] ?? { bytes: 0, keptBytes: 0, waiting: 0, failed: 0 };
 }
 
 /**
  * Let go of the copies that can be fetched again: a file the bucket already
- * has, and not one of the kept kinds', since every device keeps those and the
- * next sync would bring them straight back. A file the bucket does not have is
- * the only copy there is anywhere, so it is never dropped here.
+ * has, and not a kept one, since every device keeps those and the next sync
+ * would bring them straight back. A file the bucket does not have is the only
+ * copy there is anywhere, so it is never dropped here.
  */
 export async function dropCachedFiles(): Promise<void> {
   await engine.localWrite(
     ATTACHMENT_FILES.table,
     `DELETE FROM ${ATTACHMENT_FILES.table}
       WHERE uploaded = 1
-        AND id IN (SELECT id FROM ${ATTACHMENTS_SPEC.table} WHERE owner_kind NOT IN (${keptKindsSql}))`,
+        AND id IN (SELECT a.id FROM ${ATTACHMENTS_SPEC.table} a WHERE NOT ${keptSql})`,
+    tripsOverBefore(),
   );
 }
 
@@ -287,22 +308,25 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
 }
 
 /**
- * Fetch every kept kind's file this device lacks, so its entry can be seen
- * with no connection wherever it was added. One the bucket does not have yet
- * is left for a later run; a failure that may pass later stops the run, with
- * the rest left for the next.
+ * Fetch every kept file this device lacks, so its entry can be seen with no
+ * connection wherever it was added. One the bucket does not have yet is left
+ * for a later run; a failure that may pass later stops the run, with the rest
+ * left for the next.
  */
 async function fetchKeptFiles(): Promise<void> {
-  const ids = await engine.localQuery<{ id: string }>(`SELECT id FROM ${ATTACHMENT_FILES.table}`);
-  const held = new Set(ids.map((row) => row.id));
-  const missing = (await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).filter(
-    (attachment) => isKept(attachment) && !held.has(attachment.id),
+  const missing = await engine.localQuery<{ id: string }>(
+    `SELECT a.id FROM ${ATTACHMENTS_SPEC.table} a
+      WHERE a.pending_op IS NOT 'delete'
+        AND ${keptSql}
+        AND a.id NOT IN (SELECT id FROM ${ATTACHMENT_FILES.table})
+      ORDER BY ${ATTACHMENTS_SPEC.orderBy}`,
+    tripsOverBefore(),
   );
   reportFiles(0, missing.length);
   let done = 0;
-  for (const attachment of missing) {
-    const bytes = await downloadObject(attachment.id);
-    if (bytes) await putAttachmentFile(attachment.id, bytes, true);
+  for (const { id } of missing) {
+    const bytes = await downloadObject(id);
+    if (bytes) await putAttachmentFile(id, bytes, true);
     reportFiles(++done, missing.length);
   }
 }

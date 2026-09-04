@@ -3,8 +3,10 @@ import {
   ATTACHMENT_LIST_PAGE,
   ATTACHMENT_ORPHAN_MIN_AGE_MS,
   ATTACHMENTS_BUCKET,
+  TRIP_FILES_KEPT_DAYS,
 } from './attachmentFiles';
-import { ATTACHMENTS_SPEC } from './offline/specs';
+import { ATTACHMENTS_SPEC, TRIP_ITEMS_SPEC, TRIPS_SPEC } from './offline/specs';
+import { addDays, todayIso } from '../utils/dateUtils';
 import { server } from './offline/testing/fakeSupabase';
 import { T0, at, network } from './offline/testing/clock';
 import * as engine from './offline/engine';
@@ -37,12 +39,40 @@ const row = {
 };
 const documentRow = { ...row, owner_kind: 'document' as const, owner_id: 'd1' };
 const tripRow = { ...row, owner_kind: 'trip_item' as const, owner_id: 't1' };
+const tripItem = {
+  trip_id: '',
+  kind: 'lodging' as const,
+  title: '',
+  on_date: null,
+  at_time: null,
+  ends_on: null,
+  ends_at: null,
+  from_code: null,
+  to_code: null,
+  done: false,
+  comments: null,
+};
 
 /** An attachment as the app adds one: the file first, then its row. */
 async function added(id: string, content = 'abc'): Promise<void> {
   await putAttachmentFile(id, bytes(content), false);
   await engine.insert(ATTACHMENTS_SPEC, row, id);
 }
+
+/** A trip whose last day is `endsOn`, one row of it (`<tripId>-row`), and the
+ *  row's attachment `attachmentId`, its file not yet on this device. */
+async function tripWithFile(
+  tripId: string,
+  endsOn: string | null,
+  attachmentId: string,
+): Promise<void> {
+  await engine.insert(TRIPS_SPEC, { title: tripId, starts_on: null, ends_on: endsOn }, tripId);
+  await engine.insert(TRIP_ITEMS_SPEC, { ...tripItem, trip_id: tripId }, `${tripId}-row`);
+  await engine.insert(ATTACHMENTS_SPEC, { ...tripRow, owner_id: `${tripId}-row` }, attachmentId);
+}
+
+/** The last day a trip may have ended on and still have its files kept. */
+const lastKeptDay = () => addDays(todayIso(), -TRIP_FILES_KEPT_DAYS);
 
 const uploads = () => server.calls.filter((c) => c.op === 'upload').length;
 
@@ -217,6 +247,42 @@ describe('syncAttachmentFiles', () => {
     expect(await localAttachmentFile('chore')).toBeNull();
     await syncAttachmentFiles(pulled);
     expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(2);
+  });
+
+  it("fetches a trip row's file only while its trip is not over — a week past its last day", async () => {
+    const names = ['over', 'edge', 'undated', 'unknown'];
+    server.seedObjects(
+      ATTACHMENTS_BUCKET,
+      names.map((name) => ({ name, data: bytes(name), created_at: T0 })),
+    );
+    await tripWithFile('over', addDays(lastKeptDay(), -1), 'over');
+    await tripWithFile('edge', lastKeptDay(), 'edge');
+    await tripWithFile('undated', null, 'undated');
+    // A row this device has not got yet may be of a trip still to come.
+    await engine.insert(ATTACHMENTS_SPEC, { ...tripRow, owner_id: 'no-such-row' }, 'unknown');
+    await syncAttachmentFiles(pulled);
+    expect(await localAttachmentFile('over')).toBeNull();
+    expect(await localAttachmentFile('edge')).toEqual(bytes('edge'));
+    expect(await localAttachmentFile('undated')).toEqual(bytes('undated'));
+    expect(await localAttachmentFile('unknown')).toEqual(bytes('unknown'));
+  });
+
+  it("leaves a past trip's file this device holds where it is, and fetches again once its last day moves", async () => {
+    server.seedObjects(ATTACHMENTS_BUCKET, [
+      { name: 'held', data: bytes('held'), created_at: T0 },
+      { name: 'later', data: bytes('later'), created_at: T0 },
+    ]);
+    await tripWithFile('past', addDays(lastKeptDay(), -1), 'held');
+    await putAttachmentFile('held', bytes('held'), true);
+    await engine.insert(ATTACHMENTS_SPEC, { ...tripRow, owner_id: 'past-row' }, 'later');
+    await syncAttachmentFiles(pulled);
+    expect(await localAttachmentFile('held')).toEqual(bytes('held'));
+    expect(await localAttachmentFile('later')).toBeNull();
+    expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(0);
+
+    await engine.update(TRIPS_SPEC, 'past', { ends_on: todayIso() });
+    await syncAttachmentFiles(pulled);
+    expect(await localAttachmentFile('later')).toEqual(bytes('later'));
   });
 
   it("leaves a document's file the bucket does not have yet for a later run", async () => {
@@ -406,6 +472,17 @@ describe('making room', () => {
     expect(await localAttachmentFile('trip')).not.toBeNull();
     // The bucket does not have this one: here is the only copy there is.
     expect(await localAttachmentFile('only-copy')).not.toBeNull();
+  });
+
+  it("drops a past trip's file, and counts it among what can be fetched again", async () => {
+    await threeFiles();
+    await tripWithFile('past', addDays(lastKeptDay(), -1), 'past');
+    await putAttachmentFile('past', bytes('abcde'), true);
+    expect(await attachmentFileUsage()).toMatchObject({ bytes: 20, keptBytes: 7 });
+
+    await dropCachedFiles();
+    expect(await localAttachmentFile('past')).toBeNull();
+    expect(await localAttachmentFile('trip')).not.toBeNull();
   });
 
   it('says what the files come to and how many are still waiting', async () => {

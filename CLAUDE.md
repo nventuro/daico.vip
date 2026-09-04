@@ -196,8 +196,11 @@ gate, what a sync does with the files. These are the rules on top of it.
 - **Two rules the `afterSync` work turns on.** The kinds whose files every
   device fetches and keeps are `KEPT_OWNER_KINDS` in `attachmentFiles.ts`,
   documents and trip rows — the one exception to files being fetched on
-  demand. Adding a kind there puts its every file on every device and is a
-  decision to write up, never a default; files are still never pulled
+  demand. A trip row's is kept only until `TRIP_FILES_KEPT_DAYS` past its
+  trip's last day: from then on it is fetched on demand like a chore's and
+  «Liberar espacio» drops it, but nothing drops it on its own — a copy a
+  device holds stays. Adding a kind there puts its every file on every device
+  and is a decision to write up, never a default; files are still never pulled
   wholesale and never put in `ALL_SPECS`. The orphan sweep runs only against
   rows the run itself brought down and never against an empty table — what it
   cannot tell from an orphan is a file this device has not heard of yet, and

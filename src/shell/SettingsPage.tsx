@@ -151,7 +151,7 @@ export default function SettingsPage() {
             value={formatBytes(storage.files)}
             note={
               storage.keptFiles > 0
-                ? `${formatBytes(storage.keptFiles)} son de documentos y viajes, que se descargan automáticamente.`
+                ? `${formatBytes(storage.keptFiles)} son de documentos y de viajes que no pasaron, que se descargan automáticamente.`
                 : undefined
             }
           />
@@ -167,8 +167,8 @@ export default function SettingsPage() {
           </Button>
         </div>
         <p className="mt-2 text-sm text-muted">
-          Se eliminan las imágenes de guías y los adjuntos que no son de documentos. Vuelven a
-          bajarse cuando hagan falta.
+          Se eliminan las imágenes de guías y los adjuntos, salvo los de documentos y de viajes que
+          no pasaron. Vuelven a bajarse cuando hagan falta.
         </p>
       </section>
 
