@@ -468,8 +468,11 @@ the rules on top of it.
   form. Compras lives in the list; Recetas keeps its edit form until the
   editor has an ingredients block.
 - **Every free text is `Body`** (`src/components/editor/`), never a
-  `TextArea`, never a second markdown renderer; its placeholder is the field's
-  name («Contenido», «Comentarios»). The editor and `Markdown` share
+  `TextArea`, never a second markdown renderer. A text that is the entry
+  itself takes the field's name as its placeholder («Contenido»); what is
+  written _about_ an entry is drawn by `Comments`, headed like the sections
+  around it and saying that it is written in while it is empty, and a page
+  that takes comments draws that and never a `Body` of its own. The editor and `Markdown` share
   `src/components/markdown/classes.ts` so they look the same, and the editor's
   round trip is tested headlessly in `BodyEditor.test.ts`. It models neither
   GFM tables nor the directives: a table is kept as the text it is.

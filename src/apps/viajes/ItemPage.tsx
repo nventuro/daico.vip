@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import AttachmentGrid from '../../components/AttachmentGrid';
 import { StaticChip } from '../../components/Chip';
+import Comments from '../../components/Comments';
 import DeleteDialog from '../../components/DeleteDialog';
-import Body from '../../components/editor/Body';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
 import SectionLabel from '../../components/SectionLabel';
@@ -63,12 +63,7 @@ export default function ItemPage() {
             onChange={(patch) => void save(entry.id, patch)}
           />
 
-          <Body
-            value={entry.comments ?? ''}
-            onChange={commentsSave.onChange}
-            placeholder="Comentarios"
-            ariaLabel="Comentarios"
-          />
+          <Comments value={entry.comments ?? ''} onChange={commentsSave.onChange} />
 
           <div>
             <SectionLabel>Adjuntos</SectionLabel>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { Checkup } from '../../lib/offline/specs';
 import { StaticChip } from '../../components/Chip';
+import Comments from '../../components/Comments';
 import DeleteDialog from '../../components/DeleteDialog';
 import DueDateChips from '../../components/DueDateChips';
-import Body from '../../components/editor/Body';
 import EntryHead from '../../components/EntryHead';
 import FormField from '../../components/FormField';
 import { useLeave } from '../../hooks/useLeave';
@@ -72,12 +72,7 @@ export default function CheckupPage({ checkup, save, remove }: CheckupPageProps)
         lastDoneOn={checkup.last_done_on}
       />
 
-      <Body
-        value={checkup.comments ?? ''}
-        onChange={commentsSave.onChange}
-        placeholder="Comentarios"
-        ariaLabel="Comentarios"
-      />
+      <Comments value={checkup.comments ?? ''} onChange={commentsSave.onChange} />
 
       <DeleteDialog
         open={deleting}

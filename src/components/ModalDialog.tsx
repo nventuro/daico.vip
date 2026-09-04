@@ -46,6 +46,16 @@ export default function ModalDialog({ onClose, layout, children }: ModalDialogPr
     const dialog = ref.current;
     if (!dialog) return;
     dialog.showModal();
+    // Opening a modal puts the focus on the first control in it. In one that
+    // is filled in that is the field, where the focus is the caret and
+    // belongs; in one that asks a question it is the first answer, which the
+    // browser then draws outlined — the focus came from a field holding a
+    // caret, and it carries that over — so the answer reads as already
+    // chosen. Only a control that is typed into keeps it.
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement)) {
+      dialog.focus();
+    }
     const closed = () => onCloseRef.current();
     dialog.addEventListener('close', closed);
     const overflow = document.body.style.overflow;
@@ -57,7 +67,14 @@ export default function ModalDialog({ onClose, layout, children }: ModalDialogPr
   }, []);
 
   return createPortal(
-    <dialog ref={ref} className={LAYOUT_CLASS[layout]} style={hueStyle(hue)}>
+    <dialog
+      ref={ref}
+      // Focusable so the dialog itself can hold the focus, and drawn without
+      // the ring that would then be around the whole box.
+      tabIndex={-1}
+      className={`${LAYOUT_CLASS[layout]} outline-none`}
+      style={hueStyle(hue)}
+    >
       {children}
     </dialog>,
     document.body,

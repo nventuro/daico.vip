@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import AttachmentGrid from '../../components/AttachmentGrid';
+import Comments from '../../components/Comments';
 import DeleteDialog from '../../components/DeleteDialog';
 import DueDateChips from '../../components/DueDateChips';
-import Body from '../../components/editor/Body';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
 import FormField from '../../components/FormField';
@@ -77,12 +77,7 @@ export default function ChorePage() {
               lastDoneOn={chore.last_done_on}
             />
 
-            <Body
-              value={chore.comments ?? ''}
-              onChange={commentsSave.onChange}
-              placeholder="Comentarios"
-              ariaLabel="Comentarios"
-            />
+            <Comments value={chore.comments ?? ''} onChange={commentsSave.onChange} />
 
             <div>
               <SectionLabel>Adjuntos</SectionLabel>

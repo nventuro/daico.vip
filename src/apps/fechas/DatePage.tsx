@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import Comments from '../../components/Comments';
 import DeleteDialog from '../../components/DeleteDialog';
-import Body from '../../components/editor/Body';
 import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
 import { useEntry } from '../../hooks/useEntry';
@@ -51,12 +51,7 @@ export default function DatePage() {
             />
           </div>
 
-          <Body
-            value={entry.comments ?? ''}
-            onChange={commentsSave.onChange}
-            placeholder="Comentarios"
-            ariaLabel="Comentarios"
-          />
+          <Comments value={entry.comments ?? ''} onChange={commentsSave.onChange} />
 
           <DeleteDialog
             open={deleting}
