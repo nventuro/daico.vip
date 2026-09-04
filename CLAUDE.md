@@ -454,8 +454,13 @@ the rules on top of it.
   Never draw an ad-hoc icon on a row: a mark that is not in `marks.ts` is missing
   from Próximo. A new kind of mark is a new `EntryMark` member plus its icon.
 - **Nothing is destroyed on a single tap**: a delete goes through
-  `DeleteDialog`, from the trash in the entry's head; `UndoBar` (`useUndo`) is
-  for marks and clears, never for a delete.
+  `DeleteDialog`, from the trash in the entry's head. **The undo is the
+  app's, not a screen's**: whatever can be undone — a mark, a clear, a group
+  of rows just confirmed — is offered through `offerUndo` (`src/lib/undo.ts`)
+  and drawn by `UndoNotice`, above the screen's `BottomBar` when it has one
+  and pinned at the bottom by the shell when it has none, its seconds counted
+  from when it is first seen; never for a delete, and never a bar of a
+  page's own.
 - **An entry is born from the bar and edited on its page.** The add bar's +
   writes the row with the typed title and the defaults, then opens it with a
   plain `navigate`; there is no creation form and no Guardar. An entry page
@@ -466,7 +471,12 @@ the rules on top of it.
   bar keeps the title for a dismissed question; nothing else is ever asked at
   birth — a column with no sensible default is a design question, never a
   form. Compras lives in the list; Recetas keeps its edit form until the
-  editor has an ingredients block.
+  editor has an ingredients block. **The one control that leaves a page is
+  the square that marks it** — a chore's, a checkup's, a pendiente's, drawn
+  as a `CheckRow` under the head with the list's words: it writes what the
+  list's square writes, offers the same undo, and leaves back to where the
+  page was opened from (`useLeaveBack`), so the page never shows the
+  after-state; the screen it lands on does, with the undo.
 - **Every free text is `Body`** (`src/components/editor/`), never a
   `TextArea`, never a second markdown renderer. A text that is the entry
   itself takes the field's name as its placeholder («Contenido»); what is
@@ -477,9 +487,10 @@ the rules on top of it.
   round trip is tested headlessly in `BodyEditor.test.ts`. It models neither
   GFM tables nor the directives: a table is kept as the text it is.
 - **A page is left, never stacked on**: `useLeave` for every delete and the
-  header's arrow; a plain link or `navigate` only going down,
-  from a list to an entry. `src/lib/visited.ts` is the record it reads, and a
-  change to it comes with a test in `visited.test.ts`.
+  header's arrow, `useLeaveBack` for the mark that leaves; a plain link or
+  `navigate` only going down, from a list to an entry. `src/lib/visited.ts`
+  is the record both read, and a change to it comes with a test in
+  `visited.test.ts`.
 - **The title is the heading** (`EntryHead`): normalised on blur, never saved
   empty, with the trash at its right and the app's chips under it.
 - **A wait is shown, never written**: no «Cargando...» text. A list still being

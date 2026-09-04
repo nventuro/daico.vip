@@ -21,7 +21,8 @@ export const CHIP_IDLE_CLASS = 'border-border bg-surface-raised text-muted';
 /** Chip colours when it is the selected option: filled in the app's colour. */
 export const CHIP_SELECTED_CLASS = 'border-(--app) bg-(--app) font-medium text-on-primary';
 
-/** The bar pinned to the bottom of a list that adds to it — within thumb reach. */
+/** The bar pinned to the bottom of a screen — a list's add bar, the shell's
+ *  undo — within thumb reach. */
 export const ADD_BAR_CLASS =
   'sticky bottom-0 -mx-4 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur';
 

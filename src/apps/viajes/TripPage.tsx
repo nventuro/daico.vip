@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { TRIP_KINDS, type TripItem, type TripKind } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
-import { UNDO_MS, useUndo } from '../../hooks/useUndo';
+import { endUndo, offerUndo, type UndoOffer } from '../../lib/undo';
 import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
@@ -18,7 +18,6 @@ import FormField from '../../components/FormField';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
-import UndoBar from '../../components/UndoBar';
 import { appPath, entryPath } from '../types';
 import ItemRow from './ItemRow';
 import { tripSections } from './grouping';
@@ -46,7 +45,7 @@ export default function TripPage() {
     loading: itemsLoading,
     error: itemsError,
     add,
-    save,
+    setDone,
     remove: removeItem,
   } = useTripItems(tripId);
   const { insert: restage } = useTripInbox();
@@ -55,50 +54,56 @@ export default function TripPage() {
   const navigate = useNavigate();
   const leave = useLeave();
   const { state, pathname } = useLocation();
-  const undo = useUndo<InboxUndo>(UNDO_MS);
-  // The offer the undo was taken on, so its end is told from every other.
-  const taken = useRef<InboxUndo | null>(null);
+  // The undo of what the review just put in, while this screen offers it.
+  const inboxOffer = useRef<UndoOffer | null>(null);
   const [deleting, setDeleting] = useState(false);
   // The title typed into the bar, while its class is being asked.
   const [naming, setNaming] = useState<string | null>(null);
 
-  // What the review just put in arrives with the navigation and is offered
-  // for a moment; the navigation is then replaced without it, so coming
-  // back to the screen later does not offer it again.
-  const arrived = inboxUndoOf(state);
-  const offer = undo.offer;
-  useEffect(() => {
-    if (!arrived) return;
-    offer(arrived);
-    navigate(pathname, { replace: true, state: null });
-  }, [arrived, offer, navigate, pathname]);
-
-  // The staged files outlive the offer, so an undo finds the rows' PDFs where
-  // they were. Once the offer is over any other way — timed out, replaced, the
-  // screen left — they are let go of.
-  const offered = undo.value;
-  useEffect(() => {
-    if (!offered) return;
-    return () =>
-      settleInboxUndo(offered, taken.current === offered, (ids) => void deleteInboxFiles(ids));
-  }, [offered]);
-
   /** Takes the rows and their attachments out again and puts the suggestions
    *  back as they were; a trip created for them goes too, and with it the
    *  screen. */
-  async function undoInbox(added: InboxUndo) {
-    taken.current = added;
-    undo.clear();
-    for (const attachment of attachments) {
-      if (added.attachmentIds.includes(attachment.id)) await removeAttachment(attachment);
-    }
-    for (const id of added.itemIds) await removeItem(id);
-    for (const row of added.staged) await restage(inboxRowInput(row));
-    if (added.tripCreated) {
-      await removeTrip(added.tripId);
-      leave(appPath('viajes'));
-    }
-  }
+  const undoInbox = useCallback(
+    async (added: InboxUndo) => {
+      for (const attachment of attachments) {
+        if (added.attachmentIds.includes(attachment.id)) await removeAttachment(attachment);
+      }
+      for (const id of added.itemIds) await removeItem(id);
+      for (const row of added.staged) await restage(inboxRowInput(row));
+      if (added.tripCreated) {
+        await removeTrip(added.tripId);
+        leave(appPath('viajes'));
+      }
+    },
+    [attachments, removeAttachment, removeItem, restage, removeTrip, leave],
+  );
+
+  // What the review just put in arrives with the navigation and is offered
+  // for a moment; the navigation is then replaced without it, so coming
+  // back to the screen later does not offer it again. The staged files
+  // outlive the offer, so an undo finds the rows' PDFs where they were; once
+  // the offer is over any other way, they are let go of.
+  const arrived = inboxUndoOf(state);
+  useEffect(() => {
+    if (!arrived) return;
+    const offer: UndoOffer = {
+      message: arrived.label,
+      undo: () => undoInbox(arrived),
+      onEnd: (taken) => settleInboxUndo(arrived, taken, (ids) => void deleteInboxFiles(ids)),
+    };
+    inboxOffer.current = offer;
+    offerUndo(offer);
+    navigate(pathname, { replace: true, state: null });
+  }, [arrived, undoInbox, navigate, pathname]);
+
+  // That undo needs this screen — it may take the trip, and the screen with
+  // it — so it does not follow the member out: leaving ends it.
+  useEffect(
+    () => () => {
+      if (inboxOffer.current) endUndo(inboxOffer.current);
+    },
+    [],
+  );
 
   /** A trip's rows have no meaning without it: the server cascades them, and
    *  this device must not be left listing rows whose trip is gone — they would
@@ -118,7 +123,6 @@ export default function TripPage() {
 
   const today = todayIso();
   const { sections, done } = useMemo(() => tripSections(items), [items]);
-  const justAdded = undo.value;
 
   /** A row is born from its title and its class, chosen now and never again,
    *  and opened to have the rest said about it. */
@@ -135,7 +139,7 @@ export default function TripPage() {
         item={item}
         today={today}
         hasAttachments={attached.has(item.id)}
-        onToggle={() => void save(item.id, { done: !item.done })}
+        onToggle={() => void setDone(item.id, !item.done)}
       />
     );
   }
@@ -155,11 +159,6 @@ export default function TripPage() {
           }}
           placeholder="Agregar al viaje..."
           inputLabel="Agregar al viaje"
-          notice={
-            justAdded && (
-              <UndoBar message={justAdded.label} onAction={() => void undoInbox(justAdded)} />
-            )
-          }
         />
       }
     >

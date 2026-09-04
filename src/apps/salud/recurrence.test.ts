@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Checkup } from '../../lib/offline/specs';
-import { dueAfterMarking, groupCheckups, isDone } from './recurrence';
+import { dueAfterMarking, groupCheckups, isDone, markMessage } from './recurrence';
 
 function checkup(overrides: Partial<Checkup> = {}): Checkup {
   return {
@@ -59,5 +59,16 @@ describe('groupCheckups', () => {
     const b = once({ id: 'b', last_done_on: '2026-10-15' });
     const c = once({ id: 'c', last_done_on: null });
     expect(groupCheckups([a, b, c])).toEqual({ pending: [a, c], done: [b] });
+  });
+});
+
+describe('markMessage', () => {
+  it('says where a checkup that comes back went', () => {
+    expect(markMessage(checkup(), '2026-09-04')).toBe('Hecho · vuelve el 04/03');
+  });
+
+  it('says a checkup done once is done', () => {
+    const once = checkup({ repeat_every: null, repeat_unit: null, last_done_on: null });
+    expect(markMessage(once, '2026-09-04')).toBe('Control hecho');
   });
 });

@@ -3,26 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import type { Chore } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
-import { formatDayMonth, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
-import { UNDO_MS, useUndo } from '../../hooks/useUndo';
+import { isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { offerUndo } from '../../lib/undo';
 import ChecklistItem from '../../components/ChecklistItem';
 import EntryMarks from '../../components/EntryMarks';
 import CompletedSection from '../../components/CompletedSection';
 import SectionLabel from '../../components/SectionLabel';
 import AddBar from '../../components/AddBar';
-import UndoBar from '../../components/UndoBar';
 import EmptyState from '../../components/EmptyState';
 import ListPage from '../../components/ListPage';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import { choreMarks } from './marks';
-import { dueAfterMarking, groupChores, isDone } from './recurrence';
+import { groupChores, isDone, markMessage } from './recurrence';
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, mark, unmark, restore } = useChores();
   const { items: attachments } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'chore'), [attachments]);
-  const undo = useUndo<Chore>(UNDO_MS);
   const navigate = useNavigate();
 
   const today = todayIso();
@@ -36,21 +34,8 @@ export default function ChoresPage() {
     void mark(chore);
     // The copy is taken before the mark, so undoing puts back both the day it
     // was last marked and the day it was due.
-    undo.offer(chore);
+    offerUndo({ message: markMessage(chore, today), undo: () => restore(chore) });
   }
-
-  function undoMark(chore: Chore) {
-    undo.clear();
-    void restore(chore);
-  }
-
-  /** What the undo bar says: for a chore that comes back, where it went. */
-  function markMessage(chore: Chore): string {
-    const next = chore.repeat_every === null ? null : dueAfterMarking(chore, today);
-    return next ? `Hecha · vuelve el ${formatDayMonth(next)}` : 'Tarea hecha';
-  }
-
-  const justDone = undo.value;
 
   /** A chore is born from its title alone, undated and done once, and opened
    *  to have the rest said about it. */
@@ -94,11 +79,6 @@ export default function ChoresPage() {
           onAdd={(title) => void addChore(title)}
           placeholder="Agregar una tarea..."
           inputLabel="Nueva tarea"
-          notice={
-            justDone && (
-              <UndoBar message={markMessage(justDone)} onAction={() => undoMark(justDone)} />
-            )
-          }
         />
       }
     >

@@ -5,7 +5,7 @@ import Button from '../../components/Button';
 import EmptyState from '../../components/EmptyState';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
-import { ADD_BAR_CLASS } from '../../components/controlClasses';
+import BottomBar from '../../components/BottomBar';
 import { useMerchantRules } from './useMerchantRules';
 import { CATEGORY_LABELS } from './labels';
 import type { Rule } from './rules';
@@ -37,7 +37,7 @@ export default function RulesPage() {
         loading={loading || !rules}
         error={error}
         bar={
-          <div className={ADD_BAR_CLASS}>
+          <BottomBar>
             <Button
               onClick={() => setPasting(true)}
               disabled={masterKey.status !== 'unlocked'}
@@ -45,7 +45,7 @@ export default function RulesPage() {
             >
               Pegar reglas
             </Button>
-          </div>
+          </BottomBar>
         }
       >
         {rules?.length === 0 ? (

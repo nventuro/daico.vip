@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { TRIP_ITEMS_SPEC, type TripKind } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { offerUndo } from '../../lib/undo';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import { TRIP_KIND_DEFAULT, TRIP_KIND_SHAPES } from './kinds';
+import { TICK_MESSAGE } from './labels';
 
 /** Everything a form decides about a row of a trip: its own columns minus the
  *  engine-managed ones, the trip it belongs to, and whether it is ticked —
@@ -87,5 +89,15 @@ export function useTripItems(tripId?: string) {
     [update],
   );
 
-  return { items, loading, error, add, save, remove };
+  /** Ticks a pendiente, or unticks it. A tick is offered to be undone, the
+   *  way marking a chore is: the row leaves for Hechos. */
+  const setDone = useCallback(
+    (id: string, done: boolean) => {
+      if (done) offerUndo({ message: TICK_MESSAGE, undo: () => update(id, { done: false }) });
+      return update(id, { done });
+    },
+    [update],
+  );
+
+  return { items, loading, error, add, save, setDone, remove };
 }

@@ -1,14 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Checkup } from '../../lib/offline/specs';
-import { UNDO_MS, useUndo } from '../../hooks/useUndo';
-import {
-  formatDateShort,
-  formatDayMonth,
-  isPast,
-  relativeDay,
-  todayIso,
-} from '../../utils/dateUtils';
+import { offerUndo } from '../../lib/undo';
+import { formatDateShort, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import ChecklistItem from '../../components/ChecklistItem';
 import CompletedSection from '../../components/CompletedSection';
@@ -19,11 +13,10 @@ import LinkRow from '../../components/LinkRow';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
-import UndoBar from '../../components/UndoBar';
 import { entryPath } from '../types';
 import { SALUD_KINDS, SALUD_KIND_LABELS, type SaludKind } from './kinds';
 import { checkupMarks } from './marks';
-import { dueAfterMarking, groupCheckups, isDone } from './recurrence';
+import { groupCheckups, isDone, markMessage } from './recurrence';
 import { useCheckups } from './useCheckups';
 import { useHealthRecords } from './useHealthRecords';
 
@@ -36,7 +29,6 @@ const KIND_OPTIONS = SALUD_KINDS.map((kind) => ({ kind, label: SALUD_KIND_LABELS
 export default function SaludPage() {
   const checkups = useCheckups();
   const records = useHealthRecords();
-  const undo = useUndo<Checkup>(UNDO_MS);
   const navigate = useNavigate();
   // The title typed into the bar, while its kind is being asked.
   const [naming, setNaming] = useState<string | null>(null);
@@ -52,21 +44,8 @@ export default function SaludPage() {
     void checkups.mark(checkup);
     // The copy is taken before the mark, so undoing puts back both the day it
     // was last marked and the day it was due.
-    undo.offer(checkup);
+    offerUndo({ message: markMessage(checkup, today), undo: () => checkups.restore(checkup) });
   }
-
-  function undoMark(checkup: Checkup) {
-    undo.clear();
-    void checkups.restore(checkup);
-  }
-
-  /** What the undo bar says: for a checkup that comes back, where it went. */
-  function markMessage(checkup: Checkup): string {
-    const next = checkup.repeat_every === null ? null : dueAfterMarking(checkup, today);
-    return next ? `Hecho · vuelve el ${formatDayMonth(next)}` : 'Control hecho';
-  }
-
-  const justDone = undo.value;
 
   function renderCheckup(checkup: Checkup) {
     const finished = isDone(checkup);
@@ -120,11 +99,6 @@ export default function SaludPage() {
           }}
           placeholder="Agregar un control o estudio..."
           inputLabel="Nuevo control o estudio"
-          notice={
-            justDone && (
-              <UndoBar message={markMessage(justDone)} onAction={() => undoMark(justDone)} />
-            )
-          }
         />
       }
     >

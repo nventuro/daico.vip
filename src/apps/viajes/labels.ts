@@ -17,6 +17,9 @@ export const TRIP_KIND_LABELS: Record<TripKind, string> = {
   place: 'Lugar',
 };
 
+/** What the undo bar says once a pendiente is ticked. */
+export const TICK_MESSAGE = 'Pendiente hecho';
+
 /** What each class's section is headed with. */
 export const TRIP_SECTION_LABELS: Record<TripKind, string> = {
   todo: 'Pendientes',

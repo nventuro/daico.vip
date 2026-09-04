@@ -15,11 +15,8 @@ import LoadingLine from '../../components/LoadingLine';
 import ModalDialog from '../../components/ModalDialog';
 import SectionLabel from '../../components/SectionLabel';
 import SkeletonRows from '../../components/SkeletonRows';
-import {
-  ADD_BAR_BUTTON_CLASS,
-  ADD_BAR_CLASS,
-  ADD_BAR_INPUT_CLASS,
-} from '../../components/controlClasses';
+import BottomBar from '../../components/BottomBar';
+import { ADD_BAR_BUTTON_CLASS, ADD_BAR_INPUT_CLASS } from '../../components/controlClasses';
 import { useStatements } from './useStatements';
 import { openStatement, useStatementsContents } from './useStatementsContents';
 import { parseStatement } from './parsers';
@@ -151,7 +148,7 @@ export default function StatementsPage() {
         bar={
           /* The add bar every list ends in, with the file picker where the text
            would go: a statement is added by picking its PDF, not by typing. */
-          <div className={ADD_BAR_CLASS}>
+          <BottomBar>
             <ErrorLine problem={problem} className="mb-3" />
             {reading && (
               <div className="mb-3">
@@ -186,7 +183,7 @@ export default function StatementsPage() {
                 </div>
               )}
             </HiddenFileInput>
-          </div>
+          </BottomBar>
         }
       >
         {items.length === 0 ? (

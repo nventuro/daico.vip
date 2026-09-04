@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Chore } from '../../lib/offline/specs';
-import { dueAfterMarking, groupChores, isDone } from './recurrence';
+import { dueAfterMarking, groupChores, isDone, markMessage } from './recurrence';
 
 const TODAY = '2026-09-10';
 
@@ -114,5 +114,16 @@ describe('groupChores', () => {
   it('leaves a chore that repeats out of the done group', () => {
     const marked = { ...repeats, last_done_on: TODAY };
     expect(groupChores([marked], TODAY).done).toEqual([]);
+  });
+});
+
+describe('markMessage', () => {
+  it('says where a chore that comes back went', () => {
+    const pipette = repeating({ id: 'p', repeat_from: 'done', due_on: '2026-09-02' });
+    expect(markMessage(pipette, TODAY)).toBe('Hecha · vuelve el 10/10');
+  });
+
+  it('says a chore done once is done', () => {
+    expect(markMessage(chore({ id: 'b', due_on: TODAY }), TODAY)).toBe('Tarea hecha');
   });
 });

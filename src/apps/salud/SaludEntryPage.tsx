@@ -37,6 +37,9 @@ export default function SaludEntryPage() {
             checkup={entry.checkup}
             save={checkups.save}
             remove={checkups.remove}
+            mark={checkups.mark}
+            unmark={checkups.unmark}
+            restore={checkups.restore}
           />
         ) : (
           <RecordPage

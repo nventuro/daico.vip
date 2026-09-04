@@ -1,4 +1,5 @@
 import type { Checkup } from '../../lib/offline/specs';
+import { formatDayMonth } from '../../utils/dateUtils';
 import { addRepeats } from '../../utils/recurrence';
 
 /** Whether a checkup is finished for good: it was marked, and it is not coming
@@ -16,6 +17,13 @@ export function dueAfterMarking(checkup: Checkup, on: string): string | null {
   const { due_on, repeat_every, repeat_unit } = checkup;
   if (repeat_every === null || repeat_unit === null) return due_on;
   return addRepeats(on, repeat_every, repeat_unit);
+}
+
+/** What is said once a checkup is marked on `today`: for one that comes
+ *  back, where it went. */
+export function markMessage(checkup: Checkup, today: string): string {
+  const next = checkup.repeat_every === null ? null : dueAfterMarking(checkup, today);
+  return next ? `Hecho · vuelve el ${formatDayMonth(next)}` : 'Control hecho';
 }
 
 export interface CheckupGroups {

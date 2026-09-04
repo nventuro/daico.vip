@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { IconPlus } from '@tabler/icons-react';
-import { ADD_BAR_BUTTON_CLASS, ADD_BAR_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
+import BottomBar from './BottomBar';
+import { ADD_BAR_BUTTON_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
 
 interface AddBarProps {
   /** Called with what was typed, never blank. The bar then clears itself,
@@ -12,7 +13,7 @@ interface AddBarProps {
   inputLabel: string;
   /** Optional secondary controls (e.g. a date picker) shown under the input row. */
   children?: ReactNode;
-  /** What belongs above the input row: a transient undo bar, or a list-level action. */
+  /** What belongs above the input row: a list-level action. */
   notice?: ReactNode;
   /** Whether the keyboard capitalises what is typed: a list of things named
    *  after places takes capitals, one of things to do or buy does not. */
@@ -21,8 +22,8 @@ interface AddBarProps {
 
 /** Bottom-anchored add bar — within thumb reach for one-handed use. The bar
  *  holds what is being typed; pages pass extra controls (like a date picker) as
- *  children and what goes above the input (an undo bar, a list-level action) as
- *  `notice`, so both stay pinned with the bar. */
+ *  children and what goes above the input (a list-level action) as `notice`,
+ *  so both stay pinned with the bar. */
 export default function AddBar({
   onAdd,
   placeholder,
@@ -44,7 +45,7 @@ export default function AddBar({
   }
 
   return (
-    <div className={ADD_BAR_CLASS}>
+    <BottomBar>
       {notice && <div className="mb-3">{notice}</div>}
       <form onSubmit={handleSubmit}>
         <div className="flex items-center gap-2">
@@ -76,6 +77,6 @@ export default function AddBar({
         </div>
         {children && <div className="mt-2 flex flex-wrap items-center gap-2">{children}</div>}
       </form>
-    </div>
+    </BottomBar>
   );
 }

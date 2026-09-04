@@ -1,5 +1,5 @@
 import type { Chore } from '../../lib/offline/specs';
-import { addDays, daysUntil } from '../../utils/dateUtils';
+import { addDays, daysUntil, formatDayMonth } from '../../utils/dateUtils';
 import { addRepeats, nextOccurrenceOnOrAfter } from '../../utils/recurrence';
 
 /** Beyond this many days ahead a chore waits under «Más adelante» instead of
@@ -29,6 +29,13 @@ export function dueAfterMarking(chore: Chore, on: string): string | null {
   // same and marking it late does not skip a turn.
   const after = addDays(on < due_on ? due_on : on, 1);
   return nextOccurrenceOnOrAfter(due_on, repeat_every, repeat_unit, after) ?? due_on;
+}
+
+/** What is said once a chore is marked on `today`: for one that comes back,
+ *  where it went. */
+export function markMessage(chore: Chore, today: string): string {
+  const next = chore.repeat_every === null ? null : dueAfterMarking(chore, today);
+  return next ? `Hecha · vuelve el ${formatDayMonth(next)}` : 'Tarea hecha';
 }
 
 export interface ChoreGroups {

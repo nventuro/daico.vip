@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { stepsBackTo } from '../lib/visited';
+import { previousPathname, stepsBackTo } from '../lib/visited';
 
 /**
  * The one way an entry page goes to another screen: back to it when it is
@@ -19,4 +19,15 @@ export function useLeave(): (to: string) => void {
     },
     [navigate],
   );
+}
+
+/**
+ * The way out of a page for the one control that leaves it — the square that
+ * marks an entry: back to the screen the page was opened from, whichever it
+ * was, so a page opened from Próximo returns to Próximo; up to `fallback`
+ * when this page knows of nothing behind (it was opened on this page).
+ */
+export function useLeaveBack(): (fallback: string) => void {
+  const leave = useLeave();
+  return useCallback((fallback: string) => leave(previousPathname() ?? fallback), [leave]);
 }

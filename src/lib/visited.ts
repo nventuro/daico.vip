@@ -50,3 +50,9 @@ export function stepsBackTo(pathname: string): number | null {
   }
   return null;
 }
+
+/** Where the open screen was reached from, when this page saw it: the visit
+ *  just behind; null when the open screen is the first this page knows. */
+export function previousPathname(): string | null {
+  return open > 0 ? visits[open - 1].pathname : null;
+}

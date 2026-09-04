@@ -14,21 +14,18 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { ShoppingItem } from '../../lib/offline/specs';
 import { useShoppingList } from './useShoppingList';
 import { keyForMove } from './ordering';
-import { UNDO_MS, useUndo } from '../../hooks/useUndo';
+import { offerUndo } from '../../lib/undo';
 import SortableShoppingItem from './SortableShoppingItem';
 import AddBar from '../../components/AddBar';
 import Button from '../../components/Button';
-import UndoBar from '../../components/UndoBar';
 import EmptyState from '../../components/EmptyState';
 import ListPage from '../../components/ListPage';
 import SkeletonRows from '../../components/SkeletonRows';
 
 export default function ShoppingPage() {
   const { items, loading, error, add, toggle, removeChecked, restore, move } = useShoppingList();
-  const undo = useUndo<ShoppingItem[]>(UNDO_MS);
 
   // Optimistic ordering: a drag reorder is reflected here synchronously so the
   // dropped row stays in its new slot, instead of snapping back for a frame
@@ -60,16 +57,12 @@ export default function ShoppingPage() {
 
   async function clearStruck() {
     const removed = await removeChecked();
-    if (removed?.length) undo.offer(removed);
-  }
-
-  function undoClear(removed: ShoppingItem[]) {
-    undo.clear();
-    void restore(removed);
+    if (removed?.length) {
+      offerUndo({ message: 'Tachados borrados', undo: () => restore(removed) });
+    }
   }
 
   const hasStruck = view.some((i) => i.checked);
-  const justCleared = undo.value;
 
   return (
     <ListPage
@@ -82,9 +75,7 @@ export default function ShoppingPage() {
           placeholder="Agregar producto..."
           inputLabel="Nuevo producto"
           notice={
-            justCleared ? (
-              <UndoBar message="Tachados borrados" onAction={() => undoClear(justCleared)} />
-            ) : hasStruck ? (
+            hasStruck ? (
               <Button variant="dangerOutline" size="sm" onClick={() => void clearStruck()}>
                 Borrar tachados
               </Button>

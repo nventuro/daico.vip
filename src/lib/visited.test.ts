@@ -71,4 +71,19 @@ describe('the record of visits', () => {
     visited.recordVisit('y', '/tareas', NavigationType.Push);
     expect(visited.stepsBackTo('/tareas/1')).toBe(-1);
   });
+
+  it('knows the screen the open one was reached from, and when there is none', () => {
+    visited.recordVisit('a', '/proximo', NavigationType.Pop);
+    expect(visited.previousPathname()).toBeNull();
+    visited.recordVisit('b', '/tareas/1', NavigationType.Push);
+    expect(visited.previousPathname()).toBe('/proximo');
+    visited.recordVisit('a', '/proximo', NavigationType.Pop);
+    expect(visited.previousPathname()).toBeNull();
+  });
+
+  it('forgets what was behind an entry it never saw', () => {
+    visited.recordVisit('a', '/', NavigationType.Pop);
+    visited.recordVisit('x', '/tareas/1', NavigationType.Pop);
+    expect(visited.previousPathname()).toBeNull();
+  });
 });

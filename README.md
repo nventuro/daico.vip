@@ -121,7 +121,8 @@ Recetas is not there yet.
 **Tareas** — `chores`: a title, an optional due date and comments. A chore can
 repeat, and marking one that does moves its date on instead of finishing it.
 Born from the bar undated; its day, its repetition and its comments are set
-on its page.
+on its page, and it is marked there too — which sends the page back to
+wherever it was opened from, with the undo the list offers.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
 fractional `position`, so reordering the list writes one row. Items are born
@@ -160,7 +161,8 @@ chore that always comes back from the day it was marked, or a one-off
 appointment — with comments and no attachments; it reaches Próximo the week
 before. A health record is a study kept: a title, the day it was done and its
 files, which hold everything the study says. Both are born from one bar,
-whose + asks which of the two, and edited in place on their page.
+whose + asks which of the two, and edited in place on their page; a checkup
+is marked there as well as in the list, and the page goes back.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, two timestamps and an opaque blob, which is
@@ -188,7 +190,8 @@ rows in `trip_inbox_files`, and becomes the confirmed rows' attachment; every
 device fetches the staged files after a sync, so a group is confirmed with no
 connection. A trip and each of its rows are born from the bar — a row's
 class is asked by the + and never changed — and edited in place on their
-pages; deleting a trip takes its rows with it.
+pages; a pendiente is ticked on the trip or from its page, either with an
+undo; deleting a trip takes its rows with it.
 
 **Guías** — `guides` / `guide_chapters`: imported content (see Guides below),
 in the same markdown dialect. A guide is shelved under a group (`group_name`,

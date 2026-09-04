@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { IconSearch, IconSettings } from '@tabler/icons-react';
 import IconButton from '../components/IconButton';
+import UndoNotice from '../components/UndoNotice';
 import { recordVisit } from '../lib/visited';
 import { useAppContext } from './appContext';
 import { useDbOwnership } from '../hooks/useDbOwnership';
@@ -84,7 +85,12 @@ export default function MainLayout() {
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-6">
-        <Outlet />
+        <div className="flex flex-1 flex-col">
+          <Outlet />
+        </div>
+        {/* A screen with no bar of its own still shows the app's undo, in the
+            place a bar would have. */}
+        <UndoNotice pinned />
       </main>
     </div>
   );
