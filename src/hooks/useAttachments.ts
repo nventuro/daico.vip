@@ -13,6 +13,17 @@ import {
 import { useOfflineTable } from './useOfflineTable';
 import { lowercaseTrimmed } from '../utils/textUtils';
 
+/** A file already sealed in the attachment format, its key wrapped under the
+ *  master key: what a file sealed outside the app becomes once re-keyed. */
+export interface SealedAttachment {
+  name: string;
+  mime: string;
+  /** Of the file itself, before sealing, in bytes. */
+  size: number;
+  data: Uint8Array;
+  wrappedFileKey: string;
+}
+
 /** The entries of `kind` that have at least one attachment — what tells a row
  *  with attachments from one without, wherever it is listed. */
 export function ownersWithAttachments(
@@ -80,6 +91,30 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate, kind, ownerId],
   );
 
+  /** Keep a file that is already sealed, under a row of its own on `owner`:
+   *  the bytes go in as they are, waiting for the next sync to upload them.
+   *  Returns the new attachment's id, or undefined when it could not be added. */
+  const addSealed = useCallback(
+    (owner: AttachmentOwner, file: SealedAttachment) =>
+      mutate(async () => {
+        const id = crypto.randomUUID();
+        await putAttachmentFile(id, file.data, false);
+        return engine.insert(
+          ATTACHMENTS_SPEC,
+          {
+            owner_kind: owner.kind,
+            owner_id: owner.id,
+            name: lowercaseTrimmed(file.name),
+            mime: file.mime,
+            size: file.size,
+            wrapped_file_key: file.wrappedFileKey,
+          },
+          id,
+        );
+      }),
+    [mutate],
+  );
+
   const remove = useCallback(
     (attachment: Attachment) => mutate(() => removeAttachment(attachment)),
     [mutate],
@@ -95,5 +130,5 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate, items],
   );
 
-  return { items, loading, error, add, remove, removeAll };
+  return { items, loading, error, add, addSealed, remove, removeAll };
 }

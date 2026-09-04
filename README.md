@@ -178,7 +178,11 @@ the weeks before a trip — what is booked and what is still missing — and,
 during it, for looking up a code or an address; it is not an agenda. A
 confirmation email forwarded to the household's address becomes staged rows in
 `trip_inbox`, by the worker in `worker/`, and the app shows them under Inbox to
-be added to a trip or discarded. A trip and each of its rows are born on a
+be added to a trip or discarded. A PDF the email carries is sealed by the
+worker to a key the household publishes (`inbox_key`), waits beside the staged
+rows in `trip_inbox_files`, and becomes the confirmed rows' attachment; every
+device fetches the staged files after a sync, so a group is confirmed with no
+connection. A trip and each of its rows are born on a
 form — a row's class is chosen there and never changed — and edited in place
 on their pages; deleting a trip takes its rows with it.
 
@@ -230,7 +234,11 @@ the server only ever stores ciphertext.
   master key wraps one key per file; the file key encrypts the file with
   AES-GCM. A device unwraps the master key once, when the phrase is typed, and
   keeps it non-extractable in IndexedDB. The phrase exists only on paper:
-  losing it loses every attachment.
+  losing it loses every attachment. A second pair, the inbox key, lets the
+  email worker seal a PDF for the household without holding anything that
+  opens one: its public half is published, its private half sealed under the
+  master key like any file, and a sealed PDF becomes an attachment by having
+  its key re-wrapped.
 - **The phrase gate**: a device without the master key stops right after login,
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
@@ -243,8 +251,8 @@ the server only ever stores ciphertext.
   a PDF is drawn there page by page (its first page is its tile) and only
   leaves the app through Compartir / Descargar.
 - **Sync**: files follow every table sync — uploads go out, files of deleted
-  rows are dropped, every document's files this device lacks are fetched and
-  kept, and bucket objects no row refers to are swept.
+  rows are dropped, every document's and every trip row's files this device
+  lacks are fetched and kept, and bucket objects no row refers to are swept.
 
 ## Guides
 

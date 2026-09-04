@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { TripItem } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
@@ -22,7 +22,8 @@ import { appPath, entryPath } from '../types';
 import ItemRow from './ItemRow';
 import { draftTitleState } from '../../hooks/useDraftTitle';
 import { tripSections } from './grouping';
-import { inboxRowInput, inboxUndoOf, type InboxUndo } from './inboxUndo';
+import { deleteInboxFiles } from './inboxFiles';
+import { inboxRowInput, inboxUndoOf, settleInboxUndo, type InboxUndo } from './inboxUndo';
 import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
@@ -45,6 +46,8 @@ export default function TripPage() {
   const leave = useLeave();
   const { state, pathname } = useLocation();
   const undo = useUndo<InboxUndo>(UNDO_MS);
+  // The offer the undo was taken on, so its end is told from every other.
+  const taken = useRef<InboxUndo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // What the review just put in arrives with the navigation and is offered
@@ -58,10 +61,25 @@ export default function TripPage() {
     navigate(pathname, { replace: true, state: null });
   }, [arrived, offer, navigate, pathname]);
 
-  /** Takes the rows out again and puts the suggestions back as they were;
-   *  a trip created for them goes too, and with it the screen. */
+  // The staged files outlive the offer, so an undo finds the rows' PDFs where
+  // they were. Once the offer is over any other way — timed out, replaced, the
+  // screen left — they are let go of.
+  const offered = undo.value;
+  useEffect(() => {
+    if (!offered) return;
+    return () =>
+      settleInboxUndo(offered, taken.current === offered, (ids) => void deleteInboxFiles(ids));
+  }, [offered]);
+
+  /** Takes the rows and their attachments out again and puts the suggestions
+   *  back as they were; a trip created for them goes too, and with it the
+   *  screen. */
   async function undoInbox(added: InboxUndo) {
+    taken.current = added;
     undo.clear();
+    for (const attachment of attachments) {
+      if (added.attachmentIds.includes(attachment.id)) await removeAttachment(attachment);
+    }
     for (const id of added.itemIds) await removeItem(id);
     for (const row of added.staged) await restage(inboxRowInput(row));
     if (added.tripCreated) {

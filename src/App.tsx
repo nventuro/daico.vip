@@ -4,12 +4,17 @@ import { supabase } from './lib/supabase';
 import { afterSync } from './lib/offline/sync';
 import { syncAttachmentFiles } from './lib/attachmentFiles';
 import { clearDevice } from './lib/clearDevice';
+import { apps } from './apps/registry';
 import { AppProvider } from './shell/AppContext';
 import MainLayout from './shell/MainLayout';
 
 // Attachment files travel outside the tables; they follow every sync so a file
-// added offline goes up as soon as the rows do, whichever screen is open.
+// added offline goes up as soon as the rows do, whichever screen is open. So
+// does whatever an app keeps beside its tables.
 afterSync(syncAttachmentFiles);
+for (const app of apps) {
+  if (app.afterSync) afterSync(app.afterSync);
+}
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);

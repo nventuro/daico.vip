@@ -131,6 +131,7 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     from_code: null,
     to_code: null,
     comments: null,
+    file_ids: '[]',
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
     ...overrides,

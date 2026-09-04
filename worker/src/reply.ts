@@ -39,14 +39,16 @@ function listed(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
 }
 
-/** The two lines of a successful reply: what was found, and where it went. */
-export function successBody(tripTitle: string, counts: KindCounts): string {
+/** The two lines of a successful reply: what was found, with how many PDFs
+ *  were kept with it when any were, and where it went. */
+export function successBody(tripTitle: string, counts: KindCounts, files: number): string {
   const total = INBOX_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
   const parts = INBOX_KINDS.filter((kind) => counts[kind] > 0).map((kind) =>
     phrase(kind, counts[kind]),
   );
+  const kept = files > 0 ? `, con ${files} PDF` : '';
   return [
-    `Encontré ${total} ${total === 1 ? 'ítem' : 'ítems'} para «${tripTitle}»: ${listed(parts)}.`,
+    `Encontré ${total} ${total === 1 ? 'ítem' : 'ítems'} para «${tripTitle}»: ${listed(parts)}${kept}.`,
     `Quedaron para revisar en Viajes: ${VIAJES_URL}`,
   ].join('\n');
 }

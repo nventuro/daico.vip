@@ -2,7 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { InboxGroup } from './grouping';
 import { CREATE_TRIP_CHOICE } from './grouping';
-import { confirmInbox, discardInbox, tripItemFrom, type InboxWrites } from './inboxConfirm';
+import type { SealedAttachment } from '../../hooks/useAttachments';
+import {
+  confirmInbox,
+  discardInbox,
+  groupFileIds,
+  tripItemFrom,
+  type InboxWrites,
+} from './inboxConfirm';
 
 function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxItem {
   return {
@@ -19,6 +26,7 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     from_code: 'AEP',
     to_code: 'BRC',
     comments: 'Código QK7T2M',
+    file_ids: '[]',
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
     ...overrides,
@@ -37,20 +45,47 @@ const GROUP: InboxGroup = {
   ],
 };
 
+/** A staged file as the confirm gets it, already re-keyed. */
+function sealed(name: string): SealedAttachment {
+  return {
+    name,
+    mime: 'application/pdf',
+    size: 3,
+    data: new Uint8Array([1, 2, 3]),
+    wrappedFileKey: 'k',
+  };
+}
+
 /** Writes that remember what they were asked and hand out ids in order. */
-function writes(): InboxWrites & { added: string[]; removed: string[] } {
+function writes(): InboxWrites & {
+  added: string[];
+  attached: [string, string][];
+  removed: string[];
+  files: string[][];
+} {
   const added: string[] = [];
+  const attached: [string, string][] = [];
   const removed: string[] = [];
+  const files: string[][] = [];
   return {
     added,
+    attached,
     removed,
+    files,
     addTrip: vi.fn(async () => 'v-new'),
     addItem: vi.fn(async (input) => {
       added.push(input.title);
       return `i${added.length}`;
     }),
+    addAttachment: vi.fn(async (owner, file) => {
+      attached.push([owner.id, file.name]);
+      return `a${attached.length}`;
+    }),
     removeStaged: vi.fn(async (id: string) => {
       removed.push(id);
+    }),
+    removeFiles: vi.fn(async (ids: string[]) => {
+      files.push(ids);
     }),
   };
 }
@@ -90,8 +125,44 @@ describe('confirmInbox', () => {
       tripCreated: false,
       tripId: 'v1',
       itemIds: ['i1', 'i2', 'i3'],
+      attachmentIds: [],
       staged: GROUP.items,
+      fileIds: [],
     });
+  });
+
+  it('attaches to each row the files it was printed in, a file on two rows to each, and leaves the staged files where they are', async () => {
+    const group: InboxGroup = {
+      ...GROUP,
+      items: [
+        staged('s1', { file_ids: '["f1"]' }),
+        staged('s2', { kind: 'lodging', title: 'Hotel Cormorán', file_ids: '["f1", "f2"]' }),
+        staged('s3', { kind: 'booking', title: 'Autos Pampa' }),
+      ],
+    };
+    expect(groupFileIds(group)).toEqual(['f1', 'f2']);
+    const w = writes();
+    const files = new Map([
+      ['f1', sealed('pasajes')],
+      ['f2', sealed('hotel')],
+    ]);
+    const undo = await confirmInbox(group, 'v1', w, files);
+    expect(w.attached).toEqual([
+      ['i1', 'pasajes'],
+      ['i2', 'pasajes'],
+      ['i2', 'hotel'],
+    ]);
+    expect(undo?.attachmentIds).toEqual(['a1', 'a2', 'a3']);
+    expect(undo?.fileIds).toEqual(['f1', 'f2']);
+    expect(w.files).toEqual([]);
+  });
+
+  it('skips a file it was not given, and writes the row all the same', async () => {
+    const group: InboxGroup = { ...GROUP, items: [staged('s1', { file_ids: '["f1"]' })] };
+    const w = writes();
+    const undo = await confirmInbox(group, 'v1', w);
+    expect(w.attached).toEqual([]);
+    expect(undo?.itemIds).toEqual(['i1']);
   });
 
   it('creates the trip first, named as the model named it and without dates', async () => {
@@ -121,10 +192,15 @@ describe('confirmInbox', () => {
 });
 
 describe('discardInbox', () => {
-  it('clears the staged rows and creates nothing', async () => {
+  it('clears the staged rows and their files, and creates nothing', async () => {
+    const group: InboxGroup = {
+      ...GROUP,
+      items: [staged('s1', { file_ids: '["f1"]' }), staged('s2', { file_ids: '["f1", "f2"]' })],
+    };
     const w = writes();
-    await discardInbox(GROUP, w);
-    expect(w.removed).toEqual(['s1', 's2', 's3']);
+    await discardInbox(group, w);
+    expect(w.removed).toEqual(['s1', 's2']);
+    expect(w.files).toEqual([['f1', 'f2']]);
     expect(w.added).toEqual([]);
     expect(w.addTrip).not.toHaveBeenCalled();
   });

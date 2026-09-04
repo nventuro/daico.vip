@@ -11,6 +11,7 @@ import LoginScreen from './LoginScreen';
 import NoAccessScreen from './NoAccessScreen';
 import UnlockScreen from './UnlockScreen';
 import FirstSyncScreen from './FirstSyncScreen';
+import InboxKeySetup from './InboxKeySetup';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
 const TabConflictScreen = lazy(() => import('./TabConflictScreen'));
@@ -47,6 +48,7 @@ export default function MainLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">
+      <InboxKeySetup />
       <header className="sticky top-0 z-30 h-(--header-height) border-b-2 border-on-surface bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-full max-w-2xl items-center justify-between px-4">
           <span className="flex items-center gap-2.5">

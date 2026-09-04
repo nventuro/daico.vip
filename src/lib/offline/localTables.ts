@@ -46,6 +46,25 @@ export const ATTACHMENT_FILES: LocalTableSpec = {
 };
 
 /**
+ * The sealed PDFs waiting with the rows of an email, fetched whole after a
+ * sync so a group is confirmed with no connection, and dropped once no staged
+ * row lists them. Kept sealed as they came: nothing here is ever opened, only
+ * re-keyed at confirm into an attachment file.
+ */
+export const INBOX_FILES: LocalTableSpec = {
+  table: 'inbox_files',
+  ddl: `CREATE TABLE IF NOT EXISTS inbox_files (
+    id TEXT PRIMARY KEY,
+    import_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    data BLOB NOT NULL,
+    wrapped_key TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+};
+
+/**
  * Deletions queued on a table that had to be made again. A row waiting to be
  * deleted is an ordinary row of its table marked `pending_op`, so a table the
  * engine drops to bring it to its spec's shape takes the queued deletion with
@@ -84,6 +103,7 @@ export const SYNC_PROBLEMS: LocalTableSpec = {
 export const LOCAL_SPECS: LocalTableSpec[] = [
   GUIDE_IMAGE_CACHE,
   ATTACHMENT_FILES,
+  INBOX_FILES,
   PENDING_DELETES,
   SYNC_PROBLEMS,
 ];

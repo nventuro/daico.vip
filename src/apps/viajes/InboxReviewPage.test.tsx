@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Trip, TripInboxItem } from '../../lib/offline/specs';
@@ -37,6 +37,7 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     from_code: 'AEP',
     to_code: 'BRC',
     comments: 'Código QK7T2M',
+    file_ids: '[]',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -44,7 +45,12 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
 }
 
 // What the stores give back, set per test before the page is rendered.
-const state: { trips: Trip[]; staged: TripInboxItem[] } = { trips: [], staged: [] };
+const state: { trips: Trip[]; staged: TripInboxItem[]; missing: string[]; online: boolean } = {
+  trips: [],
+  staged: [],
+  missing: [],
+  online: true,
+};
 
 vi.mock('./useTrips', () => ({
   useTrips: () => ({ items: state.trips, loading: false, error: null, add: vi.fn() }),
@@ -68,6 +74,18 @@ vi.mock('../../hooks/useOfflineTable', () => ({
     remove: vi.fn(),
   }),
 }));
+vi.mock('../../hooks/useAttachments', () => ({
+  useAttachments: () => ({ items: [], loading: false, error: null, addSealed: vi.fn() }),
+}));
+vi.mock('../../hooks/useMasterKey', () => ({
+  useMasterKey: () => ({ status: 'unlocked', key: {} }),
+}));
+vi.mock('../../hooks/useOnline', () => ({
+  useOnline: () => state.online,
+}));
+vi.mock('./useMissingInboxFiles', () => ({
+  useMissingInboxFiles: () => state.missing,
+}));
 
 function render(importId = 'e1') {
   return renderToStaticMarkup(
@@ -87,6 +105,11 @@ describe('InboxReviewPage', () => {
     staged('s2', { kind: 'lodging', title: 'Hotel Cormorán', ends_on: fromToday(17) }),
     staged('s3', { kind: 'booking', title: 'Autos Pampa · alquiler de auto', comments: null }),
   ];
+
+  beforeEach(() => {
+    state.missing = [];
+    state.online = true;
+  });
 
   it('shows the group whole: its name, its source, what arrived as it came, and the two ways out', () => {
     state.trips = [];
@@ -140,5 +163,42 @@ describe('InboxReviewPage', () => {
     state.trips = [];
     state.staged = rows;
     expect(render('gone')).toContain('No se encontró en el inbox.');
+  });
+
+  it('marks the rows that came with a PDF, and those alone', () => {
+    state.trips = [];
+    state.staged = [staged('s1', { file_ids: '["f1"]' }), staged('s2', { title: 'Sin PDF' })];
+    const html = render();
+    expect(html.match(/Tiene comentarios o adjuntos/g)).toHaveLength(1);
+    expect(html.indexOf('Tiene comentarios o adjuntos')).toBeLessThan(html.indexOf('Sin PDF'));
+  });
+
+  it('carries the line while the PDFs it lacks are on their way', () => {
+    state.trips = [];
+    state.staged = [staged('s1', { file_ids: '["f1"]' })];
+    state.missing = ['f1'];
+    const html = render();
+    expect(html).toContain('aria-label="Cargando"');
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it('waits under the offline notice when it lacks a PDF and has no connection', () => {
+    state.trips = [];
+    state.staged = [staged('s1', { file_ids: '["f1"]' })];
+    state.missing = ['f1'];
+    state.online = false;
+    const html = render();
+    expect(html).toContain('todavía no llegaron a este dispositivo');
+    expect(html).toContain('disabled=""');
+    expect(html).not.toContain('aria-label="Cargando"');
+  });
+
+  it('is confirmed offline once the PDFs are here', () => {
+    state.trips = [];
+    state.staged = [staged('s1', { file_ids: '["f1"]' })];
+    state.online = false;
+    const html = render();
+    expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain('todavía no llegaron');
   });
 });

@@ -17,8 +17,8 @@ export interface DeviceStorage {
    *  SQLite is keeping free. */
   database: number;
   files: number;
-  /** How much of `files` belongs to documents, which every device keeps. */
-  documentFiles: number;
+  /** How much of `files` belongs to the kinds every device keeps. */
+  keptFiles: number;
   guideImages: number;
 }
 
@@ -59,7 +59,7 @@ export async function deviceStorage(): Promise<DeviceStorage> {
     persisted: promised,
     database,
     files: files.bytes,
-    documentFiles: files.documentBytes,
+    keptFiles: files.keptBytes,
     guideImages,
   };
 }

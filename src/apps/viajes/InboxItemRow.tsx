@@ -1,6 +1,8 @@
 import type { TripInboxItem } from '../../lib/offline/specs';
+import EntryMarks from '../../components/EntryMarks';
 import { TRIP_KIND_SHAPES } from './kinds';
 import { itemSubtitle } from './labels';
+import { tripInboxMarks } from './marks';
 
 interface InboxItemRowProps {
   item: TripInboxItem;
@@ -26,6 +28,7 @@ export default function InboxItemRow({ item, today }: InboxItemRowProps) {
           <span className="mt-0.5 truncate text-xs text-muted">{item.comments}</span>
         )}
       </span>
+      <EntryMarks marks={tripInboxMarks(item)} />
     </li>
   );
 }

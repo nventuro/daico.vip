@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import type { TablerIcon } from '@tabler/icons-react';
 import type { TableSpec } from '../lib/offline/specs';
+import type { AfterSyncListener } from '../lib/offline/sync';
 import type { EntryMark } from '../types';
 
 /** Every app there is. The one home of the list: the registry is checked
@@ -95,4 +96,8 @@ export interface AppModule {
   useUpcoming?: () => Upcoming[] | undefined;
   /** Full-text search over the app's content. */
   search?: (query: string) => Promise<SearchHit[]>;
+  /** What the app does once every table has come down: whatever of its own
+   *  it keeps beside its tables and has to fetch after them. The shell runs
+   *  it at the end of every sync. */
+  afterSync?: AfterSyncListener;
 }

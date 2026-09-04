@@ -185,13 +185,23 @@ gate, what a sync does with the files. These are the rules on top of it.
 - **A document is its files.** `documents` keeps a title and an expiry and
   nothing else: never add a column that holds what a document says (a number,
   a date of birth) — that is what the sealed files are for.
-- **Two rules the `afterSync` work turns on.** Keeping every **document's**
-  files on every device is the one exception to files being fetched on demand:
-  never extend it to another owner kind, never pull files wholesale, and never
-  put them in `ALL_SPECS`. The orphan sweep runs only against rows the run
-  itself brought down and never against an empty table — what it cannot tell
-  from an orphan is a file this device has not heard of yet, and the difference
-  is every document the household has.
+- **`inbox_key` is the one other key.** Written once like `household_key`, by
+  the first device holding the master key that finds none (`InboxKeySetup`,
+  straight to the server): its public half is what the email worker seals a
+  PDF's file key to, its private half is sealed under the master key as a file
+  is. The worker never holds anything that opens a file. `householdKey.ts`
+  stays the only crypto code in the app; the worker's `seal.ts` is the one
+  copy of the file format outside it, pinned by the round trip in
+  `householdKey.test.ts`.
+- **Two rules the `afterSync` work turns on.** The kinds whose files every
+  device fetches and keeps are `KEPT_OWNER_KINDS` in `attachmentFiles.ts`,
+  documents and trip rows — the one exception to files being fetched on
+  demand. Adding a kind there puts its every file on every device and is a
+  decision to write up, never a default; files are still never pulled
+  wholesale and never put in `ALL_SPECS`. The orphan sweep runs only against
+  rows the run itself brought down and never against an empty table — what it
+  cannot tell from an orphan is a file this device has not heard of yet, and
+  the difference is every document the household has.
 - **The bucket is private and gated like a table**: `storage.objects` has a
   `private.is_member()` policy scoped to the bucket, it only takes
   `application/octet-stream`, and its size limit is `ATTACHMENT_MAX_BYTES` plus
@@ -305,11 +315,20 @@ top of it.
   them. Staged rows reach neither Buscar nor Próximo: they are suggestions, not
   commitments.
 - **The worker never holds the service key.** It connects as a role that can
-  insert into `trip_inbox` and read `members` and nothing else, lets through
-  only mail from a member that passed DMARC, reads attachments for extraction
-  without storing them, logs nothing of an email, and always replies to the
+  insert into `trip_inbox` and `trip_inbox_files`, read `members` and the
+  public half of `inbox_key`, and nothing else; lets through only mail from a
+  member that passed DMARC; logs nothing of an email; and always replies to the
   sender. Its header says what it holds and why; it is deployed on its own with
   the `worker:*` scripts, never by the app's deploy.
+- **The PDFs an email brings travel sealed.** The worker seals each to the
+  inbox key and stages it in `trip_inbox_files`, listed on its rows'
+  `file_ids`; the app re-wraps the file key at confirm (`sealedFilesOf`) and
+  never decrypts a staged file. `trip_inbox_files` is never in `ALL_SPECS`:
+  the module's `afterSync` (`syncInboxFiles`) fetches every listed file into
+  the local `INBOX_FILES`, the one other table fetched whole, few and
+  short-lived, so a group is confirmed offline. The staged files are deleted
+  only once the confirm can no longer be undone (`settleInboxUndo`), at
+  discard, or by the sweep a month on.
 
 ## Salud — read before touching them
 
@@ -339,7 +358,7 @@ the rules on top of it.
   outlive the check it was about — what was done is a study, dated. A study
   is its pictures, by Documentos' rule: never add a column that holds what a
   study found. Its files are fetched on demand, never kept on every device —
-  that exception stays Documentos'.
+  that exception is Documentos' and Viajes'.
 - **Nothing links a checkup to a study**, not a key and not a shortcut: the
   title and the date already say which check a study came from, and a key
   between rows has the offline race Ideas' groups avoid.
@@ -479,9 +498,12 @@ The README says what a module is and how to add one. The rules:
   `hueStyle`; utilities read it as `bg-(--app)` / `text-(--app)`. **Never build a
   class name from data** (no `bg-${hue}`).
 - Pages don't render the app's title or a back link — the shell's app frame does.
-- `useUpcoming` and `search` on a module are optional adapters; a module without
-  them simply doesn't contribute to Próximo or search (say why in the module
-  when it is deliberate). `search(query)` is a plain async function (not a hook)
+- `useUpcoming`, `search` and `afterSync` on a module are optional adapters; a
+  module without the first two simply doesn't contribute to Próximo or search
+  (say why in the module when it is deliberate), and `afterSync` is for what
+  an app keeps beside its tables and must fetch after them — the shell runs it
+  at the end of every sync run, with the attachment files' work.
+  `search(query)` is a plain async function (not a hook)
   over the module's local store — `searchTable(spec, query, …)`, which also
   finds the entries' attachments — never a network call, so search works
   offline; how many results an app contributes is capped once, in the shell. An

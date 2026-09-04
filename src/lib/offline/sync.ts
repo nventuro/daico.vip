@@ -144,7 +144,7 @@ async function forgetSettledRefusals(spec: TableSpec): Promise<void> {
   );
 }
 
-/** Note how far the documents' files have got in this run. */
+/** Note how far the kept files have got in this run. */
 export function reportFiles(done: number, total: number): void {
   setStatus({ files: { done, total } });
 }

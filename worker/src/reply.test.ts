@@ -3,26 +3,38 @@ import { countsOf, failureBody, replyMime, serviceFailureBody, successBody } fro
 
 describe('successBody', () => {
   it('says one item in the singular, with its class', () => {
-    expect(successBody('Bariloche', countsOf(['ticket']))).toBe(
+    expect(successBody('Bariloche', countsOf(['ticket']), 0)).toBe(
       'Encontré 1 ítem para «Bariloche»: un pasaje.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
     );
-    expect(successBody('Bariloche', countsOf(['lodging']))).toContain(': un alojamiento.');
-    expect(successBody('Bariloche', countsOf(['booking']))).toContain(': una reserva.');
+    expect(successBody('Bariloche', countsOf(['lodging']), 0)).toContain(': un alojamiento.');
+    expect(successBody('Bariloche', countsOf(['booking']), 0)).toContain(': una reserva.');
   });
 
   it('lists the classes in their order, plurals where there are two, and « y » before the last', () => {
     const counts = countsOf(['booking', 'ticket', 'lodging', 'ticket', 'booking']);
-    expect(successBody('Bariloche', counts)).toBe(
+    expect(successBody('Bariloche', counts, 0)).toBe(
       'Encontré 5 ítems para «Bariloche»: 2 pasajes, un alojamiento y 2 reservas.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
     );
-    expect(successBody('Bariloche', countsOf(['ticket', 'ticket']))).toContain(': 2 pasajes.');
-    expect(successBody('Bariloche', countsOf(['lodging', 'lodging']))).toContain(
+    expect(successBody('Bariloche', countsOf(['ticket', 'ticket']), 0)).toContain(': 2 pasajes.');
+    expect(successBody('Bariloche', countsOf(['lodging', 'lodging']), 0)).toContain(
       ': 2 alojamientos.',
     );
-    expect(successBody('Bariloche', countsOf(['booking', 'booking']))).toContain(': 2 reservas.');
-    expect(successBody('Bariloche', countsOf(['ticket', 'booking']))).toContain(
+    expect(successBody('Bariloche', countsOf(['booking', 'booking']), 0)).toContain(
+      ': 2 reservas.',
+    );
+    expect(successBody('Bariloche', countsOf(['ticket', 'booking']), 0)).toContain(
       ': un pasaje y una reserva.',
     );
+  });
+
+  it('says how many PDFs were kept, and nothing when none were', () => {
+    expect(successBody('Bariloche', countsOf(['ticket', 'ticket']), 1)).toBe(
+      'Encontré 2 ítems para «Bariloche»: 2 pasajes, con 1 PDF.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
+    );
+    expect(successBody('Bariloche', countsOf(['ticket', 'lodging']), 2)).toContain(
+      ': un pasaje y un alojamiento, con 2 PDF.',
+    );
+    expect(successBody('Bariloche', countsOf(['ticket']), 0)).not.toContain('PDF');
   });
 });
 

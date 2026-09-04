@@ -1,7 +1,8 @@
 // =============================================================================
 // In-memory stand-in for the Supabase client, covering exactly the PostgREST
-// calls the app makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`,
-// `from(t).select(columns).order(c).range(from, to)` and the one-row read
+// calls the app makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
+// and `.in('id', vs)`, `from(t).select(columns).order(c).range(from, to)`, the
+// filtered reads `.eq(c, v)` / `.in(c, vs)`, the one-row read
 // `from(t).select(columns).eq(c, v).maybeSingle()`, plus the Storage calls the
 // attachment files make: `storage.from(b).upload / download / remove / list`.
 // A test installs it with
@@ -163,25 +164,36 @@ export class FakeServer {
         this.table(table).set(row.id, { ...row });
         return { error: null };
       },
-      delete: () => ({
-        eq: async (column: string, value: string) => {
+      delete: () => {
+        const remove = async (column: string, value: string) => {
           if (column !== 'id') throw new Error(`fake server: unsupported filter column ${column}`);
           const error = await this.run({ op: 'delete', table, id: value });
           if (!error && this.member) this.table(table).delete(value);
           return { error };
-        },
-      }),
+        };
+        return {
+          eq: remove,
+          // One call per row, so a refusal can be narrowed to one of them.
+          in: async (column: string, values: string[]) => {
+            for (const value of values) {
+              const { error } = await remove(column, value);
+              if (error) return { error };
+            }
+            return { error: null };
+          },
+        };
+      },
       // Chainable and awaitable at any point, like PostgREST's builder: the
       // request goes out when the caller awaits it.
       select: (columns: string) => {
         let orderBy: string | null = null;
         let range: { from: number; to: number } | null = null;
-        let filter: { column: string; value: unknown } | null = null;
+        const filters: ((row: ServerRow) => boolean)[] = [];
         const run = async () => {
           const error = await this.run({ op: 'select', table, range: range ?? undefined });
           if (error) return { data: null, error };
           let rows = this.member ? this.rows(table) : [];
-          if (filter !== null) rows = rows.filter((row) => row[filter!.column] === filter!.value);
+          rows = rows.filter((row) => filters.every((keep) => keep(row)));
           if (orderBy !== null) {
             rows.sort((a, b) => String(a[orderBy!]).localeCompare(String(b[orderBy!])));
           }
@@ -199,7 +211,11 @@ export class FakeServer {
         };
         const builder = {
           eq: (column: string, value: unknown) => {
-            filter = { column, value };
+            filters.push((row) => row[column] === value);
+            return builder;
+          },
+          in: (column: string, values: unknown[]) => {
+            filters.push((row) => values.includes(row[column]));
             return builder;
           },
           order: (column: string) => {

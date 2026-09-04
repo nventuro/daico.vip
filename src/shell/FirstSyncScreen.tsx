@@ -17,7 +17,7 @@ function appState(app: AppModule, tables: SyncStatus['tables']): TableSyncState 
   return states.includes('pulling') ? 'pulling' : 'pending';
 }
 
-/** Where the documents' files stand, with how far along when that is counted. */
+/** Where the kept files stand, with how far along when that is counted. */
 function filesState(files: SyncStatus['files']): Pick<PullRowProps, 'state' | 'share' | 'detail'> {
   if (files === null) return { state: 'pending' };
   if (files.done < files.total) {
@@ -90,7 +90,7 @@ export default function FirstSyncScreen({ onEnter }: { onEnter: () => void }) {
             state={appState(app, tables)}
           />
         ))}
-        <PullRow label="Archivos de los documentos" {...filesState(files)} />
+        <PullRow label="Archivos de documentos y viajes" {...filesState(files)} />
       </ul>
       {!online && <p className="mt-4 text-sm text-muted">Sin conexión: sigue cuando vuelva.</p>}
       <Button variant="link" className="mt-6" onClick={onEnter}>

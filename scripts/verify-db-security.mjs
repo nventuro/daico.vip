@@ -30,6 +30,9 @@ const TABLE_PRIVILEGES = {
   // would replace the wrapped master key and take every attachment and every
   // statement with it.
   household_key: ['select', 'insert'],
+  // The pair the email worker seals a PDF to: written once, as household_key
+  // is, by the first device holding the master key that finds none.
+  inbox_key: ['select', 'insert'],
   chores: CRUD,
   shopping_items: CRUD,
   dates: CRUD,
@@ -45,18 +48,24 @@ const TABLE_PRIVILEGES = {
   trips: CRUD,
   trip_items: CRUD,
   trip_inbox: CRUD,
+  // The sealed PDFs an email brought: written by the worker, read and deleted
+  // by the app, never edited.
+  trip_inbox_files: ['select', 'delete'],
   attachments: CRUD,
 };
 
 // The email worker's role: what the pipeline that stages trip suggestions may
-// touch, and nothing else. Insert-only on the staging table plus the sender
-// gate's read of members — a compromised worker can add junk suggestions and
-// learn the member emails it already handles mail for, but read or change
+// touch, and nothing else. Insert-only on the staging tables, the sender
+// gate's read of members, and the read of the key it seals a PDF to — a
+// compromised worker can add junk suggestions, learn the member emails it
+// already handles mail for and the public half of a key, but read or change
 // nothing else.
 const WRITER_ROLE = 'trip_inbox_writer';
 const WRITER_GRANTS = [
   ['trip_inbox', 'INSERT'],
+  ['trip_inbox_files', 'INSERT'],
   ['members', 'SELECT'],
+  ['inbox_key', 'SELECT'],
 ];
 
 // The shape every policy has but for the exception below: it grants the
@@ -153,9 +162,9 @@ const CHECKS = [
                      and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}'
                      and not (p.qual is null and p.with_check is null))
             and not (p.roles = '{${WRITER_ROLE}}'::name[]
-                     and ((p.tablename = 'trip_inbox' and p.cmd = 'INSERT'
+                     and ((p.tablename in ('trip_inbox', 'trip_inbox_files') and p.cmd = 'INSERT'
                            and p.qual is null and p.with_check = 'true')
-                          or (p.tablename = 'members' and p.cmd = 'SELECT'
+                          or (p.tablename in ('members', 'inbox_key') and p.cmd = 'SELECT'
                               and p.qual = 'true' and p.with_check is null)))`,
   },
   {

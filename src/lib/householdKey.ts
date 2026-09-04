@@ -14,6 +14,12 @@
 // The master key is a level of its own so that a phrase change re-wraps 40
 // bytes instead of re-encrypting every file; each file has a key of its own so
 // a GCM nonce is never reused and a file can one day be shared on its own.
+//
+// One branch hangs off it for what arrives sealed from outside: the inbox
+// key, a pair whose public half is published for the email worker to seal a
+// PDF's file key to, and whose private half is sealed under the master key
+// like any file. A file sealed that way becomes an ordinary attachment by
+// having its key re-wrapped; the bytes are never touched.
 // =============================================================================
 import { normalize } from '../utils/textUtils';
 import { PHRASE_WORDS } from './phraseWords';
@@ -220,4 +226,72 @@ export async function decryptFile(
   return new Uint8Array(
     await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, fileKey, cipher),
   );
+}
+
+// ─── The inbox key ───────────────────────────────────────────────────────────
+
+const INBOX_KEY_ALGORITHM = { name: 'RSA-OAEP', hash: 'SHA-256' } as const;
+const INBOX_KEY_MODULUS_BITS = 2048;
+/** 65537, the usual public exponent, as the bytes WebCrypto takes it in. */
+const INBOX_KEY_PUBLIC_EXPONENT = new Uint8Array([1, 0, 1]);
+
+/** The pair as stored: the public half in the clear, the private half sealed. */
+export interface InboxKeyPair {
+  /** Base64 SPKI. */
+  public_key: string;
+  /** Base64: PKCS#8, sealed as a file is. */
+  private_key: string;
+  /** Base64: the key that sealed `private_key`, wrapped under the master key. */
+  wrapped_key: string;
+}
+
+/** A fresh pair, its private half sealed under `masterKey`. */
+export async function createInboxKey(masterKey: CryptoKey): Promise<InboxKeyPair> {
+  const pair = await crypto.subtle.generateKey(
+    {
+      ...INBOX_KEY_ALGORITHM,
+      modulusLength: INBOX_KEY_MODULUS_BITS,
+      publicExponent: INBOX_KEY_PUBLIC_EXPONENT,
+    },
+    true,
+    ['wrapKey', 'unwrapKey'],
+  );
+  const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const sealed = await encryptFile(masterKey, pkcs8);
+  return {
+    public_key: toBase64(spki),
+    private_key: toBase64(sealed.data),
+    wrapped_key: sealed.wrappedFileKey,
+  };
+}
+
+/** The private half opened with `masterKey`: non-extractable, and only ever
+ *  unwraps a file key. Throws when the master key is not the pair's. */
+export async function openInboxKey(masterKey: CryptoKey, pair: InboxKeyPair): Promise<CryptoKey> {
+  const pkcs8 = await decryptFile(masterKey, pair.wrapped_key, fromBase64(pair.private_key));
+  return crypto.subtle.importKey('pkcs8', pkcs8, INBOX_KEY_ALGORITHM, false, ['unwrapKey']);
+}
+
+/**
+ * A file key wrapped under the public half, re-wrapped under `masterKey`:
+ * what turns a file sealed outside into an attachment, its bytes as they are.
+ * The key is in the clear only for the call. Throws when `wrappedKey` was not
+ * wrapped for this pair.
+ */
+export async function rewrapInboxFileKey(
+  privateKey: CryptoKey,
+  masterKey: CryptoKey,
+  wrappedKey: string,
+): Promise<string> {
+  const fileKey = await crypto.subtle.unwrapKey(
+    'raw',
+    fromBase64(wrappedKey),
+    privateKey,
+    INBOX_KEY_ALGORITHM.name,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['decrypt'],
+  );
+  return toBase64(new Uint8Array(await crypto.subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW')));
 }

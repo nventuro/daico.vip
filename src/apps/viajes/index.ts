@@ -4,6 +4,7 @@ import { TRIPS_SPEC, TRIP_ITEMS_SPEC, TRIP_INBOX_SPEC } from '../../lib/offline/
 import type { AppModule } from '../types';
 import { useTripsUpcoming } from './useTripsUpcoming';
 import { searchTrips } from './search';
+import { syncInboxFiles } from './inboxFiles';
 
 const TripsPage = lazy(() => import('./TripsPage'));
 const TripNewPage = lazy(() => import('./TripNewPage'));
@@ -40,6 +41,9 @@ const viajes: AppModule = {
   ],
   useUpcoming: useTripsUpcoming,
   search: searchTrips,
+  // The PDFs an email brought wait beside its staged rows, sealed; every
+  // device keeps them so a group is confirmed with no connection.
+  afterSync: syncInboxFiles,
 };
 
 export default viajes;

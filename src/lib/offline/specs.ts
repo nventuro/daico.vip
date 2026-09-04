@@ -77,6 +77,32 @@ export const HOUSEHOLD_KEY_SPEC: TableSpec<HouseholdKey> = {
 };
 
 /**
+ * The pair the email worker seals a PDF to: the public half in the clear, the
+ * private half sealed under the master key in the attachment file format,
+ * with the key that sealed it wrapped the way a note's body key is. One row
+ * per household, written once; synced so a device opens a staged file
+ * offline.
+ */
+export interface InboxKey extends SyncedRow {
+  /** Base64 SPKI. */
+  public_key: string;
+  /** Base64: PKCS#8, sealed as a file is. */
+  private_key: string;
+  /** Base64: the key that sealed `private_key`, wrapped under the master key. */
+  wrapped_key: string;
+}
+
+export const INBOX_KEY_SPEC: TableSpec<InboxKey> = {
+  table: 'inbox_key',
+  columns: {
+    public_key: { ddl: 'TEXT NOT NULL' },
+    private_key: { ddl: 'TEXT NOT NULL' },
+    wrapped_key: { ddl: 'TEXT NOT NULL' },
+  },
+  orderBy: 'created_at ASC',
+};
+
+/**
  * A picture or a PDF attached to an entry. Only this metadata is a synced
  * row; the file itself lives encrypted in the attachments bucket under the row's
  * id, and only ever changes by being replaced with a new attachment.
@@ -639,6 +665,9 @@ export interface TripInboxItem extends SyncedRow {
   from_code: string | null;
   to_code: string | null;
   comments: string | null;
+  /** The ids of the sealed PDFs this row was printed in, as a JSON list: the
+   *  engine carries scalars only, and the list is written once. */
+  file_ids: string;
 }
 
 export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
@@ -656,6 +685,7 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
     from_code: { ddl: 'TEXT' },
     to_code: { ddl: 'TEXT' },
     comments: { ddl: 'TEXT' },
+    file_ids: { ddl: "TEXT NOT NULL DEFAULT '[]'" },
   },
   // The groups and their order are made on display; here the rows only keep
   // the order they were staged in.
@@ -666,7 +696,7 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
 
 /** Tables no single app owns — the shell's own, and the ones several apps
  *  share — synced before any app's. */
-export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC, ATTACHMENTS_SPEC];
+export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC, INBOX_KEY_SPEC, ATTACHMENTS_SPEC];
 
 /** Every offline-synced table, in sync order. */
 export const ALL_SPECS: TableSpec[] = [

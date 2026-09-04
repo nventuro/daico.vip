@@ -36,6 +36,7 @@ const row = {
   wrapped_file_key: 'k',
 };
 const documentRow = { ...row, owner_kind: 'document' as const, owner_id: 'd1' };
+const tripRow = { ...row, owner_kind: 'trip_item' as const, owner_id: 't1' };
 
 /** An attachment as the app adds one: the file first, then its row. */
 async function added(id: string, content = 'abc'): Promise<void> {
@@ -200,19 +201,22 @@ describe('syncAttachmentFiles', () => {
     ]);
   });
 
-  it("keeps every document's file on this device, and no other", async () => {
+  it("keeps every kept kind's file on this device — a document's, a trip row's — and no other", async () => {
     server.seedObjects(ATTACHMENTS_BUCKET, [
       { name: 'doc', data: bytes('doc'), created_at: T0 },
+      { name: 'trip', data: bytes('trip'), created_at: T0 },
       { name: 'chore', data: bytes('chore'), created_at: T0 },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
+    await engine.insert(ATTACHMENTS_SPEC, tripRow, 'trip');
     await engine.insert(ATTACHMENTS_SPEC, row, 'chore');
     await syncAttachmentFiles(pulled);
     expect(await localAttachmentFile('doc')).toEqual(bytes('doc'));
     expect(await attachmentUploadState('doc')).toBe('uploaded');
+    expect(await localAttachmentFile('trip')).toEqual(bytes('trip'));
     expect(await localAttachmentFile('chore')).toBeNull();
     await syncAttachmentFiles(pulled);
-    expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(1);
+    expect(server.calls.filter((c) => c.op === 'download')).toHaveLength(2);
   });
 
   it("leaves a document's file the bucket does not have yet for a later run", async () => {
@@ -378,11 +382,13 @@ describe('syncAttachmentFiles', () => {
 });
 
 describe('making room', () => {
-  /** A document's file the bucket has, a chore's the bucket has, and one the
-   *  bucket has never seen. */
+  /** A document's and a trip row's file the bucket has, a chore's the bucket
+   *  has, and one the bucket has never seen. */
   async function threeFiles(): Promise<void> {
     await putAttachmentFile('doc', bytes('abc'), true);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
+    await putAttachmentFile('trip', bytes('abcd'), true);
+    await engine.insert(ATTACHMENTS_SPEC, tripRow, 'trip');
     await putAttachmentFile('cached', bytes('abcdef'), true);
     await engine.insert(ATTACHMENTS_SPEC, row, 'cached');
     await putAttachmentFile('only-copy', bytes('ab'), false);
@@ -394,8 +400,10 @@ describe('making room', () => {
     await dropCachedFiles();
 
     expect(await localAttachmentFile('cached')).toBeNull();
-    // Every device keeps a document's, so the next sync would fetch it straight back.
+    // Every device keeps a document's and a trip row's, so the next sync
+    // would fetch them straight back.
     expect(await localAttachmentFile('doc')).not.toBeNull();
+    expect(await localAttachmentFile('trip')).not.toBeNull();
     // The bucket does not have this one: here is the only copy there is.
     expect(await localAttachmentFile('only-copy')).not.toBeNull();
   });
@@ -403,8 +411,8 @@ describe('making room', () => {
   it('says what the files come to and how many are still waiting', async () => {
     await threeFiles();
     expect(await attachmentFileUsage()).toEqual({
-      bytes: 11,
-      documentBytes: 3,
+      bytes: 15,
+      keptBytes: 7,
       waiting: 1,
       failed: 0,
     });

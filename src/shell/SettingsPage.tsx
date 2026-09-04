@@ -150,8 +150,8 @@ export default function SettingsPage() {
             label="Adjuntos"
             value={formatBytes(storage.files)}
             note={
-              storage.documentFiles > 0
-                ? `${formatBytes(storage.documentFiles)} son de documentos, que se descargan automáticamente.`
+              storage.keptFiles > 0
+                ? `${formatBytes(storage.keptFiles)} son de documentos y viajes, que se descargan automáticamente.`
                 : undefined
             }
           />

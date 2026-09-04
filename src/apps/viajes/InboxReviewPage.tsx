@@ -1,16 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { IconTrash } from '@tabler/icons-react';
-import { TRIP_ITEMS_SPEC } from '../../lib/offline/specs';
+import { INBOX_KEY_SPEC, TRIP_ITEMS_SPEC } from '../../lib/offline/specs';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useLeave } from '../../hooks/useLeave';
+import { useMasterKey } from '../../hooks/useMasterKey';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { useOnline } from '../../hooks/useOnline';
 import { relativeDayTime, todayIso } from '../../utils/dateUtils';
+import { errorMessage } from '../../utils/textUtils';
 import DeleteDialog from '../../components/DeleteDialog';
 import EntryPage from '../../components/EntryPage';
 import FormField from '../../components/FormField';
 import FormFooter from '../../components/FormFooter';
 import Heading from '../../components/Heading';
 import IconButton from '../../components/IconButton';
+import LoadingLine from '../../components/LoadingLine';
+import OfflineBanner from '../../components/OfflineBanner';
 import SectionLabel from '../../components/SectionLabel';
 import Select from '../../components/Select';
 import { appPath, entryPath } from '../types';
@@ -21,8 +27,10 @@ import {
   suggestedTripChoice,
   type InboxGroup,
 } from './grouping';
-import { confirmInbox, discardInbox } from './inboxConfirm';
+import { confirmInbox, discardInbox, groupFileIds, sealedFilesOf } from './inboxConfirm';
+import { deleteInboxFiles } from './inboxFiles';
 import { inboxUndoState } from './inboxUndo';
+import { useMissingInboxFiles } from './useMissingInboxFiles';
 import {
   addInboxLabel,
   createTripLabel,
@@ -35,8 +43,9 @@ import { useTrips } from './useTrips';
 
 /**
  * One email's suggestions, reviewed whole: what arrived, the trip to put it
- * in, and two ways out. Confirming writes the real rows and leads to the
- * trip, where it can be undone for a moment; discarding asks first.
+ * in, and two ways out. Confirming writes the real rows, each with the PDFs
+ * it came with, and leads to the trip, where it can be undone for a moment;
+ * discarding asks first.
  */
 export default function InboxReviewPage() {
   const { importId = '' } = useParams();
@@ -45,9 +54,14 @@ export default function InboxReviewPage() {
   // The rows go in as they came, capitals and all — not through the trip
   // rows' own `add`, which lower-cases what is typed into an add bar.
   const { insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
+  const { addSealed } = useAttachments();
+  const { items: inboxKeys } = useOfflineTable(INBOX_KEY_SPEC);
+  const masterKey = useMasterKey();
+  const online = useOnline();
   const navigate = useNavigate();
   const leave = useLeave();
   const [discarding, setDiscarding] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const today = todayIso();
   const group = groups.find((candidate) => candidate.importId === importId);
@@ -57,13 +71,40 @@ export default function InboxReviewPage() {
   const [chosen, setChosen] = useState<string | null>(null);
   const choice = chosen ?? suggestedTripChoice(choices);
 
+  // The group's PDFs come to every device with a sync. Until they are here
+  // the group says so, and with no connection to bring them it waits: a row
+  // is never added short of its PDF.
+  const fileIds = useMemo(() => (group ? groupFileIds(group) : []), [group]);
+  const missing = useMissingInboxFiles(fileIds);
+  const lacking = missing !== null && missing.length > 0;
+
   async function confirm(group: InboxGroup) {
-    const undo = await confirmInbox(group, choice, { addTrip, addItem, removeStaged: remove });
+    if (masterKey.status !== 'unlocked') return;
+    setProblem(null);
+    let files;
+    try {
+      files = await sealedFilesOf(group, masterKey.key, inboxKeys[0]);
+    } catch (e) {
+      setProblem(errorMessage(e));
+      return;
+    }
+    const undo = await confirmInbox(
+      group,
+      choice,
+      {
+        addTrip,
+        addItem,
+        addAttachment: addSealed,
+        removeStaged: remove,
+        removeFiles: deleteInboxFiles,
+      },
+      files,
+    );
     if (undo) navigate(entryPath('viajes', undo.tripId), { state: inboxUndoState(undo) });
   }
 
   async function discard(group: InboxGroup) {
-    await discardInbox(group, { removeStaged: remove });
+    await discardInbox(group, { removeStaged: remove, removeFiles: deleteInboxFiles });
     leave(appPath('viajes'));
   }
 
@@ -71,7 +112,7 @@ export default function InboxReviewPage() {
     <EntryPage
       entry={group}
       loading={loading || tripsLoading}
-      error={error ?? tripsError}
+      error={error ?? tripsError ?? problem}
       missing="No se encontró en el inbox."
     >
       {(group) => (
@@ -82,6 +123,12 @@ export default function InboxReviewPage() {
           }}
           className="flex flex-col gap-4"
         >
+          {lacking && !online && (
+            <OfflineBanner>
+              Los PDF de este correo todavía no llegaron a este dispositivo: para agregarlo hace
+              falta conexión.
+            </OfflineBanner>
+          )}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <Heading>{group.tripTitle}</Heading>
@@ -106,6 +153,7 @@ export default function InboxReviewPage() {
 
           <section>
             <SectionLabel detail={inboxCountLabel(group.items.length)}>Qué llegó</SectionLabel>
+            {lacking && online && <LoadingLine className="mb-2" />}
             <ul>
               {group.items.map((item) => (
                 <InboxItemRow key={item.id} item={item} today={today} />
@@ -113,7 +161,10 @@ export default function InboxReviewPage() {
             </ul>
           </section>
 
-          <FormFooter submitLabel={addInboxLabel(group.items.length)} />
+          <FormFooter
+            submitLabel={addInboxLabel(group.items.length)}
+            submitDisabled={lacking && !online}
+          />
 
           <DeleteDialog
             open={discarding}

@@ -2,16 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { HOUSEHOLD_PHRASE_WORDS } from './householdKey';
 import { PHRASE_WORDS } from './phraseWords';
 import {
+  createInboxKey,
   createMasterKey,
   decryptFile,
   encryptFile,
   fromBase64,
   generatePhrase,
   isPhraseWord,
+  openInboxKey,
   parsePhrase,
+  rewrapInboxFileKey,
   toBase64,
   unwrapMasterKey,
 } from './householdKey';
+// The worker's copy of the file format: what it seals, this file opens.
+import { importInboxPublicKey, sealPdf } from '../../worker/src/seal';
 
 const PHRASE = PHRASE_WORDS.slice(0, HOUSEHOLD_PHRASE_WORDS);
 const OTHER_PHRASE = PHRASE_WORDS.slice(HOUSEHOLD_PHRASE_WORDS, 2 * HOUSEHOLD_PHRASE_WORDS);
@@ -182,5 +187,42 @@ describe('base64', () => {
     }
     expect(fromBase64(toBase64(big))).toEqual(big);
     expect(fromBase64(toBase64(new Uint8Array(0)))).toEqual(new Uint8Array(0));
+  });
+});
+
+describe('the inbox key', () => {
+  it('opens under its master key, and a PDF the worker sealed to it becomes an ordinary attachment', async () => {
+    const { key: masterKey } = await createMasterKey(PHRASE);
+    const pair = await createInboxKey(masterKey);
+    const sealed = await sealPdf(await importInboxPublicKey(pair.public_key), bytes('%PDF hola'));
+    const privateKey = await openInboxKey(masterKey, pair);
+    const wrapped = await rewrapInboxFileKey(privateKey, masterKey, sealed.wrappedKey);
+    // The bytes are the worker's, untouched; only the key changed hands.
+    expect(text(await decryptFile(masterKey, wrapped, sealed.data))).toBe('%PDF hola');
+  });
+
+  it("does not open under another household's master key", async () => {
+    const { key: masterKey } = await createMasterKey(PHRASE);
+    const { key: other } = await createMasterKey(OTHER_PHRASE);
+    const pair = await createInboxKey(masterKey);
+    await expect(openInboxKey(other, pair)).rejects.toThrow();
+  });
+
+  it('refuses a file key wrapped for another pair', async () => {
+    const { key: masterKey } = await createMasterKey(PHRASE);
+    const pair = await createInboxKey(masterKey);
+    const otherPair = await createInboxKey(masterKey);
+    const sealed = await sealPdf(await importInboxPublicKey(otherPair.public_key), bytes('x'));
+    const privateKey = await openInboxKey(masterKey, pair);
+    await expect(rewrapInboxFileKey(privateKey, masterKey, sealed.wrappedKey)).rejects.toThrow();
+  });
+
+  it('keeps the private half sealed and the public half in the clear', async () => {
+    const { key: masterKey } = await createMasterKey(PHRASE);
+    const pair = await createInboxKey(masterKey);
+    // SPKI, importable as it is; the other two are opaque without the key.
+    await expect(importInboxPublicKey(pair.public_key)).resolves.toBeTruthy();
+    expect(fromBase64(pair.private_key)[0]).toBe(1);
+    expect(pair.wrapped_key).not.toBe('');
   });
 });

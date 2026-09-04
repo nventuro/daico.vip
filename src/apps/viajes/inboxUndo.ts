@@ -2,9 +2,9 @@ import type { RowInput, TripInboxItem } from '../../lib/offline/specs';
 
 /**
  * What confirming a group of suggestions did, carried to the trip's screen in
- * the navigation so it can be undone there and nowhere else: the rows
- * created, the trip if one was, and the staged rows as they were, to put
- * back.
+ * the navigation so it can be undone there and nowhere else: the rows and
+ * attachments created, the trip if one was, the staged rows as they were, to
+ * put back, and the staged files to let go of once the offer is over.
  */
 export interface InboxUndo {
   /** What the undo bar says. */
@@ -12,7 +12,24 @@ export interface InboxUndo {
   tripCreated: boolean;
   tripId: string;
   itemIds: string[];
+  attachmentIds: string[];
   staged: TripInboxItem[];
+  /** The staged files the rows were printed in, still where they were. */
+  fileIds: string[];
+}
+
+/**
+ * What becomes of the staged files once an offer to undo is over. Taken, the
+ * rows are back beside their files and nothing is done; over any other way —
+ * timed out, replaced, the screen left — the files are let go of, through
+ * `release`.
+ */
+export function settleInboxUndo(
+  offer: InboxUndo,
+  taken: boolean,
+  release: (fileIds: string[]) => void,
+): void {
+  if (!taken) release(offer.fileIds);
 }
 
 /** What the review hands the trip's screen on its way there. */
@@ -44,5 +61,6 @@ export function inboxRowInput(row: TripInboxItem): RowInput<TripInboxItem> {
     from_code: row.from_code,
     to_code: row.to_code,
     comments: row.comments,
+    file_ids: row.file_ids,
   };
 }

@@ -9,6 +9,7 @@ import * as engine from './offline/engine';
 import { ATTACHMENT_FILES } from './offline/localTables';
 import { ATTACHMENTS_SPEC, type Attachment } from './offline/specs';
 import { reportFiles } from './offline/sync';
+import type { AttachmentOwnerKind } from '../types';
 import { tooLargeMessage } from '../utils/textUtils';
 
 /** The storage bucket holding the encrypted attachment files. */
@@ -35,6 +36,22 @@ export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
 export function isPdf(mime: string): boolean {
   return mime === PDF_TYPE;
 }
+
+/**
+ * The kinds of entry whose files every device fetches and keeps, so they can
+ * be seen with no connection wherever they were added: what is asked for at
+ * a counter, and what is needed on a trip. Every other kind's files are
+ * fetched on demand. Adding a kind here puts its every file on every device.
+ */
+export const KEPT_OWNER_KINDS: readonly AttachmentOwnerKind[] = ['document', 'trip_item'];
+
+/** Whether `attachment`'s file is one every device keeps. */
+function isKept(attachment: Pick<Attachment, 'owner_kind'>): boolean {
+  return KEPT_OWNER_KINDS.includes(attachment.owner_kind);
+}
+
+/** The kept kinds as SQL takes them: fixed names, never anything typed. */
+const keptKindsSql = KEPT_OWNER_KINDS.map((kind) => `'${kind}'`).join(', ');
 
 /**
  * How old a bucket object with no attachment row must be before the orphan
@@ -136,11 +153,11 @@ export async function deleteAttachmentFile(id: string): Promise<void> {
 }
 
 /** What this device's copies of the files come to: the room they take, how
- *  much of that is documents', and how many are still waiting for the bucket —
- *  of those, the ones it has refused for good. */
+ *  much of that is the kept kinds', and how many are still waiting for the
+ *  bucket — of those, the ones it has refused for good. */
 export interface AttachmentFileUsage {
   bytes: number;
-  documentBytes: number;
+  keptBytes: number;
   waiting: number;
   failed: number;
 }
@@ -149,29 +166,29 @@ export async function attachmentFileUsage(): Promise<AttachmentFileUsage> {
   const rows = await engine.localQuery<AttachmentFileUsage & Record<string, unknown>>(
     `SELECT
        coalesce(sum(length(f.data)), 0) AS bytes,
-       coalesce(sum(CASE WHEN a.owner_kind = 'document' THEN length(f.data) ELSE 0 END), 0)
-         AS documentBytes,
+       coalesce(sum(CASE WHEN a.owner_kind IN (${keptKindsSql}) THEN length(f.data) ELSE 0 END), 0)
+         AS keptBytes,
        coalesce(sum(CASE WHEN f.uploaded = 0 THEN 1 ELSE 0 END), 0) AS waiting,
        coalesce(sum(CASE WHEN f.uploaded = 0 AND f.upload_error IS NOT NULL THEN 1 ELSE 0 END), 0)
          AS failed
      FROM ${ATTACHMENT_FILES.table} f
      LEFT JOIN ${ATTACHMENTS_SPEC.table} a ON a.id = f.id`,
   );
-  return rows[0] ?? { bytes: 0, documentBytes: 0, waiting: 0, failed: 0 };
+  return rows[0] ?? { bytes: 0, keptBytes: 0, waiting: 0, failed: 0 };
 }
 
 /**
  * Let go of the copies that can be fetched again: a file the bucket already
- * has, and not a document's, since every device keeps those and the next sync
- * would bring them straight back. A file the bucket does not have is the only
- * copy there is anywhere, so it is never dropped here.
+ * has, and not one of the kept kinds', since every device keeps those and the
+ * next sync would bring them straight back. A file the bucket does not have is
+ * the only copy there is anywhere, so it is never dropped here.
  */
 export async function dropCachedFiles(): Promise<void> {
   await engine.localWrite(
     ATTACHMENT_FILES.table,
     `DELETE FROM ${ATTACHMENT_FILES.table}
       WHERE uploaded = 1
-        AND id IN (SELECT id FROM ${ATTACHMENTS_SPEC.table} WHERE owner_kind <> 'document')`,
+        AND id IN (SELECT id FROM ${ATTACHMENTS_SPEC.table} WHERE owner_kind NOT IN (${keptKindsSql}))`,
   );
 }
 
@@ -270,16 +287,16 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
 }
 
 /**
- * Fetch every document's file this device lacks, so a document can be seen
+ * Fetch every kept kind's file this device lacks, so its entry can be seen
  * with no connection wherever it was added. One the bucket does not have yet
  * is left for a later run; a failure that may pass later stops the run, with
  * the rest left for the next.
  */
-async function fetchDocumentFiles(): Promise<void> {
+async function fetchKeptFiles(): Promise<void> {
   const ids = await engine.localQuery<{ id: string }>(`SELECT id FROM ${ATTACHMENT_FILES.table}`);
   const held = new Set(ids.map((row) => row.id));
   const missing = (await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).filter(
-    (attachment) => attachment.owner_kind === 'document' && !held.has(attachment.id),
+    (attachment) => isKept(attachment) && !held.has(attachment.id),
   );
   reportFiles(0, missing.length);
   let done = 0;
@@ -345,7 +362,7 @@ async function sweepOrphans(): Promise<void> {
 export async function syncAttachmentFiles(synced: ReadonlySet<string>): Promise<void> {
   await uploadPending();
   await pruneAttachmentFiles();
-  await fetchDocumentFiles();
+  await fetchKeptFiles();
   // What the sweep calls an orphan it reads off the local rows, so it may only
   // run against rows this very run brought down: after a pull that never
   // happened, every file of the household looks like an orphan.
