@@ -13,13 +13,12 @@ GitHub Pages · a Cloudflare Email Worker for the one thing that arrives by mail
 
 Daico is one app made of several small ones. The **shell** (`src/shell/`) owns
 sign-in, membership, the home screen (a grid of app tiles) and the per-app frame
-(a header with the app's name in its colour and an arrow one level up, which
-steps back to that screen when it is behind rather than stacking it on; the
-wordmark «daico» is the way home). Each
-feature is a **module** in `src/apps/<id>/` — its pages, hooks and the offline
-tables it owns — described by an `AppModule` object (contract in
-`src/apps/types.ts`) and listed in `src/apps/registry.ts`. The router and the
-home screen are built from the registry; its order is the tile order.
+(a header with the app's name in its colour and an arrow one level up; the
+wordmark «daico» is the way home). Each feature is a **module** in
+`src/apps/<id>/` — its pages, hooks and the offline tables it owns — described
+by an `AppModule` object (contract in `src/apps/types.ts`) and listed in
+`src/apps/registry.ts`. The router and the home screen are built from the
+registry; its order is the tile order.
 
 Three screens are the shell's rather than any app's. **Buscar** (the magnifier
 in the header) searches every app at once, offline: a module takes part by
@@ -27,18 +26,18 @@ exporting a `search(query)` adapter over its own local store, and the hits are
 grouped by app in registry order. **Próximo** is the home screen's list of what
 is coming up, every module's `useUpcoming()` entries merged soonest-first, with
 «Ver todo» opening the whole list. **Ajustes** (the gear) is what this device
-has to say about itself — when it last synced, what it still has to push, what
-the server has refused, how much room it takes, which build it runs — and where
-to sign out, which leaves the device with nothing.
+has to say about itself, and where to sign out, which leaves the device with
+nothing.
 
 ### Adding an app
 
 1. Create `src/apps/<id>/index.ts` exporting an `AppModule`: `id`, `name`,
    `icon`, the `TableSpec`s it owns and its `routes` (relative to `/<id>`, pages
    `lazy()`-loaded at module scope).
-2. Add the id to `APP_IDS` in `src/apps/types.ts` and a `--color-app-<id>` token
-   to the `@theme static` block in `src/index.css` — an app's colour is its id,
-   and a test checks the registry and the theme against that one list.
+2. Add the id to `APP_IDS` in `src/apps/types.ts`, a `--color-app-<id>` token
+   to the `@theme static` block in `src/index.css` and the app's motif to
+   `MOTIFS` in `src/components/Motif.tsx` — an app's colour is its id, and a
+   test checks the registry and the theme against that one list.
 3. Append the module to `apps` in `src/apps/registry.ts`.
 4. Its tables go in `src/lib/offline/specs.ts` / `ALL_SPECS` **and** in the
    module's `specs` — a test checks the two agree.
@@ -53,18 +52,14 @@ this work:
 
 - **PWA / service worker** (`vite-plugin-pwa`). The first online visit precaches
   the app shell, SQLite WebAssembly included, so the app opens and runs with no
-  network, and it installs to the home screen. A new build is downloaded whole
-  and then waits: it goes in at boot or when the app leaves the screen, never
-  over a page that is running, and whoever never puts the app down is told on
-  the home screen (`src/lib/appUpdate.ts`). The app can therefore be a version
-  behind the database for a session, which costs nothing while a migration
-  only adds; a column is dropped one deploy after the code stopped reading it.
+  network, and it installs to the home screen. A new build waits until the app
+  is not running before it goes in (`src/lib/appUpdate.ts`), so the app can be
+  a version behind the database for a session.
 - **Local SQLite** (`src/lib/offline/`). [SQLocal](https://sqlocal.dev) runs
   SQLite in a Web Worker, persisted to the browser's OPFS through the SAH-pool
   VFS — the header of `sahpoolWorker.ts` says why that one and not the default.
-  It allows a single connection per browser, so one tab owns the database and a
-  second shows an "already open in another tab" notice. `engine.ts` is what the
-  UI reads and writes.
+  It allows a single connection per browser, so one tab owns the database at a
+  time. `engine.ts` is what the UI reads and writes.
 - **Sync engine** (`sync.ts`). On load, on reconnect, on app focus and after
   every local change it pushes what is queued and pulls the server's state.
   Rows carry a client-generated UUID, so one created offline has its identity
@@ -75,17 +70,15 @@ this work:
 
 The membership check is offline-tolerant too: the verdict cached per user
 answers first and the live read then confirms or revokes it, so no signal never
-locks a member out. This is only a UI gate — the server's RLS is the real
-authority (see `CLAUDE.md`). Local data is wiped on sign-out.
+locks a member out; the server's RLS is the real authority either way. Local
+data is wiped on sign-out.
 
 ### Adding another offline table
 
 1. Migration: create the table with a `uuid` primary key (client-supplied) and an
    `updated_at` timestamp, plus the usual RLS + `private.is_member()` policy +
    `authenticated` grants and the `private.last_write_wins()` trigger every synced
-   table has. `updated_at` is **the client's to set** — never add a trigger that
-   bumps it, or an edit made offline would be ordered by the time it synced.
-   `db:verify` checks both.
+   table has. `db:verify` checks all of it.
 2. Add a `TableSpec` to `src/lib/offline/specs.ts` (and to `ALL_SPECS`), and list
    it in the `specs` of the module that owns it (`src/apps/<id>/index.ts`).
 3. Add a thin typed hook (see `useShoppingList` / `useChores`) over
@@ -93,9 +86,8 @@ authority (see `CLAUDE.md`). Local data is wiped on sign-out.
 
 ### Adding a column to an existing offline table
 
-1. Migration: `alter table ... add column`. A `not null` column needs a **default**,
-   or Postgres refuses it on a table that already holds rows. No new RLS/grant: a
-   column inherits the table's.
+1. Migration: `alter table ... add column`, with a default if it is `not null`.
+   No new RLS/grant: a column inherits the table's.
 2. Add the column to the table's `TableSpec.columns`. The engine brings every
    local database up to the spec on next load, and sync carries the column.
 3. If you **backfill** existing rows, bump their `updated_at` in the same migration
@@ -108,43 +100,37 @@ authority (see `CLAUDE.md`). Local data is wiped on sign-out.
 Every table below is offline-synced. This is what each app is for and what its
 rows are; what may never change about them is in `CLAUDE.md`.
 
-An entry is born from the bar and lives on a page. The add bar's + writes
-the row with the typed title and nothing else decided, and opens it; from
-then on the entry is edited where it is read — the title is the heading,
-every control saves as it changes, every free text is the shared editor
-saving a moment after typing stops and on leaving — and deleted from the
-trash in its head, behind a question. Where one thing about an entry can
-never be changed once it exists, the + asks it first, in a dialog that
-leaves the typed title in the bar if dismissed. Compras has no page, and
-Recetas is not there yet.
+An entry is born from the bar and lives on a page. The add bar's + writes the
+row with the typed title and nothing else decided, and opens it; from then on
+the entry is edited where it is read, every control saving as it changes, and
+deleted from the trash in its head, behind a question. Where one thing about
+an entry can never be changed once it exists, the + asks it first. The square
+that marks a chore, a checkup or a pendiente is the one control that leaves a
+page: it does what the list's square does and goes back to where the page was
+opened from. How far ahead a dated entry reaches Próximo is one window per
+app, a constant of the app's, never the entry's. Each app below says only
+where it departs from this.
 
 **Tareas** — `chores`: a title, an optional due date and comments. A chore can
 repeat, and marking one that does moves its date on instead of finishing it.
-Born from the bar undated; its day, its repetition and its comments are set
-on its page, and it is marked there too — which sends the page back to
-wherever it was opened from, with the undo the list offers.
 
 **Compras** — `shopping_items`: a name, whether it is in the cart, and a
-fractional `position`, so reordering the list writes one row. Items are born
-from the bar and live in the list; there is no page.
+fractional `position`, so reordering the list writes one row. Items live in the
+list; there is no page.
 
 **Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
-`occurs_on` is the anchor the user entered, a repeating entry's next occurrence
-is computed from it on read, and it reaches Próximo the week before. Born
-from the bar on today; its day, repetition and comments are set on its page.
+`occurs_on` is the anchor the user entered, and a repeating entry's next
+occurrence is computed from it on read. Born on today.
 
 **Recetas** — `recipes`: a title, an optional time and number of servings, and
 a markdown body in the dialect below, whose `:::ingredients` block is a
-tickable list that can be sent to Compras. Born from the bar and still written
-on a form of its own, until the editor has an ingredients block; deleted from
-its page.
+tickable list that can be sent to Compras. Still written on a form of its own,
+until the editor has an ingredients block.
 
-**Documentos** — `documents`: a title, an optional expiry and its notice
-window. The content of a document is its files — pictures, PDFs — encrypted on the device;
-nothing else is typed in, so a number or a date of birth never reaches the
-server in the clear. Every document's files are kept on every device. Born
-from the bar with no expiry; its files are added on its page, where the rest
-is edited in place.
+**Documentos** — `documents`: a title and an optional expiry. The content of a
+document is its files — pictures, PDFs — encrypted on the device; nothing else
+is typed in, so a number or a date of birth never reaches the server in the
+clear. Every document's files are kept on every device.
 
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
 parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
@@ -153,56 +139,50 @@ dates, its two totals, whether it was paid — while every purchase and
 installment travels in `payload`, gzipped and encrypted under the household key
 like an attachment's file. Purchases are filed into a fixed set of categories
 on display, by `merchant_rules`, an encrypted pattern each. A statement is born
-from its PDF and deleted from its page.
+from its PDF, not the bar. Próximo lists every statement still to be paid, and
+a statement that is late to be imported.
 
 **Salud** — `checkups` and `health_records`, each row one member's and hidden
 from the others by the server. A checkup is a health check to have done — a
 chore that always comes back from the day it was marked, or a one-off
-appointment — with comments and no attachments; it reaches Próximo the week
-before. A health record is a study kept: a title, the day it was done and its
-files, which hold everything the study says. Both are born from one bar,
-whose + asks which of the two, and edited in place on their page; a checkup
-is marked there as well as in the list, and the page goes back.
+appointment — with comments and no attachments. A health record is a study
+kept: a title, the day it was done and its files, which hold everything the
+study says. Both are born from one bar, whose + asks which of the two.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
-in the clear — the row is a title, two timestamps and an opaque blob, which is
-why Buscar matches a note's title and nothing else. Born from the bar with
-nothing written; written on its page, the title on blur and the text as it
-goes.
+in the clear — the row is a title, its timestamps and a sealed body, which is
+why Buscar matches a note's title and nothing else.
 
 **Ideas** — `ideas`: a title, the group it is filed under (`group_name`, plain
 text such as «comer» or «películas») and a markdown body, all in the clear like
 a recipe. A group is not a table: it is whatever ideas name it, and goes when
 the last of them does; an idea can also be filed under none, and those are
-listed ahead of the groups. Born from the bar in the group of the idea last
-written on; edited in place on its page, the group a chip under the title.
+listed ahead of the groups. Born in the group of the idea last written on.
 
 **Viajes** — `trips` (a title and its days, both optional) and `trip_items`,
 every row of a trip in one table told apart by `kind`: a pendiente to resolve
 before leaving, or a pasaje, an alojamiento, a reserva, a lugar. The app is for
 the weeks before a trip — what is booked and what is still missing — and,
-during it, for looking up a code or an address; it is not an agenda. A
-confirmation email forwarded to the household's address becomes staged rows in
-`trip_inbox`, by the worker in `worker/`, and the app shows them under Inbox to
-be added to a trip or discarded. A PDF the email carries is sealed by the
-worker to a key the household publishes (`inbox_key`), waits beside the staged
-rows in `trip_inbox_files`, and becomes the confirmed rows' attachment; every
-device fetches the staged files after a sync, so a group is confirmed with no
-connection. A trip and each of its rows are born from the bar — a row's
-class is asked by the + and never changed — and edited in place on their
-pages; a pendiente is ticked on the trip or from its page, either with an
-undo; deleting a trip takes its rows with it.
+during it, for looking up a code or an address; it is not an agenda. A row's
+kind is asked by the + and never changed, only a pendiente is ever ticked, and
+deleting a trip takes its rows with it. A forwarded confirmation email becomes
+staged rows in `trip_inbox`, shown under Inbox to be added to a trip or
+discarded (Correo a Viajes below).
 
-**Guías** — `guides` / `guide_chapters`: imported content (see Guides below),
-in the same markdown dialect. A guide is shelved under a group (`group_name`,
-as an idea is) and can be archived out of the list; that much is the
-household's to change, the contents are the import's. There is no form and
-no delete: the title and the group are edited in place on the guide's page.
+**Guías** — `guides` / `guide_chapters`: imported reference documents — a guide,
+its sections, their chapters — in the same markdown dialect (Importing guides
+below). A guide is shelved under a group (`group_name`, as an idea is) and can
+be archived out of the list; that much is the household's to change, the
+contents are the import's, and there is no delete. `guide_images` is not
+synced — images are too large to pull wholesale on every sync — so the app
+fetches each image the first time a chapter needs it and keeps it in a
+local-only cache.
 
 ## Markdown dialect
 
-Guide chapters and recipe bodies share one reader (`src/components/markdown/`):
-CommonMark + GFM tables, plus these
+Every body — a guide's chapters, a recipe, a note, an idea, an entry's
+comments — is read by one reader (`src/components/markdown/`): CommonMark + GFM
+tables, plus these
 [remark-directive](https://github.com/remarkjs/remark-directive) forms mapped to
 components:
 
@@ -214,120 +194,86 @@ components:
 - `:::ingredients` … `:::` — a markdown list (`-`, `*` or `1.`) inside; each
   item becomes a tickable row with an "add to Compras" button. Only a recipe
   renders it (`RecipeMarkdown`), since only there is there a list to add to.
-  Inline markup in an item is flattened to plain text; anything that isn't a
-  list item is ignored.
 
 Links to other guides or chapters are ordinary relative links
 (`/guias/<guide>/<chapter>`).
 
 The editor (`src/components/editor/`) writes the same dialect and draws it with
-the reader's own classes, so a body looks the same read or written. It does
-not model GFM tables or the directives: they stay as the text they are, and
-are kept unchanged unless written on.
+the reader's own classes, so a body looks the same read or written.
 
 ## Adjuntos
 
-A chore, a document, a note, an idea or a row of a trip can carry attachments —
-pictures and PDFs — that are encrypted on the device before they leave it, so
-the server only ever stores ciphertext.
+A chore, a document, a note, an idea, a study or a row of a trip can carry
+attachments — pictures and PDFs — that are encrypted on the device before they
+leave it, so the server only ever stores ciphertext.
 
-- **Tables and bucket**: `attachments` (owner, optional name, mime, size, the
-  wrapped file key) is an ordinary offline-synced table; the bytes live in the
-  private `attachments` bucket under the row's id, and on the device in a
-  local-only table. A file is immutable: a different picture is a new
-  attachment.
-- **Keys**: a six-word phrase (from the BIP-39 Spanish list) derives the key
-  that wraps the household's master key, stored wrapped in `household_key`; the
-  master key wraps one key per file; the file key encrypts the file with
-  AES-GCM. A device unwraps the master key once, when the phrase is typed, and
-  keeps it non-extractable in IndexedDB. The phrase exists only on paper:
-  losing it loses every attachment. A second pair, the inbox key, lets the
-  email worker seal a PDF for the household without holding anything that
-  opens one: its public half is published, its private half sealed under the
-  master key like any file, and a sealed PDF becomes an attachment by having
-  its key re-wrapped.
+- **Tables and bucket**: `attachments` is an ordinary offline-synced table that
+  carries the wrapped file key; the bytes live in the private `attachments`
+  bucket under the row's id, and on the device in a local-only table. A file is
+  immutable: a different picture is a new attachment.
+- **Keys**: a six-word phrase derives the key that wraps the household's master
+  key, stored wrapped in `household_key`; the master key wraps one key per file;
+  the file key encrypts the file with AES-GCM. A device unwraps the master key
+  once, when the phrase is typed, and keeps it non-extractable in IndexedDB. The
+  phrase exists only on paper: losing it loses every attachment.
 - **The phrase gate**: a device without the master key stops right after login,
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
-- **In the app**: an entry's page shows its attachments as a grid. Agregar
-  asks for pictures or a PDF, each through the device's own picker — on a
-  phone, the photo picker for pictures and the file chooser for a PDF — and
-  each file picked goes through the add dialog: a picture cropped and turned
-  if wanted, a PDF as it is, with an optional name. A tile opens the lightbox;
-  a PDF is drawn there page by page (its first page is its tile) and only
-  leaves the app through Compartir / Descargar.
+- **In the app**: an entry's page shows its attachments as a grid, and a PDF is
+  drawn in the app, never handed to the system.
 - **Sync**: files follow every table sync — uploads go out, files of deleted
-  rows are dropped, every document's files and those of the trips not yet over
-  (a week past their last day) that this device lacks are fetched and kept, and
-  bucket objects no row refers to are swept. A past trip's files are fetched on
-  demand from then on, and «Liberar espacio» lets them go.
+  rows are dropped, and the files every device keeps — every document's, and a
+  trip's until a week past its last day — are fetched. Everything else is
+  fetched on demand, and «Liberar espacio» in Ajustes lets a past trip's go.
 
-## Guides
+## Correo a Viajes
 
-Guides are reference documents (a guide → sections → chapters) that members
-can read offline. Their contents come from an import script and are only read
-in the app; what the household decides about a guide — its title, the group
-it is shelved under and whether it is archived — is edited in the app.
+A confirmation email forwarded to the household's address reaches the worker in
+`worker/` (its header says what it holds and why). It lets through only mail
+from a member, has a model read the bookings out of it, and stages one row per
+booking in `trip_inbox`, always replying to the sender. The PDFs the email
+carries are staged beside the rows in `trip_inbox_files`, sealed to the
+household's inbox key: a pair in `inbox_key` whose public half the worker seals
+to and whose private half is sealed under the master key like any file, so the
+worker never holds anything that opens one. Every device fetches the staged
+files after a sync, so a group is confirmed with no connection; confirming
+makes the rows a trip's and the PDFs their attachments, and discarding drops
+both.
 
-- **Tables**: `guides` and `guide_chapters` are ordinary offline-synced tables,
-  so chapters read with no connection. `guide_images` is **not** synced — images
-  are too large to pull wholesale on every sync — so the app fetches each image
-  the first time a chapter needs it and keeps it in a local-only cache.
-  `guide_chapters` and `guide_images` are `select`-only for `authenticated`;
-  `guides` also takes `insert` and `update` — never `delete`, a guide is only
-  removed by the import.
-- **The list** groups guides by `group_name` (dividers in name order, as
-  Ideas), with the archived ones under a collapsed «Archivadas» at the foot.
-  Buscar leaves archived guides and their chapters out.
-- **Chapter bodies** are written in the markdown dialect above.
-
-### Importing guides
+## Importing guides
 
 ```
 npm run guides:import -- --dump <dir> [--group <name>] [--dry-run] [--preview <dir>]
 ```
 
-The dump directory (kept **outside the repo** — it's private content) has:
-
-```
-guides/<slug>.json   metadata, sections and chapters in the source site's markdown,
-                     plus an image map (token reference → file)
-images/              the referenced image files
-docs/index.json      linked documents (HTML exports) with titles
-decklists/index.json linked decklists (plain text) with titles and source URLs
-```
-
-The importer (`scripts/import-guides.mjs`, helpers in `scripts/import-guides/`)
-converts the source dialect to the markdown above (`normalize.mjs`), turns linked
-documents and decklists into chapters in an "Adjuntos" section and rewrites links
-to them in-app, and recompresses images to WebP (≤ 1600 px). Everything
-source-specific stays in the importer; the app only knows the dialect above.
-
-A guide is shelved under the author the dump names, or under `--group` for the
-whole dump. Ids derive from the source identifiers (UUID v5), so re-running the
-import replaces a guide's description, chapters and images while keeping every
-id — clients update in place via the normal sync and links keep working — and
-keeps the title, group and archived flag a guide already has, since those are
-the household's. `--dry-run` skips the database;
-`--preview <dir>` writes each chapter's normalized markdown as a file to inspect.
-Missing attachment files are reported and their links left external.
+The dump is the source site's export, kept **outside the repo** — it's private
+content; the header of `scripts/import-guides.mjs` says what it holds and what
+becomes of it. Everything source-specific stays in the importer, and the app
+only knows the dialect above. Ids derive from the source identifiers (UUID v5),
+so re-running the import replaces a guide's description, chapters and images
+while keeping every id — clients update in place via the normal sync and links
+keep working — and keeps the title, group and archived flag a guide already
+has, since those are the household's. A guide is shelved under the author the
+dump names, or under `--group` for the whole dump.
 
 ## Local development
 
 ```bash
 npm install
-npm run dev      # dev server
-npm test         # the whole suite once (npm run test:watch to keep it running)
+npm run dev          # dev server
+npm test             # the whole suite once (npm run test:watch to keep it running)
 npm run lint
-npm run format   # format:check only reports
-npm run build    # tsc -b + the production build
-npm run preview  # serves the build, the one place the CSP is live locally
+npm run format       # format:check only reports
+npm run build        # tsc -b + the production build
+npm run preview      # serves the build, the one place the CSP is live locally
+npm run worker:test  # the email worker's tests and type check
 ```
 
 The tests run on real SQLite in-process and a stand-in for the server, so they
-need nothing running; CI runs the same four checks on every push to `main`. The
-app won't authenticate until you wire up a Supabase project (below).
+need nothing running; CI runs the app's four checks on every push to `main`,
+not the worker's. The app won't authenticate until you wire up a Supabase
+project (below).
 
 ## First-time setup
 
@@ -335,8 +281,7 @@ app won't authenticate until you wire up a Supabase project (below).
 
 - Create a project at [supabase.com](https://supabase.com).
 - Copy the project URL and the **publishable** key (`sb_publishable_...`) from
-  Project Settings → API Keys into `src/config.ts`. (The legacy anon JWT key still
-  works but is deprecated — use the publishable key.)
+  Project Settings → API Keys into `src/config.ts`.
 - Create a `.env` (gitignored) with:
   ```
   SUPABASE_PROJECT_REF=your-project-ref
