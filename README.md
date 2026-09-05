@@ -222,9 +222,10 @@ leave it, so the server only ever stores ciphertext.
   written down. Signing out forgets the key.
 - **In the app**: an entry's page shows its attachments as a grid, and a PDF is
   drawn in the app, never handed to the system.
-- **Sync**: files follow every table sync — uploads go out, files of deleted
-  rows are dropped, and the files every device keeps — every document's, and a
-  trip's until a week past its last day — are fetched. Everything else is
+- **Sync**: files follow every table sync — uploads go out once their rows are
+  on the server, files of deleted rows are dropped, and the files every device
+  keeps — every document's, and a trip's until a week past its last day — are
+  fetched. Everything else is
   fetched on demand, and «Liberar espacio» in Ajustes lets a past trip's go.
 
 ## Correo a Viajes

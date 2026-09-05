@@ -128,20 +128,34 @@ describe('spendParts', () => {
 
 describe('movementsOfMonth', () => {
   const ids = [{ id: 'a' }, { id: 'b' }];
+  const opened = new Map([
+    ['a', bought],
+    ['b', billedLater],
+  ]);
 
   it('holds a purchase whole, once, in the month it was made', () => {
-    expect(
-      movementsOfMonth(ids, [bought, billedLater], '2026-08').map((m) => [m.statementId, m.cents]),
-    ).toEqual([['a', 72_000]]);
+    expect(movementsOfMonth(ids, opened, '2026-08').map((m) => [m.statementId, m.cents])).toEqual([
+      ['a', 72_000],
+    ]);
   });
 
   it('leaves out the statement that only bills a later installment', () => {
-    expect(movementsOfMonth(ids, [bought, billedLater], '2026-09')).toEqual([]);
+    expect(movementsOfMonth(ids, opened, '2026-09')).toEqual([]);
   });
 
   it('points a movement at the line the mark lives on', () => {
-    const [movement] = movementsOfMonth(ids, [bought, billedLater], '2026-08');
+    const [movement] = movementsOfMonth(ids, opened, '2026-08');
     expect(movement.line.installment).toEqual({ number: 1, of: 6 });
+  });
+
+  it('pairs each statement with its own contents, whatever order either is in', () => {
+    const reordered = new Map([
+      ['b', billedLater],
+      ['a', bought],
+    ]);
+    expect(movementsOfMonth(ids, reordered, '2026-08').map((m) => m.statementId)).toEqual(['a']);
+    // A statement whose contents are not open yet has nothing to show.
+    expect(movementsOfMonth([...ids, { id: 'c' }], opened, '2026-08')).toHaveLength(1);
   });
 });
 

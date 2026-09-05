@@ -86,23 +86,21 @@ export function amounts(line: PageLine): {
   return { ars, usd, rest };
 }
 
-/** The most installments a purchase is ever split into. A statement marks an
- *  installment "3/6"; a "07/26" past this count is a period, not one. */
-const INSTALLMENTS_MAX = 24;
-
 /** What a column of the lines comes to. */
 export function sum(lines: StatementLine[], key: 'ars_cents' | 'usd_cents'): number {
   return lines.reduce((acc, line) => acc + line[key], 0);
 }
 
 /** Which installment of how many a "3/6" token says, or null when the token
- *  is not one — a "07/26" is a period. */
+ *  cannot be one. A period reads the same way ("07/26"): where on the line a
+ *  token that could be either is printed is what tells them apart, and that is
+ *  each layout's to say. */
 export function installment(token: string): { number: number; of: number } | null {
   const m = /^(\d\d)\/(\d\d)$/.exec(token);
   if (!m) return null;
   const number = Number(m[1]);
   const of = Number(m[2]);
-  return number >= 1 && number <= of && of <= INSTALLMENTS_MAX ? { number, of } : null;
+  return number >= 1 && number <= of ? { number, of } : null;
 }
 
 /** The statement's closing and due dates, and the previous statement's

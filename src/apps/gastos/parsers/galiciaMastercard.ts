@@ -3,8 +3,8 @@
 // in a consolidated block, then the purchases — the account holder's, closed
 // by a SUBTOTAL, then each additional card's, closed by a "TOTAL ADICIONAL DE
 // <holder>"; each total is only checked against, who made a purchase is not
-// kept. An installment is a "3/6" beside the merchant, and a "07/26" beside
-// one is a period.
+// kept. An installment is a "3/6" set off from the merchant as a field of its
+// own; a "07/26" a merchant writes on to its own name is a period.
 // =============================================================================
 import { STATEMENT_CONTENTS_SCHEMA } from '../statement';
 import {
@@ -32,6 +32,11 @@ const SIGNATURE = /^Tarjeta Crédito MASTERCARD/;
 const RECEIPT_MIN_X0 = 320;
 const RECEIPT_MAX_X0 = 440;
 const ADDITIONAL_TOTAL = /^TOTAL ADICIONAL DE .+? [\d.]+,\d\d [\d.]+,\d\d$/;
+/** An installment is printed as a field of its own, this far or further from
+ *  the word before it; a period a merchant prints in its own name sits one
+ *  space (about 9) from it. Under "CUOTA DEL MES" every token is an
+ *  installment, wherever it sits; under "COMPRAS DEL MES" both are found. */
+const INSTALLMENT_MIN_GAP = 18;
 
 export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
   const lines = pages.flat();
@@ -47,12 +52,17 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
   let total: { ars: number; usd: number } | null = null;
   let inDetail = false;
   let inCharges = false;
+  let inInstallments = false;
 
   for (const line of lines) {
     const t = text(line);
     if (t === 'DETALLE DEL CONSUMO') {
       inDetail = true;
       inCharges = false;
+      continue;
+    }
+    if (t === 'CUOTA DEL MES' || t === 'COMPRAS DEL MES') {
+      inInstallments = t === 'CUOTA DEL MES';
       continue;
     }
     if (!inDetail) {
@@ -88,6 +98,7 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
       if (block.length > 0) cards++;
       purchases.push(...block);
       block = [];
+      inInstallments = false;
       continue;
     }
     const on = isoFromNamedDate(line[0].text);
@@ -97,7 +108,12 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
     const receipt = body.find(
       (w) => w.x0 >= RECEIPT_MIN_X0 && w.x0 < RECEIPT_MAX_X0 && /^\d{5}$/.test(w.text),
     );
-    const paid = body.find((w) => w.x0 < RECEIPT_MIN_X0 && installment(w.text));
+    const paid = body.find(
+      (w, i) =>
+        w.x0 < RECEIPT_MIN_X0 &&
+        installment(w.text) !== null &&
+        (inInstallments || (i > 0 && w.x0 - body[i - 1].x1 >= INSTALLMENT_MIN_GAP)),
+    );
     block.push({
       on,
       description: body

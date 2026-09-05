@@ -129,8 +129,11 @@ are the rules on top of it.
   `src/lib/appUpdate.ts` (its header says why) is the only place that decides
   when a version goes in and the only place that talks to
   `navigator.serviceWorker`; a change to when a version goes in must come with
-  a test in `appUpdate.test.ts`. A pull asks for `*`, never the columns a spec
-  names, so a build a migration got ahead of still brings its tables down.
+  a test in `appUpdate.test.ts`. Whatever hides the page without the member
+  leaving — the device's picker, its share sheet — and whatever a reload would
+  cut short holds the version back through `holdUpdates`, never any other
+  way. A pull asks for `*`, never the columns a spec names, so a build a
+  migration got ahead of still brings its tables down.
 - **The membership check is offline-tolerant** (`AppContext` falls back to a
   per-user cached verdict when the live read fails). This is only a UI gate — the
   server's RLS is the real authority, so a stale `true` still reads nothing and has
@@ -287,9 +290,11 @@ and what becomes of a forwarded email. These are the rules on top of it.
 - **The worker never holds the service key.** It connects as
   `trip_inbox_writer`, a role with exactly the grants and policies `db:verify`
   pins — its header says what it holds and why — lets through only mail from
-  a member that passed DMARC, logs nothing of an email, and always replies to
-  the sender. It is deployed on its own with the `worker:*` scripts, never by
-  the app's deploy.
+  a member that passed DMARC in the receiving server's own verdict (the first
+  `Authentication-Results` header, and only when it is headed by that
+  server's name), logs nothing of an email, and always replies to the sender.
+  It is deployed on its own with the `worker:*` scripts, never by the app's
+  deploy.
 - **The app never decrypts a staged file**: it re-wraps the file key at confirm
   (`sealedFilesOf`). `trip_inbox_files` is never in `ALL_SPECS`: the module's
   `afterSync` (`syncInboxFiles`) fetches every listed file into the local

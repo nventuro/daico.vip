@@ -49,7 +49,11 @@ export default function TripPage() {
     remove: removeItem,
   } = useTripItems(tripId);
   const { insert: restage } = useTripInbox();
-  const { items: attachments, remove: removeAttachment } = useAttachments();
+  const {
+    items: attachments,
+    remove: removeAttachment,
+    removeByIds: removeAttachments,
+  } = useAttachments();
   const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
   const navigate = useNavigate();
   const leave = useLeave();
@@ -65,9 +69,9 @@ export default function TripPage() {
    *  screen. */
   const undoInbox = useCallback(
     async (added: InboxUndo) => {
-      for (const attachment of attachments) {
-        if (added.attachmentIds.includes(attachment.id)) await removeAttachment(attachment);
-      }
+      // By id: the offer is made as the screen opens, before the attachments
+      // have been read, and its undo is the closure made then.
+      await removeAttachments(added.attachmentIds);
       for (const id of added.itemIds) await removeItem(id);
       for (const row of added.staged) await restage(inboxRowInput(row));
       if (added.tripCreated) {
@@ -75,7 +79,7 @@ export default function TripPage() {
         leave(appPath('viajes'));
       }
     },
-    [attachments, removeAttachment, removeItem, restage, removeTrip, leave],
+    [removeAttachments, removeItem, restage, removeTrip, leave],
   );
 
   // What the review just put in arrives with the navigation and is offered

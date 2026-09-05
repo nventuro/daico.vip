@@ -230,13 +230,19 @@ function statusOf(error: { message: string }): number | undefined {
   return 'status' in error && typeof error.status === 'number' ? error.status : undefined;
 }
 
-/** Send every file still waiting for the bucket. Stops at the first refusal
- *  that may pass later, leaving that file and the rest for the next run. */
+/** Send every file still waiting for the bucket whose row the server has
+ *  taken. Stops at the first refusal that may pass later, leaving that file
+ *  and the rest for the next run. */
 export async function uploadPending(): Promise<void> {
-  // The ones the bucket refused for good are not among them: they are shown
-  // as failed and never sent again.
+  // A file goes up only after its row: an object no row refers to is an
+  // orphan to every other device's sweep, and once swept, the copy here would
+  // still count as uploaded and never go up again. The ones the bucket refused
+  // for good are not among them either: they are shown as failed and never
+  // sent again.
   const waiting = await engine.localQuery<Pick<AttachmentFileRow, 'id' | 'data'>>(
-    `SELECT id, data FROM ${ATTACHMENT_FILES.table} WHERE uploaded = 0 AND upload_error IS NULL`,
+    `SELECT f.id, f.data FROM ${ATTACHMENT_FILES.table} f
+      JOIN ${ATTACHMENTS_SPEC.table} a ON a.id = f.id
+     WHERE f.uploaded = 0 AND f.upload_error IS NULL AND a.pending_op IS NULL`,
   );
   for (const { id, data } of waiting) {
     const { error } = await bucket().upload(id, new Blob([data]), {

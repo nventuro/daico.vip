@@ -291,8 +291,25 @@ for (const [key, { file, guideId }] of images) {
 
 // ---- preview ------------------------------------------------------------------------------
 
+// A preview is written from scratch, so the directory is emptied first — but
+// only one this script wrote: it leaves a marker behind, and a directory
+// without one is somebody else's.
+const PREVIEW_MARKER = '.import-guides-preview';
 if (previewDir) {
+  const exists = (p) =>
+    fs.access(p).then(
+      () => true,
+      () => false,
+    );
+  if ((await exists(previewDir)) && !(await exists(path.join(previewDir, PREVIEW_MARKER)))) {
+    console.error(
+      `--preview: ${previewDir} exists and was not written by this script; not removing it.`,
+    );
+    process.exit(1);
+  }
   await fs.rm(previewDir, { recursive: true, force: true });
+  await fs.mkdir(previewDir, { recursive: true });
+  await fs.writeFile(path.join(previewDir, PREVIEW_MARKER), '');
   for (const c of chapters) {
     const g = guides.find((x) => x.id === c.guide_id);
     const dir = path.join(previewDir, g.title.replace(/[^\w-]+/g, '_'));

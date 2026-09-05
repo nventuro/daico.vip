@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { StatementError } from '../statement';
+import { StatementError, type PageLine } from '../statement';
 import { parseGaliciaMastercard } from './galiciaMastercard';
 import { pages } from './testing/galiciaMastercardPages';
+
+/** The pages with one token reworded where it stands, so the sums still add up. */
+function retokened(from: string, to: string): PageLine[][] {
+  return pages().map((page) =>
+    page.map((line) => line.map((word) => (word.text === from ? { ...word, text: to } : word))),
+  );
+}
 
 describe('the Galicia MASTERCARD layout', () => {
   it('reads the consolidated block: totals, previous balance, nothing pending', () => {
@@ -33,6 +40,24 @@ describe('the Galicia MASTERCARD layout', () => {
     ]);
     expect(purchases[0]).toMatchObject({ usd_cents: 249 });
     expect(purchases[3]).toMatchObject({ on: '2026-07-04' });
+  });
+
+  it('tells an installment from a period by how it is set, not by its numbers', () => {
+    // A period one space after the merchant is a period whatever it reads as.
+    const period = parseGaliciaMastercard(retokened('07/26', '01/24'));
+    expect(period.lines.find((line) => line.description.endsWith('01/24'))?.installment).toBeNull();
+    // A field set off from the merchant is an installment however long the plan.
+    const long = parseGaliciaMastercard(retokened('01/02', '01/30'));
+    expect(long.lines.find((line) => line.description === 'VETERINARIA X')?.installment).toEqual({
+      number: 1,
+      of: 30,
+    });
+    // Under "CUOTA DEL MES" there is nothing but installments.
+    const cuota = parseGaliciaMastercard(retokened('03/06', '03/26'));
+    expect(cuota.lines.find((line) => line.description === 'MERPAGO*TV')?.installment).toEqual({
+      number: 3,
+      of: 26,
+    });
   });
 
   it("reads the bank's charges from the block, dated the closing day", () => {

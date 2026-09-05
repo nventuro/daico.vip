@@ -84,6 +84,13 @@ const OWNER_TABLES = ['checkups', 'health_records'];
 const OWNER_POLICY = '(private.is_member() AND (owner = auth.uid()))';
 const ownerTables = OWNER_TABLES.map((table) => `'${table}'`).join(', ');
 
+// The attachments bucket takes only opaque blobs — the real type lives in the
+// row — and nothing larger than the 10 MiB the app accepts plus the 29 bytes
+// sealing adds. What the migration set, pinned so a change in the dashboard
+// shows up here.
+const BUCKET_MIME_TYPES = ['application/octet-stream'];
+const BUCKET_MAX_BYTES = 10485789;
+
 const expectedPrivileges = Object.entries(TABLE_PRIVILEGES)
   .map(([table, privileges]) => {
     const listed = privileges.map((p) => p.toUpperCase()).sort();
@@ -111,10 +118,28 @@ const CHECKS = [
                      or coalesce(p.with_check,'') ilike '%is_member%'))`,
   },
   {
-    name: 'anon has zero privileges on any public table',
-    sql: `select table_name || ' [' || privilege_type || ']' as violation
-          from information_schema.role_table_grants
-          where grantee = 'anon' and table_schema = 'public'`,
+    // Asked of the role itself rather than read off its grants: a grant to
+    // PUBLIC, to a role anon is a member of, or on a single column reaches anon
+    // just the same and is listed under none of its own.
+    name: 'anon holds no privilege on any public table or column, however it would get there',
+    sql: `select c.relname || ' [' || priv || ']' as violation
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'])
+            as priv
+          where n.nspname = 'public' and c.relkind in ('r','p','v','m')
+            and (has_table_privilege('anon', c.oid, priv)
+                 or (priv in ('SELECT','INSERT','UPDATE','REFERENCES')
+                     and has_any_column_privilege('anon', c.oid, priv)))`,
+  },
+  {
+    name: 'anon can call no function in public or private, and cannot see into private',
+    sql: `select n.nspname || '.' || p.proname || '()' as violation
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname in ('public', 'private')
+            and has_function_privilege('anon', p.oid, 'EXECUTE')
+          union all
+          select 'usage on schema private' as violation
+          where has_schema_privilege('anon', 'private', 'USAGE')`,
   },
   {
     name: 'authenticated holds exactly the privileges listed for each public table',
@@ -241,7 +266,9 @@ const CHECKS = [
           where n.nspname = 'public' and c.relkind in ('v','m')`,
   },
   {
-    name: 'every SECURITY DEFINER function pins search_path',
+    // Pinned, and pinned empty: a search_path that names a schema still lets
+    // an object planted there be found first.
+    name: 'every SECURITY DEFINER function pins search_path to nothing',
     sql: `select n.nspname || '.' || p.proname as violation
           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
           where p.prosecdef
@@ -249,7 +276,7 @@ const CHECKS = [
                                   'realtime','vault','extensions','graphql','graphql_public',
                                   'pgbouncer','supabase_migrations')
             and not exists (select 1 from unnest(coalesce(p.proconfig,'{}')) cfg
-                            where cfg like 'search_path=%')`,
+                            where cfg in ('search_path=', 'search_path=""'))`,
   },
   {
     // Scoped to `postgres` — the role our migrations create objects under, so
@@ -271,7 +298,7 @@ const CHECKS = [
     // Sync integrity rather than access control: `updated_at` marks the
     // offline-synced tables, and without the guard a pushed stale edit would
     // overwrite a newer row and devices would stop converging.
-    name: 'every public table with updated_at has the private.last_write_wins() trigger',
+    name: 'every public table with updated_at has the private.last_write_wins() trigger, enabled',
     sql: `select c.relname as violation
           from pg_class c join pg_namespace n on n.oid = c.relnamespace
           where n.nspname = 'public' and c.relkind = 'r'
@@ -284,6 +311,7 @@ const CHECKS = [
               join pg_namespace pn on pn.oid = p.pronamespace
               where t.tgrelid = c.oid and not t.tgisinternal
                 and pn.nspname = 'private' and p.proname = 'last_write_wins'
+                and t.tgenabled <> 'D'      -- a disabled trigger is no trigger
                 and (t.tgtype & 2) <> 0     -- before
                 and (t.tgtype & 16) <> 0    -- update
                 and (t.tgtype & 1) <> 0)    -- row
@@ -294,6 +322,14 @@ const CHECKS = [
     // unauthenticated URLs to them.
     name: 'no storage bucket is public',
     sql: `select id as violation from storage.buckets where public`,
+  },
+  {
+    name: 'every storage bucket takes only opaque blobs, no larger than the app seals',
+    sql: `select id || ': ' || coalesce(array_to_string(allowed_mime_types, ','), '(any type)')
+                 || ', ' || coalesce(file_size_limit::text, '(no limit)') || ' bytes' as violation
+          from storage.buckets
+          where allowed_mime_types is distinct from array[${BUCKET_MIME_TYPES.map((t) => `'${t}'`).join(', ')}]::text[]
+             or file_size_limit is distinct from ${BUCKET_MAX_BYTES}`,
   },
   {
     name: 'every storage bucket is gated by a private.is_member() policy on storage.objects',

@@ -47,6 +47,16 @@ const COMPONENTS = ['**/components/**'];
 const HOOKS = ['**/hooks/**'];
 const SHELL = ['**/shell/**'];
 
+// Nor may an app reach into another: what two apps share belongs in src/lib,
+// src/hooks or src/components. Imports are matched as written, so from a file
+// `depth` directories under its app's own, the other apps are one `..` further
+// up than that — its own files never are, and anything higher is the layers
+// below. `types` is the module contract, named from anywhere.
+const otherApps = (up) => [`${up}*`, `${up}*/**`, `!${up}..`, `!${up}../**`, `!${up}types`];
+const APP_DEPTHS = 4;
+const APP_MESSAGE =
+  'An app knows nothing of the shell that mounts it, nor of the registry it is listed in, nor of another app: what two apps share belongs in src/lib, src/hooks or src/components.';
+
 export default defineConfig([
   // `worker/` is a package of its own, run by Cloudflare rather than in the
   // app: its dependencies, its globals and its types are its own, so the
@@ -99,9 +109,21 @@ export default defineConfig([
   },
   {
     files: ['src/apps/**'],
+    rules: layer([...SHELL, '**/registry'], APP_MESSAGE),
+  },
+  ...Array.from({ length: APP_DEPTHS }, (_, depth) => ({
+    files: [`src/apps/*/${'*/'.repeat(depth)}*.{ts,tsx}`],
+    rules: layer([...SHELL, '**/registry', ...otherApps('../'.repeat(depth + 1))], APP_MESSAGE),
+  })),
+  {
+    // The one place an app reaches into another, until Recetas is built out
+    // and pushing to the shopping list finds where it belongs. The directory
+    // is let back in before the file: a file under an excluded directory
+    // cannot be let in on its own.
+    files: ['src/apps/recetas/Ingredients.tsx'],
     rules: layer(
-      [...SHELL, '**/registry'],
-      'An app knows nothing of the shell that mounts it, nor of the registry it is listed in.',
+      [...SHELL, '**/registry', ...otherApps('../'), '!../compras', '!../compras/useShoppingList'],
+      APP_MESSAGE,
     ),
   },
   {

@@ -65,11 +65,11 @@ export function movementsOf(statementId: string, contents: StatementContents): M
  */
 export function movementsOfMonth(
   statements: { id: string }[],
-  all: StatementContents[],
+  all: ReadonlyMap<string, StatementContents>,
   month: string,
 ): Movement[] {
-  return statements.flatMap((statement, i) => {
-    const contents = all[i];
+  return statements.flatMap((statement) => {
+    const contents = all.get(statement.id);
     if (!contents) return [];
     return contents.lines.flatMap((line, index) =>
       yearMonthOf(line.on) === month && !isLaterInstallment(line)

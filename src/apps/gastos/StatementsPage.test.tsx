@@ -43,8 +43,14 @@ const all = [
 ];
 const items = all.map((contents, i) => rowOf(`s${i}`, contents));
 
+/** The given statements' contents as the hook hands them over, by id. */
+const openedOf = (contents: StatementContents[]) =>
+  new Map(contents.map((c, i) => [items[i].id, c] as const));
+
 // What the store gives back, set per test before the page is rendered.
-const state: { contents: StatementContents[] | undefined } = { contents: all };
+const state: { contents: ReadonlyMap<string, StatementContents> | undefined } = {
+  contents: openedOf(all),
+};
 
 vi.mock('./useStatements', () => ({
   useStatements: () => ({
@@ -77,7 +83,7 @@ const { default: StatementsPage } = await import('./StatementsPage');
 
 describe('StatementsPage', () => {
   it('lists every statement by the days it covers', () => {
-    state.contents = all;
+    state.contents = openedOf(all);
     const html = render();
     expect(html).toContain('03/07/26 – 28/07/26');
     expect(html).toContain('29/05/26 – 02/07/26');
@@ -86,20 +92,20 @@ describe('StatementsPage', () => {
   // Its gaps are rows of their own, in the list, where the statements that
   // never came in would have been; nothing new at all has no such place.
   it('says which card has gone quiet', () => {
-    state.contents = all;
+    state.contents = openedOf(all);
     expect(render()).toContain('Falta el último resumen');
   });
 
   // The rows come from the store before their payloads are open, and the list
   // is built on every render, not only on the one that shows it.
   it('holds the list place while the statements are still opening', () => {
-    state.contents = [];
+    state.contents = new Map();
     expect(render).not.toThrow();
     expect(render()).toContain('Cargando');
   });
 
   it('holds it while a statement just synced is opening', () => {
-    state.contents = all.slice(0, 2);
+    state.contents = openedOf(all.slice(0, 2));
     expect(render).not.toThrow();
     expect(render()).toContain('Cargando');
   });

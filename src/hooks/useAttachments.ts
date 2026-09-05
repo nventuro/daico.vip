@@ -35,10 +35,10 @@ export function ownersWithAttachments(
 
 /** The row, this device's copy of the file, and (best effort) the bucket's
  *  object. */
-async function removeAttachment(attachment: Attachment): Promise<void> {
-  await engine.remove(ATTACHMENTS_SPEC, attachment.id);
-  await deleteAttachmentFile(attachment.id);
-  void removeAttachmentObject(attachment.id);
+async function removeAttachment(id: string): Promise<void> {
+  await engine.remove(ATTACHMENTS_SPEC, id);
+  await deleteAttachmentFile(id);
+  void removeAttachmentObject(id);
 }
 
 /**
@@ -116,7 +116,7 @@ export function useAttachments(owner?: AttachmentOwner) {
   );
 
   const remove = useCallback(
-    (attachment: Attachment) => mutate(() => removeAttachment(attachment)),
+    (attachment: Attachment) => mutate(() => removeAttachment(attachment.id)),
     [mutate],
   );
 
@@ -125,10 +125,21 @@ export function useAttachments(owner?: AttachmentOwner) {
   const removeAll = useCallback(
     () =>
       mutate(async () => {
-        for (const attachment of items) await removeAttachment(attachment);
+        for (const attachment of items) await removeAttachment(attachment.id);
       }),
     [mutate, items],
   );
 
-  return { items, loading, error, add, addSealed, remove, removeAll };
+  /** Take the attachments with these ids, whoever's they are: for an undo
+   *  that knows what it added by id, and may run before `items` has been
+   *  read. */
+  const removeByIds = useCallback(
+    (ids: string[]) =>
+      mutate(async () => {
+        for (const id of ids) await removeAttachment(id);
+      }),
+    [mutate],
+  );
+
+  return { items, loading, error, add, addSealed, remove, removeAll, removeByIds };
 }

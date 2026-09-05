@@ -143,9 +143,7 @@ export default {
         {
           envelopeFrom: message.from,
           headerFrom: email.from?.address ?? null,
-          authenticationResults:
-            firstHeader(email, 'authentication-results') ??
-            message.headers.get('Authentication-Results'),
+          authenticationResults: firstHeader(email, 'authentication-results'),
         },
         await memberEmails(db),
       );

@@ -7,7 +7,9 @@
 // It goes in at one of two moments, both of them with nobody looking:
 //   - at boot, before the app has drawn anything;
 //   - when the app leaves the screen, so coming back is coming back to the new
-//     one.
+//     one — unless something is under way that a reload would cut short (the
+//     device's picker or share sheet up over the app, a write still being
+//     made), which holds it for the next time.
 // A member who never puts the app down is told, and can ask for it outright.
 // =============================================================================
 
@@ -24,6 +26,10 @@ let waiting: ServiceWorker | null = null;
 // Set for good once a takeover is under way: the page is being replaced, and a
 // second attempt would only race the first.
 let takingOver = false;
+// How many things are under way that a reload would cut short. On Android the
+// page is hidden while the device's picker or share sheet is up over it, so
+// that moment looks exactly like the app being put down, and is not.
+let holds = 0;
 const listeners = new Set<() => void>();
 
 /** Whether a version newer than the running one is downloaded and waiting. */
@@ -80,6 +86,22 @@ export function applyUpdate(): void {
   if (waiting) void takeOver(waiting);
 }
 
+/**
+ * Keep a waiting build from going in on its own until the returned release is
+ * called: for the device's picker or share sheet while it is up, for a write
+ * while it is being made. A release counts once. The member asking outright
+ * is never held.
+ */
+export function holdUpdates(): () => void {
+  holds += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    holds -= 1;
+  };
+}
+
 /** Watch a registration for a build arriving while the app is in use. */
 function watchForUpdates(registration: ServiceWorkerRegistration): void {
   const onFound = () => {
@@ -104,7 +126,7 @@ function installUpdateTriggers(registration: ServiceWorkerRegistration): void {
   window.addEventListener('online', ask);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') ask();
-    else if (waiting) void takeOver(waiting);
+    else if (waiting && holds === 0) void takeOver(waiting);
   });
 }
 

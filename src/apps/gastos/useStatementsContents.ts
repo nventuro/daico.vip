@@ -14,24 +14,29 @@ export function openStatement(
   return openOnce(statement, () => openContents(masterKey, statement));
 }
 
-/** The contents of every statement given, in the same order; undefined
- *  until all are open (or while the device holds no key). */
+/** The contents of every statement given, by statement id; undefined until
+ *  all are open (or while the device holds no key). By id and never by place
+ *  in the list: the statements change under a screen while a sync runs, and
+ *  what is opened lags them, so a place in one list is not a place in the
+ *  other — and a mark written into the wrong statement is written for good. */
 export function useStatementsContents(statements: Statement[]): {
-  contents: StatementContents[] | undefined;
+  contents: ReadonlyMap<string, StatementContents> | undefined;
   error: string | null;
 } {
   const masterKey = useMasterKey();
   const [state, setState] = useState<{
-    contents: StatementContents[] | undefined;
+    contents: ReadonlyMap<string, StatementContents> | undefined;
     error: string | null;
   }>({ contents: undefined, error: null });
 
   useEffect(() => {
     if (masterKey.status !== 'unlocked') return;
     let active = true;
-    Promise.all(statements.map((s) => openStatement(s, masterKey.key))).then(
-      (contents) => {
-        if (active) setState({ contents, error: null });
+    Promise.all(
+      statements.map(async (s) => [s.id, await openStatement(s, masterKey.key)] as const),
+    ).then(
+      (opened) => {
+        if (active) setState({ contents: new Map(opened), error: null });
       },
       (error: unknown) => {
         if (active) setState({ contents: undefined, error: errorMessage(error) });

@@ -23,7 +23,9 @@ export function useStatementsUpcoming(): Upcoming[] | undefined {
   // The rate is in the sealed payload; only the statements shown are opened.
   const { contents } = useStatementsContents(unpaid);
   return useMemo(() => {
-    if (loading || !contents || contents.length !== unpaid.length) return undefined;
+    if (loading || !contents || unpaid.some((statement) => !contents.has(statement.id))) {
+      return undefined;
+    }
     const missing = cardCloses(items, today)
       .filter((card) => card.late)
       .map((card) => ({
@@ -32,9 +34,9 @@ export function useStatementsUpcoming(): Upcoming[] | undefined {
         to: STATEMENTS_PATH,
         appId: 'gastos' as const,
       }));
-    const toPay = unpaid.map((statement, i) => ({
+    const toPay = unpaid.map((statement) => ({
       title: `${FORMAT_LABELS[statement.format]} · ${formatArsCompact(
-        toPayCents({ ...statement, usd_rate: contents[i].usd_rate }),
+        toPayCents({ ...statement, usd_rate: contents.get(statement.id)?.usd_rate ?? null }),
       )}`,
       on: statement.due_on,
       to: statementPath(statement.id),

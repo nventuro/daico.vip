@@ -69,13 +69,13 @@ export default function StatementPage() {
   // installment, in whichever statement first billed it. Opening a statement
   // already open costs nothing.
   const { contents: all, error: openError } = useStatementsContents(items);
-  const contents = statement && all ? all[items.indexOf(statement)] : undefined;
-  const previousContents = previous && all ? all[items.indexOf(previous)] : undefined;
+  const contents = statement ? all?.get(statement.id) : undefined;
+  const previousContents = previous ? all?.get(previous.id) : undefined;
 
   /** Whether the purchase behind each first installment is set apart. */
   const purchaseMarks = useMemo(() => {
     const marks = new Map<string, boolean>();
-    for (const opened of all ?? [])
+    for (const opened of all?.values() ?? [])
       for (const line of opened.lines)
         if (line.installment?.number === 1) marks.set(purchaseKey(line), line.one_off);
     return marks;

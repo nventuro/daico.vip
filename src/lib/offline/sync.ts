@@ -151,6 +151,7 @@ export function reportFiles(done: number, total: number): void {
 
 /** Forget that this device ever completed a run — for when its data is wiped. */
 export function resetSyncStatus(): void {
+  generation += 1;
   writeCompletedAt(null);
   lastRunAt = null;
   setStatus({ tables: {}, files: null, completedAt: null });
@@ -164,6 +165,11 @@ let syncing = false;
 let rerun = false;
 // When the last run ended, whatever came of it; null until one has.
 let lastRunAt: number | null = null;
+// Which data a run belongs to: the device's as it was when the run started.
+// A reset while a run is on means that data is gone — the session ended and
+// the store was wiped — and what the run still brings down belongs to nobody:
+// written, it would build the store again for whoever is next at the device.
+let generation = 0;
 
 /** Work that belongs to a sync but lives beside the tables — files in a
  *  storage bucket. It is told which tables came down in the run, so it never
@@ -190,6 +196,8 @@ export async function syncAll(): Promise<void> {
     return;
   }
   syncing = true;
+  const run = generation;
+  const superseded = () => generation !== run;
   setStatus({
     syncing: true,
     tables: Object.fromEntries(ALL_SPECS.map((spec) => [spec.table, 'pending'])),
@@ -208,9 +216,7 @@ export async function syncAll(): Promise<void> {
       for (const spec of ALL_SPECS) {
         setTable(spec.table, 'pulling');
         try {
-          await syncTable(spec);
-          synced.add(spec.table);
-          setTable(spec.table, 'done');
+          await syncTable(spec, superseded);
         } catch (err) {
           // Network blip, expired token, a column the server doesn't have yet…
           // Queued changes stay put; we retry on the next trigger (online
@@ -219,7 +225,13 @@ export async function syncAll(): Promise<void> {
           whole = false;
           setTable(spec.table, 'pending');
           console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
+          continue;
         }
+        // The data this run was for is gone: nothing more is brought down,
+        // nothing follows, and the run is nobody's to stamp.
+        if (superseded()) return;
+        synced.add(spec.table);
+        setTable(spec.table, 'done');
       }
     } while (rerun && navigator.onLine);
     for (const listener of afterSyncListeners) {
@@ -237,7 +249,7 @@ export async function syncAll(): Promise<void> {
       setStatus({ completedAt });
     }
   } finally {
-    lastRunAt = Date.now();
+    if (!superseded()) lastRunAt = Date.now();
     syncing = false;
     setStatus({ syncing: false });
   }
@@ -323,7 +335,9 @@ async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
   }
 }
 
-async function syncTable(spec: TableSpec): Promise<void> {
+/** One table's turn in a run; `superseded` says whether the data the run is
+ *  for has been wiped meanwhile, in which case nothing more is written. */
+async function syncTable(spec: TableSpec, superseded: () => boolean): Promise<void> {
   // 1. Queued creates/updates — the objects are already in server shape.
   for (const row of await engine.getPendingUpserts(spec)) {
     const { error } = await supabase.from(spec.table).upsert(row);
@@ -345,7 +359,9 @@ async function syncTable(spec: TableSpec): Promise<void> {
   }
 
   // 3. Full pull + reconcile.
-  await engine.reconcile(spec, await pull(spec));
+  const remote = await pull(spec);
+  if (superseded()) return;
+  await engine.reconcile(spec, remote);
 
   await forgetSettledRefusals(spec);
 }

@@ -115,19 +115,20 @@ export default function StatementsPage() {
   // there is no list to build — and the list is built whether or not it is the
   // one on screen, so a row without its contents is not something holding the
   // list's place can save.
-  const opened = contents?.length === items.length ? contents : undefined;
-  const cards = opened ? coverageByCard(opened, today) : [];
+  const opened =
+    contents && items.every((statement) => contents.has(statement.id)) ? contents : undefined;
+  const cards = opened ? coverageByCard([...opened.values()], today) : [];
   // A card whose gaps are missing statements says so where they belong, in
   // the list; one that has gone quiet has nowhere in the list to say it.
   const late = cards.filter((card) => card.late);
   const listed: Listed[] = opened
     ? [
-        ...items.map((statement, i) => ({
-          kind: 'statement' as const,
-          on: statement.closed_on,
-          statement,
-          contents: opened[i],
-        })),
+        ...items.flatMap((statement) => {
+          const contents = opened.get(statement.id);
+          return contents
+            ? [{ kind: 'statement' as const, on: statement.closed_on, statement, contents }]
+            : [];
+        }),
         ...cards.flatMap((card) =>
           card.gaps.map((period) => ({
             kind: 'gap' as const,

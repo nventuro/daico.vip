@@ -59,6 +59,13 @@ async function added(id: string, content = 'abc'): Promise<void> {
   await engine.insert(ATTACHMENTS_SPEC, row, id);
 }
 
+/** One added and its row pushed, as the run that uploads the file has done
+ *  by the time it gets to the files. */
+async function pushed(id: string, content = 'abc'): Promise<void> {
+  await added(id, content);
+  await syncAll();
+}
+
 /** A trip whose last day is `endsOn`, one row of it (`<tripId>-row`), and the
  *  row's attachment `attachmentId`, its file not yet on this device. */
 async function tripWithFile(
@@ -123,7 +130,7 @@ describe('the local file cache', () => {
 
 describe('uploadPending', () => {
   it('sends each waiting file to the bucket as an opaque blob and marks it uploaded', async () => {
-    await added('a', 'abc');
+    await pushed('a', 'abc');
     await uploadPending();
     expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([
       { name: 'a', data: bytes('abc'), created_at: T0 },
@@ -135,14 +142,14 @@ describe('uploadPending', () => {
 
   it('treats an object already in the bucket as uploaded', async () => {
     server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
-    await added('a');
+    await pushed('a');
     await uploadPending();
     expect(await attachmentUploadState('a')).toBe('uploaded');
   });
 
   it('gives up on a file the bucket refuses for good and never sends it again', async () => {
-    await added('big');
-    await added('fine');
+    await pushed('big');
+    await pushed('fine');
     server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await attachmentUploadState('big')).toBe('failed');
@@ -154,12 +161,12 @@ describe('uploadPending', () => {
   });
 
   it('sends what is still waiting and nothing else: not one the bucket has, nor one it refused', async () => {
-    await added('refused');
+    await pushed('refused');
     server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
     await uploadPending();
     server.restore();
     await putAttachmentFile('held', bytes('xyz'), true);
-    await added('waiting');
+    await pushed('waiting');
 
     const before = uploads();
     await uploadPending();
@@ -171,7 +178,7 @@ describe('uploadPending', () => {
   });
 
   it('keeps a file queued through a failure that may pass later', async () => {
-    await added('a');
+    await pushed('a');
     server.fail('upload', ATTACHMENTS_BUCKET, 'network down');
     await expect(uploadPending()).rejects.toThrow('network down');
     expect(await attachmentUploadState('a')).toBe('pending');
@@ -181,10 +188,20 @@ describe('uploadPending', () => {
   });
 
   it('keeps a file queued while the session is rejected', async () => {
-    await added('a');
+    await pushed('a');
     server.fail('upload', ATTACHMENTS_BUCKET, 'JWT expired', { status: 401 });
     await expect(uploadPending()).rejects.toThrow();
     expect(await attachmentUploadState('a')).toBe('pending');
+  });
+
+  it('leaves a file whose row the server has not taken yet', async () => {
+    await added('a');
+    await uploadPending();
+    expect(uploads()).toBe(0);
+    expect(await attachmentUploadState('a')).toBe('pending');
+    await syncAll();
+    await uploadPending();
+    expect(await attachmentUploadState('a')).toBe('uploaded');
   });
 });
 
@@ -354,6 +371,25 @@ describe('syncAttachmentFiles', () => {
     expect(await attachmentUploadState('a')).toBe('uploaded');
   });
 
+  it('holds a file back until the server takes its row, so no sweep can take it for an orphan', async () => {
+    const stop = afterSync(syncAttachmentFiles);
+    try {
+      await added('a');
+      server.fail('upsert', 'attachments', 'network down');
+      await syncAll();
+      expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([]);
+      expect(await attachmentUploadState('a')).toBe('pending');
+
+      server.restore();
+      await syncAll();
+      expect(server.rows('attachments').map((r) => r.id)).toEqual(['a']);
+      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+      expect(await attachmentUploadState('a')).toBe('uploaded');
+    } finally {
+      stop();
+    }
+  });
+
   it('keeps an object exactly as old as the grace period, and one of no known age', async () => {
     const ago = (ms: number) => new Date(Date.parse(T0) - ms).toISOString();
     server.seedObjects(ATTACHMENTS_BUCKET, [
@@ -494,6 +530,7 @@ describe('making room', () => {
       failed: 0,
     });
 
+    await syncAll();
     server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await attachmentFileUsage()).toMatchObject({ waiting: 1, failed: 1 });

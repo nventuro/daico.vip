@@ -6,6 +6,7 @@ import EntryHead from '../../components/EntryHead';
 import EntryPage from '../../components/EntryPage';
 import LoadingLine from '../../components/LoadingLine';
 import SectionLabel from '../../components/SectionLabel';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
 import { useMasterKey } from '../../hooks/useMasterKey';
@@ -20,6 +21,7 @@ import { useNotes } from './useNotes';
 export default function NotePage() {
   const { items, loading, error, save, remove } = useNotes();
   const note = useEntry(items);
+  const attachments = useAttachments({ kind: 'note', id: note?.id ?? '' });
   const { text, error: bodyError } = useNoteText(note);
   const masterKey = useMasterKey();
   const key = masterKey.status === 'unlocked' ? masterKey.key : null;
@@ -32,6 +34,8 @@ export default function NotePage() {
   });
 
   async function removeNote(id: string) {
+    // The note's pictures go with it; nothing else would ever list them.
+    await attachments.removeAll();
     await remove(id);
     leave(appPath('notas'));
   }

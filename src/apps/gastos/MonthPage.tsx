@@ -64,7 +64,10 @@ export default function MonthPage() {
     [items, contents, month],
   );
 
-  const cards = useMemo(() => (contents ? coverageByCard(contents, today) : []), [contents, today]);
+  const cards = useMemo(
+    () => (contents ? coverageByCard([...contents.values()], today) : []),
+    [contents, today],
+  );
   const coverage = useMemo(() => monthCoverage(month, cards), [month, cards]);
   // A month no statement covers a day of is not a month the app has.
   const listed = useMemo(() => coveredMonths(cards).includes(month), [cards, month]);
@@ -74,7 +77,9 @@ export default function MonthPage() {
     if (!contents) return { previousMonth: null, previousCents: 0, comparable: false };
     const months = coveredMonths(cards);
     const older = months[months.indexOf(month) + 1] ?? null;
-    const totals = new Map(byMonth(contents, rules, 'total').map((row) => [row.month, row.cents]));
+    const totals = new Map(
+      byMonth([...contents.values()], rules, 'total').map((row) => [row.month, row.cents]),
+    );
     return {
       previousMonth: older,
       previousCents: older ? (totals.get(older) ?? 0) : 0,
@@ -95,10 +100,10 @@ export default function MonthPage() {
   function toggleOneOff(movement: Movement) {
     if (masterKey.status !== 'unlocked' || !contents) return;
     const { key } = masterKey;
-    const at = items.findIndex((statement) => statement.id === movement.statementId);
-    if (at < 0) return;
     const { statementId } = movement;
-    const pending = writing.current.get(statementId) ?? Promise.resolve(contents[at]);
+    const opened = contents.get(statementId);
+    if (!opened) return;
+    const pending = writing.current.get(statementId) ?? Promise.resolve(opened);
     const written = pending.then(async (current) => {
       const marked = withOneOff(current, movement.index);
       await replace(statementId, marked, key);
@@ -137,13 +142,11 @@ export default function MonthPage() {
         const oneOffs = movements.filter((movement) => isOneOff(movement.line, rules));
         // The statements a movement of this month came in, newest first: a
         // month is rarely one statement, and never the same days as one.
-        const sources = items
-          .map((statement, i) => ({
-            statement,
-            contents: contents[i],
-            movements: movements.filter((movement) => movement.statementId === statement.id),
-          }))
-          .filter((source) => source.movements.length > 0);
+        const sources = items.flatMap((statement) => {
+          const opened = contents.get(statement.id);
+          const own = movements.filter((movement) => movement.statementId === statement.id);
+          return opened && own.length > 0 ? [{ statement, contents: opened, movements: own }] : [];
+        });
 
         return (
           <div className="flex flex-col gap-6">

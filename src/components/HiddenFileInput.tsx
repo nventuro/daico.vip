@@ -1,4 +1,5 @@
-import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { holdUpdates } from '../lib/appUpdate';
 
 interface HiddenFileInputProps {
   /** What the device may offer, e.g. 'image/*' or 'application/pdf'. */
@@ -30,14 +31,34 @@ export default function HiddenFileInput({
   children,
 }: HiddenFileInputProps) {
   const [input, setInput] = useState<HTMLInputElement | null>(null);
+  // The picker hides the page while it is up, and a build waiting to go in
+  // must not take the page then: the pick would come back to nothing.
+  const holding = useRef<(() => void) | null>(null);
+  const settle = useCallback(() => {
+    holding.current?.();
+    holding.current = null;
+  }, []);
 
   useEffect(() => {
-    if (!input || !onCancel) return;
-    input.addEventListener('cancel', onCancel);
-    return () => input.removeEventListener('cancel', onCancel);
-  }, [input, onCancel]);
+    if (!input) return;
+    const cancelled = () => {
+      settle();
+      onCancel?.();
+    };
+    input.addEventListener('cancel', cancelled);
+    return () => input.removeEventListener('cancel', cancelled);
+  }, [input, onCancel, settle]);
+
+  // A control that goes away holds nothing back.
+  useEffect(() => settle, [settle]);
+
+  function pick() {
+    holding.current ??= holdUpdates();
+    input?.click();
+  }
 
   function picked(e: ChangeEvent<HTMLInputElement>) {
+    settle();
     const files = Array.from(e.target.files ?? []);
     // Cleared so picking the same files again still counts as a change.
     e.target.value = '';
@@ -46,7 +67,7 @@ export default function HiddenFileInput({
 
   return (
     <>
-      {children(() => input?.click())}
+      {children(pick)}
       <input
         ref={setInput}
         type="file"

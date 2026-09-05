@@ -3,6 +3,7 @@ import type { SyncedRow } from '../types';
 import type { RowInput, TableSpec } from '../lib/offline/specs';
 import * as engine from '../lib/offline/engine';
 import { syncAll, syncIfStale } from '../lib/offline/sync';
+import { holdUpdates } from '../lib/appUpdate';
 import { errorMessage } from '../utils/textUtils';
 
 /**
@@ -50,10 +51,14 @@ export function useOfflineTable<Row extends SyncedRow>(spec: TableSpec<Row>) {
   const mutate = useCallback(async <R>(op: () => Promise<R>): Promise<R | undefined> => {
     setError(null);
     let result: R | undefined;
+    // A build waiting to go in does not reload the page over a write half made.
+    const release = holdUpdates();
     try {
       result = await op();
     } catch (e) {
       setError(errorMessage(e));
+    } finally {
+      release();
     }
     void syncAll();
     return result;

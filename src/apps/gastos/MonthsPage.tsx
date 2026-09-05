@@ -39,14 +39,19 @@ export default function MonthsPage() {
   const [pick, setPick] = useState<TrendPick>('total');
   const today = todayIso();
 
-  const cards = useMemo(() => (contents ? coverageByCard(contents, today) : []), [contents, today]);
+  const cards = useMemo(
+    () => (contents ? coverageByCard([...contents.values()], today) : []),
+    [contents, today],
+  );
 
   const months = useMemo(() => {
     if (!contents || !rules) return undefined;
     // Every month the cards cover, whether or not anything was spent in it;
     // a month outside them is left out, since all that is known of it are the
     // installments of its purchases that came in with a later statement.
-    const totals = new Map(byMonth(contents, rules, pick).map((row) => [row.month, row]));
+    const totals = new Map(
+      byMonth([...contents.values()], rules, pick).map((row) => [row.month, row]),
+    );
     return coveredMonths(cards).map((month) => ({
       ...(totals.get(month) ?? { month, cents: 0, usual: 0, oneOff: 0 }),
       coverage: monthCoverage(month, cards),

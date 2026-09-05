@@ -136,6 +136,19 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * The stamp for a write to a row last written at `previous`: now, unless this
+ * device's clock is behind the row, then a moment past the row's own stamp.
+ * The server keeps whichever of the stamps it is given is later, so a write
+ * stamped before the row it changes would be dropped without a word, and the
+ * next pull would then put the server's copy back over the edit made here.
+ */
+function stampAfter(previous: string | undefined): string {
+  const now = Date.now();
+  const after = Date.parse(previous ?? '') + 1;
+  return new Date(after > now ? after : now).toISOString();
+}
+
 function toDb(col: ColumnSpec, value: unknown): unknown {
   if (col.boolean) return value ? 1 : 0;
   return value === undefined ? null : value;
@@ -251,10 +264,14 @@ export async function update<Row extends SyncedRow>(
   const patched = columnsOf(spec).filter(([name]) => name in given);
   const sets = patched.map(([name]) => `${name} = ?`);
   const params: unknown[] = patched.map(([name, col]) => toDb(col, given[name]));
-  sets.push('updated_at = ?');
-  params.push(nowIso());
-  sets.push("pending_op = 'upsert'");
   const c = await db();
+  const [stored] = await c.sql<{ updated_at: string }>(
+    `SELECT updated_at FROM ${spec.table} WHERE id = ?`,
+    id,
+  );
+  sets.push('updated_at = ?');
+  params.push(stampAfter(stored?.updated_at));
+  sets.push("pending_op = 'upsert'");
   await c.sql(
     `UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ? AND pending_op IS NOT 'delete'`,
     ...params,

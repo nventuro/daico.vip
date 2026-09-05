@@ -12,6 +12,7 @@ import {
 } from '@tabler/icons-react';
 import type { Attachment } from '../lib/offline/specs';
 import { isPdf } from '../lib/attachmentFiles';
+import { holdUpdates } from '../lib/appUpdate';
 import { useOnline } from '../hooks/useOnline';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
@@ -117,7 +118,10 @@ export default function AttachmentLightbox({
   function open() {
     if (!file || !url) return;
     if (canShare) {
-      void navigator.share({ files: [file], title: attachment.name || undefined });
+      // The sheet hides the page while it is up; a waiting build must not
+      // take the page from under it.
+      const release = holdUpdates();
+      void navigator.share({ files: [file], title: attachment.name || undefined }).finally(release);
     } else {
       const link = document.createElement('a');
       link.href = url;

@@ -50,7 +50,7 @@ vi.mock('./useTripInbox', () => ({
   }),
 }));
 vi.mock('../../hooks/useAttachments', () => ({
-  useAttachments: () => ({ items: [], loading: false, error: null }),
+  useAttachments: () => ({ items: [], loading: false, error: null, removeByIds: vi.fn() }),
   ownersWithAttachments: () => new Set<string>(),
 }));
 

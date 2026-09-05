@@ -294,6 +294,19 @@ describe('what the server settles', () => {
     expect(server.rows('chores')).toMatchObject([{ title: 'edited here', updated_at: T1 }]);
   });
 
+  it('gets an edit through from a device whose clock is behind the row it edits', async () => {
+    // The row was last written on a device whose clock runs ahead of this
+    // one's: an edit stamped by this clock alone would be older than the row,
+    // skipped by the server, and then overwritten here by the next pull.
+    server.seed('chores', [serverChore('a', T2)]);
+    await syncAll();
+    await engine.update<Chore>(CHORES_SPEC, 'a', { title: 'edited here' });
+    await syncAll();
+    expect(server.rows('chores')).toMatchObject([{ title: 'edited here' }]);
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([{ title: 'edited here' }]);
+    expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
   it('keeps a queued write the server will not take from a session that is not a member', async () => {
     const id = await engine.insert(CHORES_SPEC, newChore);
     await syncAll();
@@ -377,6 +390,49 @@ describe('changes made while a push is in flight', () => {
     expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
     expect(server.rows('chores')).toEqual([]);
     expect(await bookkeeping('chores', id)).toBeNull();
+  });
+});
+
+describe('a run whose data is wiped under it', () => {
+  /** What the device forgets when its session ends, in that order. */
+  async function wiped(): Promise<void> {
+    resetSyncStatus();
+    await engine.clearAll();
+  }
+
+  it('writes nothing more into the store and asks for nothing more', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    const pull = server.hold('select', 'chores');
+    const run = syncAll();
+    await pull.started;
+    await wiped();
+    pull.release();
+    await run;
+
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+    for (const spec of ALL_SPECS) expect(await engine.listVisible(spec)).toEqual([]);
+    expect(callLog().at(-1)).toBe('select:chores');
+  });
+
+  it('leaves the run unstamped and runs none of the after-sync work', async () => {
+    const pull = server.hold('select', 'chores');
+    const listener = vi.fn(async () => {});
+    const stop = afterSync(listener);
+    try {
+      const run = syncAll();
+      await pull.started;
+      await wiped();
+      pull.release();
+      await run;
+    } finally {
+      stop();
+    }
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: null });
+    // Nor does it count as a recent run for whoever is next at the device.
+    await syncIfStale();
+    expect(callLog().filter((c) => c === 'select:chores')).toHaveLength(2);
   });
 });
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CHORES_SPEC } from './offline/specs';
 import * as engine from './offline/engine';
-import { newChore } from './offline/testing/rows';
+import { server } from './offline/testing/fakeSupabase';
+import { newChore, serverChore } from './offline/testing/rows';
 import { getSyncStatus, syncAll } from './offline/sync';
 import { cachedVerdict, rememberVerdict } from './membershipCache';
 import { clearDevice } from './clearDevice';
@@ -27,6 +28,7 @@ Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true
 beforeEach(async () => {
   stored.clear();
   cleared.mockClear();
+  server.reset();
   await engine.clearAll();
 });
 
@@ -44,6 +46,20 @@ describe('clearDevice', () => {
     expect(await localAttachmentFile('a')).toBeNull();
     expect(cachedVerdict('u1')).toBeNull();
     expect(cleared).toHaveBeenCalled();
+    expect(getSyncStatus().completedAt).toBeNull();
+  });
+
+  it('leaves nothing of a sync that was going on when the session ended', async () => {
+    server.seed('chores', [serverChore('a', '2026-08-27T10:00:00.000Z')]);
+    const pull = server.hold('select', 'chores');
+    const run = syncAll();
+    await pull.started;
+
+    await clearDevice('u1');
+    pull.release();
+    await run;
+
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
     expect(getSyncStatus().completedAt).toBeNull();
   });
 

@@ -276,6 +276,62 @@ describe('a build arriving while the app is in use', () => {
   });
 });
 
+describe('something under way that a reload would cut short', () => {
+  it('holds a waiting build back on the way out, and lets it in the next time once released', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, holdUpdates } = await load();
+    await installAppUpdates();
+    const arriving = browser.arrive();
+    const release = holdUpdates();
+
+    // The picker comes up: the page is hidden, and nothing must change under it.
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(arriving.posted).toEqual([]);
+    expect(browser.reloads()).toBe(0);
+
+    browser.show();
+    release();
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(arriving.posted).toEqual([{ type: 'SKIP_WAITING' }]);
+    expect(browser.reloads()).toBe(1);
+  });
+
+  it('is held while any one hold is on, and a release counts once', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, holdUpdates } = await load();
+    await installAppUpdates();
+    browser.arrive();
+    const first = holdUpdates();
+    const second = holdUpdates();
+    first();
+    first();
+
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(browser.reloads()).toBe(0);
+
+    second();
+    browser.show();
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(browser.reloads()).toBe(1);
+  });
+
+  it('does not hold back the member who asks outright', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, holdUpdates, applyUpdate } = await load();
+    await installAppUpdates();
+    browser.arrive();
+    holdUpdates();
+
+    applyUpdate();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(browser.reloads()).toBe(1);
+  });
+});
+
 describe('asking whether there is a new build', () => {
   it('asks when the app comes back to the screen and when the connection returns', async () => {
     const browser = fakeBrowser();

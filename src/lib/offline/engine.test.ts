@@ -176,9 +176,25 @@ describe('update', () => {
     const id = await engine.insert(CHORES_SPEC, newChore);
     // A patch is typed, so these keys can only come from a plain object.
     const patch = { id: 'other', created_at: T2, bogus: 1, title: 'x' } as Partial<Chore>;
+    at(T1);
     await engine.update(CHORES_SPEC, id, patch);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
-      { id, ...newChore, title: 'x', created_at: T0, updated_at: T0 },
+      { id, ...newChore, title: 'x', created_at: T0, updated_at: T1 },
+    ]);
+  });
+
+  it("stamps an edit a moment past the row when this device's clock is behind it", async () => {
+    // Pulled as the server sends it, from a device whose clock runs ahead of
+    // this one's (T0).
+    await pulled(serverChore('a', '2026-08-27T10:00:05.123456+00:00'));
+    await engine.update(CHORES_SPEC, 'a', { title: 'edited here' });
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([
+      { id: 'a', title: 'edited here', updated_at: '2026-08-27T10:00:05.124Z' },
+    ]);
+    // Two edits in the same instant still read in order.
+    await engine.update(CHORES_SPEC, 'a', { title: 'edited again' });
+    expect(await engine.getPendingUpserts<Chore>(CHORES_SPEC)).toMatchObject([
+      { title: 'edited again', updated_at: '2026-08-27T10:00:05.125Z' },
     ]);
   });
 
