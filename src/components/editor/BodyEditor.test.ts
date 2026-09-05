@@ -21,6 +21,9 @@ const KEPT = [
   'línea uno  \nlínea dos',
   'Párrafo uno\n\nPárrafo dos',
   '~~tachado~~',
+  'Un :spoiler[secreto] entre texto.',
+  '![foto](https://ejemplo.test/a.png)',
+  '::youtube{id="abc"}\n\nTexto después.',
   '',
 ];
 
@@ -35,7 +38,15 @@ const NORMALISED: [string, string][] = [
   // A hard break is kept, written the one way.
   ['línea uno\\\nlínea dos', 'línea uno  \nlínea dos'],
   ['   \n\n  ', ''],
+  // A leaf directive ends at its line; what follows is the next block.
+  ['::youtube{id="abc"}\nTexto después.', '::youtube{id="abc"}\n\nTexto después.'],
 ];
+
+/** A document of one paragraph of plain text. */
+const paragraphOf = (text: string) => ({
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+});
 
 describe('the body round trip', () => {
   it.each(KEPT)('keeps %j', (markdown) => {
@@ -62,13 +73,46 @@ describe('the body round trip', () => {
   });
 
   it('keeps a literal that would otherwise read as markup', () => {
+    const doc = paragraphOf('a*b*c, snake_case y > no cita');
+    expect(manager.parse(manager.serialize(doc))).toEqual(doc);
+  });
+
+  it.each([
+    'a) opción',
+    '1) opción',
+    '2024. fue un año',
+    '- 5 grados',
+    '+ más',
+    '# título',
+    '---',
+    '==',
+    '| celda',
+    '> no cita',
+  ])('keeps a paragraph that starts like a block: %j', (text) => {
+    const doc = paragraphOf(text);
+    expect(manager.parse(manager.serialize(doc))).toEqual(doc);
+  });
+
+  it('keeps a paragraph whose line after a hard break starts like a block', () => {
     const doc = {
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'a*b*c, snake_case y > no cita' }] },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'línea' },
+            { type: 'hardBreak' },
+            { type: 'text', text: '- no lista' },
+          ],
+        },
       ],
     };
-    const markdown = manager.serialize(doc);
-    expect(manager.parse(markdown)).toEqual(doc);
+    expect(manager.parse(manager.serialize(doc))).toEqual(doc);
+  });
+
+  it('drops the spaces a paragraph starts with, which would read as code', () => {
+    expect(manager.parse(manager.serialize(paragraphOf('    cuatro espacios')))).toEqual(
+      paragraphOf('cuatro espacios'),
+    );
   });
 });

@@ -34,6 +34,7 @@
     "@tiptap/core": "^3.31.0",
     "@tiptap/extension-heading": "^3.31.0",
     "@tiptap/extension-list": "^3.31.0",
+    "@tiptap/extension-paragraph": "^3.31.0",
     "@tiptap/extension-placeholder": "^3.31.0",
     "@tiptap/markdown": "^3.31.0",
     "@tiptap/pm": "^3.31.0",

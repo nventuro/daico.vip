@@ -13,6 +13,7 @@ import {
 } from '@tiptap/core';
 import Heading, { type Level } from '@tiptap/extension-heading';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
+import { Paragraph } from '@tiptap/extension-paragraph';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Markdown } from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
@@ -36,6 +37,37 @@ const BodyHeading = Heading.extend({
     return [`h${level}`, mergeAttributes(HTMLAttributes, { class: HEADING_CLASS[level] }), 0];
   },
 }).configure({ levels: HEADING_LEVELS });
+
+/**
+ * What markdown reads as a block of its own at the start of a line: a heading,
+ * a bullet, a rule or a setext underline, a table row. `*` and `_` are escaped
+ * with the inline marks already, and `<` and `>` leave as entities.
+ */
+const BLOCK_START = /^(?:#{1,6}(?=[ \t]|$)|[-+](?=[ \t]|$)|(?:-+|=+)[ \t]*$|\|)/;
+/** A list item's number or letter, then the dot or bracket the escape goes on. */
+const LIST_START = /^(\d{1,9}|[A-Za-z])([.)])(?=[ \t]|$)/;
+
+/**
+ * A paragraph whose text would read as another block on the way back in —
+ * `1) opción`, `- 5 grados`, `# título` — keeps its meaning by an escape on
+ * each of its lines, the first and every one a hard break starts. Leading
+ * spaces go: markdown drops them, and four would read as code.
+ */
+function escapeBlockStarts(markdown: string): string {
+  return markdown
+    .split('\n')
+    .map((line) => {
+      const text = line.replace(/^[ \t]+/, '');
+      return BLOCK_START.test(text) ? `\\${text}` : text.replace(LIST_START, '$1\\$2');
+    })
+    .join('\n');
+}
+
+/** A paragraph written so that it reads back as one. */
+const BodyParagraph = Paragraph.extend({
+  renderMarkdown: (node, helpers, context) =>
+    escapeBlockStarts(Paragraph.config.renderMarkdown!(node, helpers, context)),
+}).configure({ HTMLAttributes: { class: MARKDOWN_CLASS.p } });
 
 /**
  * A block the editor does not model, kept as the markdown text it is: a block
@@ -94,6 +126,81 @@ const MarkdownDirective = keptAsText('markdownDirective', 'markdownDirective', {
 });
 
 /**
+ * A leaf directive (`::name{…}`) is a line of its own. Cut out as one, or
+ * marked would read it as a paragraph and the soft-break rule would fold the
+ * line after it onto it.
+ */
+const LEAF_DIRECTIVE = /^::(?!:)[A-Za-z][\w-]*(?:\[[^\]\n]*\])?(?:\{[^}\n]*\})?[ \t]*(?=\n|$)/;
+const MarkdownLeafDirective = keptAsText('markdownLeafDirective', 'markdownLeafDirective', {
+  name: 'markdownLeafDirective',
+  level: 'block',
+  start: (src) => src.search(/^::(?!:)/m),
+  tokenize: (src) => {
+    const match = LEAF_DIRECTIVE.exec(src);
+    return match ? { type: 'markdownLeafDirective', raw: match[0] } : undefined;
+  },
+});
+
+/** A tokenizer cutting what `pattern` matches out of a run of text, as `type`. */
+function inlineTokenizer(name: string, type: string, pattern: RegExp): MarkdownTokenizer {
+  const anywhere = new RegExp(pattern.source.replace(/^\^/, ''));
+  return {
+    name,
+    level: 'inline',
+    start: (src) => src.search(anywhere),
+    tokenize: (src) => {
+      const match = pattern.exec(src);
+      return match ? { type, raw: match[0] } : undefined;
+    },
+  };
+}
+
+/** A text directive (`:spoiler[…]`), what the dialect wraps in one included. */
+const TEXT_DIRECTIVE = /^:[A-Za-z][\w-]*\[[^\]\n]*\](?:\{[^}\n]*\})?/;
+/** An image by address (`![alt](url)`), which nothing here draws. */
+const IMAGE = /^!\[[^\]\n]*\]\([^)\n]*\)/;
+
+/**
+ * An inline the editor does not model, kept the way a block is: as the
+ * markdown text it is, written out unescaped so it survives every open, and
+ * drawn as code. One piece, deleted whole and never written on.
+ */
+const MarkdownInline = Node.create({
+  name: 'markdownInline',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return { text: { default: '' } };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'code[data-markdown-inline]',
+        getAttrs: (element) => ({ text: (element as HTMLElement).textContent ?? '' }),
+      },
+    ];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'code',
+      mergeAttributes(HTMLAttributes, { 'data-markdown-inline': '', class: MARKDOWN_CLASS.code }),
+      String(node.attrs.text),
+    ];
+  },
+  markdownTokenizer: inlineTokenizer('markdownTextDirective', 'markdownInline', TEXT_DIRECTIVE),
+  parseMarkdown: (token, helpers) =>
+    helpers.createNode('markdownInline', { text: token.raw ?? '' }),
+  renderMarkdown: (node) => String(node.attrs?.text ?? ''),
+});
+
+/** The image form, read into the same inline. */
+const MarkdownImage = Extension.create({
+  name: 'markdownImage',
+  markdownTokenizer: inlineTokenizer('markdownImage', 'markdownInline', IMAGE),
+});
+
+/**
  * A newline on its own inside a paragraph: the dialect reads it as a space,
  * so the editor does too, or it would draw a line break the renderer does
  * not. A hard break — two spaces or a backslash before the newline — is left
@@ -116,6 +223,7 @@ export function bodyExtensions(placeholder: string): AnyExtension[] {
   return [
     StarterKit.configure({
       heading: false,
+      paragraph: false,
       // Has no form in the dialect: the renderer would show its marks.
       underline: false,
       link: {
@@ -125,7 +233,6 @@ export function bodyExtensions(placeholder: string): AnyExtension[] {
         openOnClick: false,
         HTMLAttributes: { class: MARKDOWN_CLASS.a },
       },
-      paragraph: { HTMLAttributes: { class: MARKDOWN_CLASS.p } },
       bulletList: { HTMLAttributes: { class: MARKDOWN_CLASS.ul } },
       orderedList: { HTMLAttributes: { class: MARKDOWN_CLASS.ol } },
       listItem: { HTMLAttributes: { class: MARKDOWN_CLASS.li } },
@@ -134,11 +241,15 @@ export function bodyExtensions(placeholder: string): AnyExtension[] {
       code: { HTMLAttributes: { class: MARKDOWN_CLASS.code } },
       codeBlock: { HTMLAttributes: { class: MARKDOWN_CLASS.codeBlock } },
     }),
+    BodyParagraph,
     BodyHeading,
     TaskList.configure({ HTMLAttributes: { class: MARKDOWN_CLASS.taskList } }),
     TaskItem.configure({ nested: true, HTMLAttributes: { class: MARKDOWN_CLASS.taskItem } }),
     MarkdownTable,
     MarkdownDirective,
+    MarkdownLeafDirective,
+    MarkdownInline,
+    MarkdownImage,
     SoftBreak,
     Placeholder.configure({ placeholder }),
     Markdown,

@@ -429,9 +429,9 @@ the rules on top of it.
   reader until the editor's chunk arrives, so any block the two draw
   differently jumps on screen. They share
   `src/components/markdown/classes.ts`, the editor has no height of its own,
-  a soft line break reads as the space it is on both sides, and a block the
-  editor does not model — a GFM table, a container directive — is kept as
-  the text it is. The round trip is tested headlessly in `BodyEditor.test.ts`.
+  a soft line break reads as the space it is on both sides, and what the
+  editor does not model — a GFM table, a directive, an image by address — is
+  kept as the text it is. The round trip is tested headlessly in `BodyEditor.test.ts`.
 - **A page is left, never stacked on**: `useLeave` for every delete and the
   header's arrow, `useLeaveBack` for the mark that leaves; a plain link or
   `navigate` only going down, from a list to an entry. `src/lib/visited.ts`
