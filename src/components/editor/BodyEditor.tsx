@@ -22,12 +22,13 @@ export interface BodyProps {
 }
 
 /**
- * The editable element itself: no box, no outline, a selection in the app's
- * colour, and the placeholder drawn in the first block while the body is
- * empty (the classes and attribute are the placeholder extension's).
+ * The editable element itself: no box, no outline, no height of its own, a
+ * selection in the app's colour, and the placeholder drawn in the first block
+ * while the body is empty (the classes and attribute are the placeholder
+ * extension's).
  */
 const CONTENT_CLASS =
-  'min-h-32 outline-none selection:bg-(--app)/25 [&_.is-editor-empty:first-child]:before:pointer-events-none [&_.is-editor-empty:first-child]:before:float-left [&_.is-editor-empty:first-child]:before:h-0 [&_.is-editor-empty:first-child]:before:text-muted [&_.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]';
+  'outline-none selection:bg-(--app)/25 [&_.is-editor-empty:first-child]:before:pointer-events-none [&_.is-editor-empty:first-child]:before:float-left [&_.is-editor-empty:first-child]:before:h-0 [&_.is-editor-empty:first-child]:before:text-muted [&_.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]';
 
 /** The editor behind `Body`: the text drawn as it reads, written in place. */
 export default function BodyEditor({

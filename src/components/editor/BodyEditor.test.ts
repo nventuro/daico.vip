@@ -15,11 +15,9 @@ const KEPT = [
   '- uno\n- dos\n  - anidado\n- tres',
   '1. primero\n2. segundo',
   '- [ ] por hacer\n- [x] hecho',
-  '> una cita\n> de dos líneas',
   '```\ncódigo\n  con sangría\n```',
   '---',
   'Un [enlace](https://ejemplo.test/ruta) y otro [interno](/guias/g/c).',
-  'línea uno\nlínea dos',
   'línea uno  \nlínea dos',
   'Párrafo uno\n\nPárrafo dos',
   '~~tachado~~',
@@ -30,6 +28,12 @@ const KEPT = [
 const NORMALISED: [string, string][] = [
   ['_cursiva_ y __negrita__', '*cursiva* y **negrita**'],
   ['* con asterisco\n* otro', '- con asterisco\n- otro'],
+  // A newline on its own is a soft break, which reads as a space.
+  ['línea uno\nlínea dos', 'línea uno línea dos'],
+  ['> una cita\n> de dos líneas', '> una cita de dos líneas'],
+  ['- uno\n  sigue\n- dos', '- uno sigue\n- dos'],
+  // A hard break is kept, written the one way.
+  ['línea uno\\\nlínea dos', 'línea uno  \nlínea dos'],
   ['   \n\n  ', ''],
 ];
 
@@ -53,6 +57,8 @@ describe('the body round trip', () => {
     const directives =
       '::youtube{id="abc" start="0"}\n\n:::spoiler\nescondido\n:::\n\n::image{key="k" width="60"}';
     expect(roundTrip(directives)).toBe(directives);
+    const ingredients = 'Antes\n\n:::ingredients\n- harina\n- agua\n:::\n\nDespués';
+    expect(roundTrip(ingredients)).toBe(ingredients);
   });
 
   it('keeps a literal that would otherwise read as markup', () => {

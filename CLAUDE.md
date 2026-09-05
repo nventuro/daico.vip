@@ -425,10 +425,13 @@ the rules on top of it.
   itself takes the field's name as its placeholder («Contenido»); what is
   written _about_ an entry is drawn by `Comments`, headed like the sections
   around it, and a page that takes comments never draws a `Body` of its own.
-  The editor and `Markdown` share `src/components/markdown/classes.ts` so they
-  look the same, and the editor's round trip is tested headlessly in
-  `BodyEditor.test.ts`. It models neither GFM tables nor the directives: a
-  table is kept as the text it is.
+  **The editor draws exactly what `Markdown` draws**: `Body` shows the
+  reader until the editor's chunk arrives, so any block the two draw
+  differently jumps on screen. They share
+  `src/components/markdown/classes.ts`, the editor has no height of its own,
+  a soft line break reads as the space it is on both sides, and a block the
+  editor does not model — a GFM table, a container directive — is kept as
+  the text it is. The round trip is tested headlessly in `BodyEditor.test.ts`.
 - **A page is left, never stacked on**: `useLeave` for every delete and the
   header's arrow, `useLeaveBack` for the mark that leaves; a plain link or
   `navigate` only going down, from a list to an entry. `src/lib/visited.ts`

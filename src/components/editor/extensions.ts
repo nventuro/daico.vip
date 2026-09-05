@@ -4,7 +4,13 @@
 // and serialiser between them and the text; the placeholder. No React and no
 // DOM at import, so the round trip can be run headlessly.
 // =============================================================================
-import { Node, mergeAttributes, type AnyExtension } from '@tiptap/core';
+import {
+  Extension,
+  Node,
+  mergeAttributes,
+  type AnyExtension,
+  type MarkdownTokenizer,
+} from '@tiptap/core';
 import Heading, { type Level } from '@tiptap/extension-heading';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -32,40 +38,78 @@ const BodyHeading = Heading.extend({
 }).configure({ levels: HEADING_LEVELS });
 
 /**
- * A GFM table, which the editor does not model: it is kept as the markdown
- * text it is, in a block of its own whose text is never escaped on the way
- * out, so a table survives every open untouched unless it is written on. It
- * is drawn as code, which is what it reads as here.
+ * A block the editor does not model, kept as the markdown text it is: a block
+ * of its own whose text is never escaped on the way out, so it survives every
+ * open untouched unless it is written on. It is drawn as code, which is what
+ * it reads as here. `tokenName` is the marked token it is made from — one of
+ * marked's own, or the one `tokenizer` cuts out of the text.
  */
-const MarkdownTable = Node.create({
-  name: 'markdownTable',
-  group: 'block',
-  content: 'text*',
-  marks: '',
-  code: true,
-  defining: true,
-  parseHTML() {
-    return [{ tag: 'p[data-markdown-table]', preserveWhitespace: 'full' }];
+function keptAsText(name: string, tokenName: string, tokenizer?: MarkdownTokenizer) {
+  const attribute = `data-${name}`;
+  return Node.create({
+    name,
+    group: 'block',
+    content: 'text*',
+    marks: '',
+    code: true,
+    defining: true,
+    parseHTML() {
+      return [{ tag: `p[${attribute}]`, preserveWhitespace: 'full' }];
+    },
+    renderHTML({ HTMLAttributes }) {
+      return [
+        'p',
+        mergeAttributes(HTMLAttributes, {
+          [attribute]: '',
+          class: `${MARKDOWN_CLASS.p} ${MARKDOWN_CLASS.code} whitespace-pre-wrap`,
+        }),
+        0,
+      ];
+    },
+    markdownTokenName: tokenName,
+    markdownTokenizer: tokenizer,
+    parseMarkdown: (token, helpers) =>
+      helpers.createNode(name, {}, [{ type: 'text', text: (token.raw ?? '').trim() }]),
+    renderMarkdown: (node, helpers) => helpers.renderChildren(node),
+  });
+}
+
+/** A GFM table, from marked's own token. */
+const MarkdownTable = keptAsText('markdownTable', 'table');
+
+/**
+ * A container directive (`:::name` … `:::`), which marked would read as a
+ * paragraph and the soft-break rule below would then fold onto one line.
+ * Cut out whole, from the opening line to the first closing one.
+ */
+const CONTAINER_DIRECTIVE = /^:::[^\n]*\n[\s\S]*?\n:::[ \t]*(?=\n|$)/;
+const MarkdownDirective = keptAsText('markdownDirective', 'markdownDirective', {
+  name: 'markdownDirective',
+  level: 'block',
+  start: (src) => src.search(/^:::/m),
+  tokenize: (src) => {
+    const match = CONTAINER_DIRECTIVE.exec(src);
+    return match ? { type: 'markdownDirective', raw: match[0] } : undefined;
   },
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'p',
-      mergeAttributes(HTMLAttributes, {
-        'data-markdown-table': '',
-        class: `${MARKDOWN_CLASS.p} ${MARKDOWN_CLASS.code} whitespace-pre-wrap`,
-      }),
-      0,
-    ];
-  },
-  markdownTokenName: 'table',
-  parseMarkdown: (token, helpers) =>
-    helpers.createNode('markdownTable', {}, [{ type: 'text', text: (token.raw ?? '').trim() }]),
-  renderMarkdown: (node, helpers) => helpers.renderChildren(node),
 });
 
-/** A ticked list is a list without bullets, each row a box and its text. */
-const TASK_LIST_CLASS = 'my-3 list-none pl-0';
-const TASK_ITEM_CLASS = 'my-1 flex items-start gap-2 leading-relaxed';
+/**
+ * A newline on its own inside a paragraph: the dialect reads it as a space,
+ * so the editor does too, or it would draw a line break the renderer does
+ * not. A hard break — two spaces or a backslash before the newline — is left
+ * to the rule that reads it. Marked cuts a run of text short at `start`, so
+ * the newline is met on its own and read here.
+ */
+const SOFT_BREAK = /(?<! {2}|\\)\n/;
+const SoftBreak = Extension.create({
+  name: 'softBreak',
+  markdownTokenizer: {
+    name: 'softBreak',
+    level: 'inline',
+    start: (src) => src.search(SOFT_BREAK),
+    tokenize: (src) => (src.startsWith('\n') ? { type: 'text', raw: '\n', text: ' ' } : undefined),
+  },
+});
 
 /** The editor's extensions, with `placeholder` shown while the body is empty. */
 export function bodyExtensions(placeholder: string): AnyExtension[] {
@@ -88,12 +132,14 @@ export function bodyExtensions(placeholder: string): AnyExtension[] {
       blockquote: { HTMLAttributes: { class: MARKDOWN_CLASS.blockquote } },
       horizontalRule: { HTMLAttributes: { class: MARKDOWN_CLASS.hr } },
       code: { HTMLAttributes: { class: MARKDOWN_CLASS.code } },
-      codeBlock: { HTMLAttributes: { class: `my-4 overflow-x-auto ${MARKDOWN_CLASS.code}` } },
+      codeBlock: { HTMLAttributes: { class: MARKDOWN_CLASS.codeBlock } },
     }),
     BodyHeading,
-    TaskList.configure({ HTMLAttributes: { class: TASK_LIST_CLASS } }),
-    TaskItem.configure({ nested: true, HTMLAttributes: { class: TASK_ITEM_CLASS } }),
+    TaskList.configure({ HTMLAttributes: { class: MARKDOWN_CLASS.taskList } }),
+    TaskItem.configure({ nested: true, HTMLAttributes: { class: MARKDOWN_CLASS.taskItem } }),
     MarkdownTable,
+    MarkdownDirective,
+    SoftBreak,
     Placeholder.configure({ placeholder }),
     Markdown,
   ];
