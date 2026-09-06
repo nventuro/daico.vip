@@ -27,6 +27,14 @@ Chromium-only APIs are available everywhere.
   too. **Google is the only provider enabled in the dashboard — keep it that
   way**; that toggle, which no migration or `db:verify` can see, is what makes
   «Google only» true.
+- **Nobody becomes a user but a member.** The auth server asks
+  `private.before_user_created()` before it makes a user — its «Before User
+  Created» hook, switched on in the dashboard and pointed at that function —
+  and the function refuses any email not in `members`, so a stranger who
+  signs in leaves no row in `auth.users`. Adding a member is still the row in
+  `members` first, then their sign-in. `db:verify` pins the function's body
+  and that `supabase_auth_admin` alone may call it; the toggle is the other
+  one it cannot see — **keep it on**.
 - **Never add an anon grant or a public view.** There is no public data. The anon
   role must always resolve to zero access; `db:verify` fails on any privilege
   it holds.

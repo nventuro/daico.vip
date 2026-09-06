@@ -319,6 +319,11 @@ npm run db:link   # once
 npm run db:push
 ```
 
+In the dashboard → Authentication → Hooks, enable **Before User Created** as a
+Postgres function: schema `private`, function `before_user_created`. The auth
+server asks it before it makes a user, and it refuses any email that is not in
+`members`, so a stranger who signs in leaves no row behind.
+
 Then add the authorized Google account emails to the `members` table via the
 Supabase SQL editor — only those accounts can access
 the app. Until a member exists, the app denies everyone.

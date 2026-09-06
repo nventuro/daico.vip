@@ -120,6 +120,28 @@ const IS_MEMBER_BODY = `
       and coalesce((i.identity_data ->> 'email_verified')::boolean, false)
   )
 `;
+
+// The gate on who becomes a user at all, in the same terms: the auth server
+// asks it before making a user (its «before user created» hook, switched on
+// in the dashboard and pointed at it) and it answers by the roster, so a
+// stranger who signs in leaves no row behind. Pinned for the same reason.
+const HOOK_ROLE = 'supabase_auth_admin';
+const BEFORE_USER_CREATED_BODY = `
+  select case
+    when exists (
+      select 1 from public.members m
+      where lower(m.email) = lower(event -> 'user' ->> 'email')
+    ) then '{}'::jsonb
+    else jsonb_build_object('error', jsonb_build_object(
+      'http_code', 403,
+      'message', 'This account is not a member.'
+    ))
+  end
+`;
+const PINNED_FUNCTIONS = [
+  { name: 'is_member', body: IS_MEMBER_BODY },
+  { name: 'before_user_created', body: BEFORE_USER_CREATED_BODY },
+];
 const collapsed = (sql) => sql.replace(/\s+/g, ' ').trim().replace(/'/g, "''");
 
 // The triggers a table may carry, and nothing else: the last-write-wins guard
@@ -389,9 +411,9 @@ const CHECKS = [
               and i.indexname = t.index_name
               and i.indexdef like 'CREATE UNIQUE INDEX %((true))')`,
   },
-  {
-    name: 'private.is_member() reads exactly as its migration wrote it',
-    sql: `select 'private.is_member(): ' || case
+  ...PINNED_FUNCTIONS.map(({ name, body }) => ({
+    name: `private.${name}() reads exactly as its migration wrote it`,
+    sql: `select 'private.${name}(): ' || case
                  when p.oid is null then 'missing'
                  when not p.prosecdef then 'not security definer'
                  when p.provolatile <> 's' then 'not stable'
@@ -399,9 +421,36 @@ const CHECKS = [
                end as violation
           from (select 1) as one
           left join (pg_proc p join pg_namespace n on n.oid = p.pronamespace)
-            on n.nspname = 'private' and p.proname = 'is_member'
+            on n.nspname = 'private' and p.proname = '${name}'
           where p.oid is null or not p.prosecdef or p.provolatile <> 's'
-             or regexp_replace(btrim(p.prosrc, E' \\n\\t'), '\\s+', ' ', 'g') <> '${collapsed(IS_MEMBER_BODY)}'`,
+             or regexp_replace(btrim(p.prosrc, E' \\n\\t'), '\\s+', ' ', 'g') <> '${collapsed(body)}'`,
+  })),
+  {
+    // The auth server's role is the hook's only caller: any other holding
+    // execute could ask it which emails are members'. A null ACL is the
+    // default a create leaves behind, execute for everyone.
+    name: `private.before_user_created() is callable by ${HOOK_ROLE}, who can see into private, and by nobody else`,
+    sql: `select 'private.before_user_created(): '
+                 || case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end
+                 || ' holds execute' as violation
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          cross join lateral aclexplode(p.proacl) a
+          where n.nspname = 'private' and p.proname = 'before_user_created'
+            and a.grantee <> '${HOOK_ROLE}'::regrole and a.grantee <> p.proowner
+          union all
+          select 'private.before_user_created(): ' || case
+                   when p.oid is null then 'missing'
+                   when p.proacl is null then 'callable by everyone'
+                   else '${HOOK_ROLE} cannot call it'
+                 end as violation
+          from (select 1) as one
+          left join (pg_proc p join pg_namespace n on n.oid = p.pronamespace)
+            on n.nspname = 'private' and p.proname = 'before_user_created'
+          where p.oid is null or p.proacl is null
+             or not has_function_privilege('${HOOK_ROLE}', p.oid, 'EXECUTE')
+          union all
+          select '${HOOK_ROLE} cannot see into private' as violation
+          where not has_schema_privilege('${HOOK_ROLE}', 'private', 'USAGE')`,
   },
   {
     // Storage holds the attachment files: a public bucket would hand out

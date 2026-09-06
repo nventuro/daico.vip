@@ -45,3 +45,29 @@ describe('the login screen and the splash', () => {
     expect(said(footerOf(screen))).toBe(said(footerOf(splash!)));
   });
 });
+
+/** The screen as drawn on a page whose address is `href`. */
+function drawnAt(href: string): string {
+  vi.stubGlobal('window', { location: { href } });
+  try {
+    return renderToStaticMarkup(<LoginScreen />);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+}
+
+// The auth server sends a refused sign-in back to the page it left, with the
+// refusal in the address; the screen is what says so.
+describe('a sign-in sent back refused', () => {
+  const line = 'No se pudo entrar con esa cuenta.';
+
+  it('is said when the refusal comes back in the address, query or fragment', () => {
+    expect(drawnAt('https://daico.vip/?error=access_denied&error_description=x')).toContain(line);
+    expect(drawnAt('https://daico.vip/#error=access_denied&error_code=x')).toContain(line);
+  });
+
+  it('is not said on any other address', () => {
+    expect(drawnAt('https://daico.vip/')).not.toContain(line);
+    expect(drawnAt('https://daico.vip/?code=abc')).not.toContain(line);
+  });
+});
