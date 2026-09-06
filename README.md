@@ -214,9 +214,12 @@ attachments — pictures and PDFs — that are encrypted on the device before th
 leave it, so the server only ever stores ciphertext.
 
 - **Tables and bucket**: `attachments` is an ordinary offline-synced table that
-  carries the wrapped file key; the bytes live in the private `attachments`
-  bucket under the row's id, and on the device in a local-only table. A file is
-  immutable: a different picture is a new attachment.
+  carries the wrapped file key; the bytes live in the `attachments` R2 bucket
+  under the row's id, and on the device in a local-only table. The bucket has
+  no address of its own: the files worker in `worker/` is the only way in, and
+  it asks the database, with the session's token, whether the caller is a
+  member before touching an object. A file is immutable: a different picture
+  is a new attachment.
 - **Keys**: a six-word phrase derives the key that wraps the household's master
   key, stored wrapped in `household_key`; the master key wraps one key per file;
   the file key encrypts the file with AES-GCM, bound to the row that carries it,
@@ -239,8 +242,8 @@ leave it, so the server only ever stores ciphertext.
 
 ## Correo a Viajes
 
-A confirmation email forwarded to the household's address reaches the worker in
-`worker/` (its header says what it holds and why). It lets through only mail
+A confirmation email forwarded to the household's address reaches the email
+worker in `worker/` (its header says what it holds and why). It lets through only mail
 from a member, has a model read the bookings out of it, and stages one row per
 booking in `trip_inbox`, always replying to the sender; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
@@ -299,7 +302,7 @@ project (below).
   SUPABASE_PROJECT_REF=your-project-ref
   SUPABASE_DB_PASSWORD=your-db-password
   ```
-  (The email worker adds two more; see step 5.)
+  (The workers add three more; see step 5.)
 
 ### 2. Configure Google OAuth
 
@@ -333,13 +336,35 @@ the app. Until a member exists, the app denies everyone.
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and deploys
 to GitHub Pages.
 
-### 5. The email worker (Correo a Viajes)
+### 5. The workers
 
-The worker in `worker/` is deployed to Cloudflare on its own; the app's deploy
-does not touch it. It needs two more lines in `.env`: `CLOUDFLARE_API_TOKEN`
-(template "Edit Cloudflare Workers", plus **Hyperdrive: Edit** and **SSL and
-Certificates: Edit** on the account) and `ANTHROPIC_API_KEY` (a key from a
-workspace of its own, with a spend limit). Then, in order:
+The two workers in `worker/` are deployed to Cloudflare on their own; the
+app's deploy does not touch them. Each has a token of its own in `.env`,
+holding what its scripts need and nothing more — neither may touch the
+zone's DNS, which could point the domain and its mail anywhere:
+
+- `CLOUDFLARE_FILES_API_TOKEN` for `files:*`: template "Edit Cloudflare
+  Workers" plus **Workers R2 Storage: Edit** on the account.
+- `CLOUDFLARE_INBOX_API_TOKEN` for `worker:*`: template "Edit Cloudflare
+  Workers" plus **Hyperdrive: Edit** and **SSL and Certificates: Edit** on the
+  account. With it, `ANTHROPIC_API_KEY` (a key from a workspace of its own,
+  with a spend limit).
+
+**The files worker (Adjuntos)** serves the attachment files out of the R2
+bucket, at the address `src/config.ts` names — a name under the household's
+domain, whose DNS must be on Cloudflare. Once:
+
+```bash
+npm run files:bucket   # creates the bucket; it gets no public address
+npm run files:deploy   # creates the worker
+```
+
+Then give the worker its address in the dashboard → Workers & Pages →
+`files` → Settings → Domains & Routes → Add → Custom domain, the name
+`src/config.ts` names. Every change to the worker is `npm run files:deploy`
+again, and `npm run files:tail` follows its log.
+
+**The email worker (Correo a Viajes)**, in order:
 
 ```bash
 npm run worker:cert                            # uploads supabase/ca.crt, prints a certificate id

@@ -1,13 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import {
-  ATTACHMENT_LIST_PAGE,
-  ATTACHMENT_ORPHAN_MIN_AGE_MS,
-  ATTACHMENTS_BUCKET,
-  TRIP_FILES_KEPT_DAYS,
-} from './attachmentFiles';
+import { ATTACHMENT_ORPHAN_MIN_AGE_MS, TRIP_FILES_KEPT_DAYS } from './attachmentFiles';
 import { ATTACHMENTS_SPEC, TRIP_ITEMS_SPEC, TRIPS_SPEC } from './offline/specs';
 import { addDays, todayIso } from '../utils/dateUtils';
-import { server } from './offline/testing/fakeSupabase';
+import { FILES, FILES_LIST_PAGE, server } from './offline/testing/fakeSupabase';
 import { T0, at, network } from './offline/testing/clock';
 import * as engine from './offline/engine';
 import { afterSync, syncAll } from './offline/sync';
@@ -132,25 +127,24 @@ describe('uploadPending', () => {
   it('sends each waiting file to the bucket as an opaque blob and marks it uploaded', async () => {
     await pushed('a', 'abc');
     await uploadPending();
-    expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([
-      { name: 'a', data: bytes('abc'), created_at: T0 },
-    ]);
+    expect(server.files()).toEqual([{ name: 'a', data: bytes('abc'), uploaded: T0 }]);
     expect(await attachmentUploadState('a')).toBe('uploaded');
     await uploadPending();
     expect(uploads()).toBe(1);
   });
 
-  it('treats an object already in the bucket as uploaded', async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
+  it('sends a file the bucket already has again — the same bytes under the same id', async () => {
+    server.seedFiles([{ name: 'a', data: bytes('abc'), uploaded: T0 }]);
     await pushed('a');
     await uploadPending();
     expect(await attachmentUploadState('a')).toBe('uploaded');
+    expect(server.files()).toEqual([{ name: 'a', data: bytes('abc'), uploaded: T0 }]);
   });
 
   it('gives up on a file the bucket refuses for good and never sends it again', async () => {
     await pushed('big');
     await pushed('fine');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
+    server.fail('upload', FILES, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await attachmentUploadState('big')).toBe('failed');
     expect(await attachmentUploadState('fine')).toBe('failed');
@@ -162,7 +156,7 @@ describe('uploadPending', () => {
 
   it('sends what is still waiting and nothing else: not one the bucket has, nor one it refused', async () => {
     await pushed('refused');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
+    server.fail('upload', FILES, 'Payload too large', { status: 413 });
     await uploadPending();
     server.restore();
     await putAttachmentFile('held', bytes('xyz'), true);
@@ -179,7 +173,7 @@ describe('uploadPending', () => {
 
   it('keeps a file queued through a failure that may pass later', async () => {
     await pushed('a');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'network down');
+    server.fail('upload', FILES, 'network down');
     await expect(uploadPending()).rejects.toThrow('network down');
     expect(await attachmentUploadState('a')).toBe('pending');
     server.restore();
@@ -189,7 +183,7 @@ describe('uploadPending', () => {
 
   it('keeps a file queued while the session is rejected', async () => {
     await pushed('a');
-    server.fail('upload', ATTACHMENTS_BUCKET, 'JWT expired', { status: 401 });
+    server.fail('upload', FILES, 'JWT expired', { status: 401 });
     await expect(uploadPending()).rejects.toThrow();
     expect(await attachmentUploadState('a')).toBe('pending');
   });
@@ -207,7 +201,7 @@ describe('uploadPending', () => {
 
 describe('fetchAttachmentFile', () => {
   it('downloads once and serves the local copy from then on', async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
+    server.seedFiles([{ name: 'a', data: bytes('abc'), uploaded: T0 }]);
     expect(await fetchAttachmentFile('a')).toEqual(bytes('abc'));
     expect(await attachmentUploadState('a')).toBe('uploaded');
     network.online = false;
@@ -223,8 +217,8 @@ describe('fetchAttachmentFile', () => {
   });
 
   it('is null when the download fails, and keeps nothing from it', async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('abc'), created_at: T0 }]);
-    server.fail('download', ATTACHMENTS_BUCKET, 'network down');
+    server.seedFiles([{ name: 'a', data: bytes('abc'), uploaded: T0 }]);
+    server.fail('download', FILES, 'network down');
     expect(await fetchAttachmentFile('a')).toBeNull();
     expect(await localAttachmentFile('a')).toBeNull();
     server.restore();
@@ -235,24 +229,21 @@ describe('fetchAttachmentFile', () => {
 describe('syncAttachmentFiles', () => {
   it('removes old objects no attachment refers to and keeps every other one', async () => {
     const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'old-orphan', data: bytes('x'), created_at: old },
-      { name: 'young-orphan', data: bytes('x'), created_at: T0 },
-      { name: 'old-kept', data: bytes('x'), created_at: old },
+    server.seedFiles([
+      { name: 'old-orphan', data: bytes('x'), uploaded: old },
+      { name: 'young-orphan', data: bytes('x'), uploaded: T0 },
+      { name: 'old-kept', data: bytes('x'), uploaded: old },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, row, 'old-kept');
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual([
-      'young-orphan',
-      'old-kept',
-    ]);
+    expect(server.files().map((o) => o.name)).toEqual(['young-orphan', 'old-kept']);
   });
 
   it("keeps every kept kind's file on this device — a document's, a trip row's — and no other", async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'doc', data: bytes('doc'), created_at: T0 },
-      { name: 'trip', data: bytes('trip'), created_at: T0 },
-      { name: 'chore', data: bytes('chore'), created_at: T0 },
+    server.seedFiles([
+      { name: 'doc', data: bytes('doc'), uploaded: T0 },
+      { name: 'trip', data: bytes('trip'), uploaded: T0 },
+      { name: 'chore', data: bytes('chore'), uploaded: T0 },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
     await engine.insert(ATTACHMENTS_SPEC, tripRow, 'trip');
@@ -268,10 +259,7 @@ describe('syncAttachmentFiles', () => {
 
   it("fetches a trip row's file only while its trip is not over — a week past its last day", async () => {
     const names = ['over', 'edge', 'undated', 'unknown'];
-    server.seedObjects(
-      ATTACHMENTS_BUCKET,
-      names.map((name) => ({ name, data: bytes(name), created_at: T0 })),
-    );
+    server.seedFiles(names.map((name) => ({ name, data: bytes(name), uploaded: T0 })));
     await tripWithFile('over', addDays(lastKeptDay(), -1), 'over');
     await tripWithFile('edge', lastKeptDay(), 'edge');
     await tripWithFile('undated', null, 'undated');
@@ -285,9 +273,9 @@ describe('syncAttachmentFiles', () => {
   });
 
   it("leaves a past trip's file this device holds where it is, and fetches again once its last day moves", async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'held', data: bytes('held'), created_at: T0 },
-      { name: 'later', data: bytes('later'), created_at: T0 },
+    server.seedFiles([
+      { name: 'held', data: bytes('held'), uploaded: T0 },
+      { name: 'later', data: bytes('later'), uploaded: T0 },
     ]);
     await tripWithFile('past', addDays(lastKeptDay(), -1), 'held');
     await putAttachmentFile('held', bytes('held'), true);
@@ -303,23 +291,21 @@ describe('syncAttachmentFiles', () => {
   });
 
   it("leaves a document's file the bucket does not have yet for a later run", async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'now', data: bytes('now'), created_at: T0 }]);
+    server.seedFiles([{ name: 'now', data: bytes('now'), uploaded: T0 }]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'later');
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'now');
     await syncAttachmentFiles(pulled);
     expect(await localAttachmentFile('now')).toEqual(bytes('now'));
     expect(await localAttachmentFile('later')).toBeNull();
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'later', data: bytes('later'), created_at: T0 },
-    ]);
+    server.seedFiles([{ name: 'later', data: bytes('later'), uploaded: T0 }]);
     await syncAttachmentFiles(pulled);
     expect(await localAttachmentFile('later')).toEqual(bytes('later'));
   });
 
   it('leaves the fetch of document files for the next run when the bucket is unreachable', async () => {
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'doc', data: bytes('doc'), created_at: T0 }]);
+    server.seedFiles([{ name: 'doc', data: bytes('doc'), uploaded: T0 }]);
     await engine.insert(ATTACHMENTS_SPEC, documentRow, 'doc');
-    server.fail('download', ATTACHMENTS_BUCKET, 'network down');
+    server.fail('download', FILES, 'network down');
     await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
     expect(await localAttachmentFile('doc')).toBeNull();
     server.restore();
@@ -329,30 +315,30 @@ describe('syncAttachmentFiles', () => {
 
   it('does not sweep when the attachments table did not come down in the run', async () => {
     const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+    server.seedFiles([{ name: 'a', data: bytes('x'), uploaded: old }]);
     await engine.insert(ATTACHMENTS_SPEC, row, 'other');
     await syncAttachmentFiles(new Set(['chores']));
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+    expect(server.files().map((o) => o.name)).toEqual(['a']);
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([]);
+    expect(server.files()).toEqual([]);
   });
 
   it('does not sweep when this device holds no attachment at all', async () => {
     const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-    server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+    server.seedFiles([{ name: 'a', data: bytes('x'), uploaded: old }]);
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+    expect(server.files().map((o) => o.name)).toEqual(['a']);
   });
 
   it('sweeps nothing after a sync in which the attachments table failed', async () => {
     const stop = afterSync(syncAttachmentFiles);
     try {
       const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-      server.seedObjects(ATTACHMENTS_BUCKET, [{ name: 'a', data: bytes('x'), created_at: old }]);
+      server.seedFiles([{ name: 'a', data: bytes('x'), uploaded: old }]);
       await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
       server.fail('select', 'attachments', 'network down');
       await syncAll();
-      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+      expect(server.files().map((o) => o.name)).toEqual(['a']);
     } finally {
       stop();
     }
@@ -367,7 +353,7 @@ describe('syncAttachmentFiles', () => {
       stop();
     }
     expect(server.rows('attachments').map((r) => r.id)).toEqual(['a']);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+    expect(server.files().map((o) => o.name)).toEqual(['a']);
     expect(await attachmentUploadState('a')).toBe('uploaded');
   });
 
@@ -377,50 +363,48 @@ describe('syncAttachmentFiles', () => {
       await added('a');
       server.fail('upsert', 'attachments', 'network down');
       await syncAll();
-      expect(server.objects(ATTACHMENTS_BUCKET)).toEqual([]);
+      expect(server.files()).toEqual([]);
       expect(await attachmentUploadState('a')).toBe('pending');
 
       server.restore();
       await syncAll();
       expect(server.rows('attachments').map((r) => r.id)).toEqual(['a']);
-      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a']);
+      expect(server.files().map((o) => o.name)).toEqual(['a']);
       expect(await attachmentUploadState('a')).toBe('uploaded');
     } finally {
       stop();
     }
   });
 
-  it('keeps an object exactly as old as the grace period, and one of no known age', async () => {
+  it('keeps an object exactly as old as the grace period', async () => {
     const ago = (ms: number) => new Date(Date.parse(T0) - ms).toISOString();
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'at-cutoff', data: bytes('x'), created_at: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS) },
-      { name: 'ageless', data: bytes('x'), created_at: null },
+    server.seedFiles([
+      { name: 'at-cutoff', data: bytes('x'), uploaded: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS) },
       {
         name: 'a-moment-older',
         data: bytes('x'),
-        created_at: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS + 1),
+        uploaded: ago(ATTACHMENT_ORPHAN_MIN_AGE_MS + 1),
       },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['at-cutoff', 'ageless']);
+    expect(server.files().map((o) => o.name)).toEqual(['at-cutoff']);
   });
 
   it('reads the bucket past its first page, and sweeps by every page of it', async () => {
     const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-    const last = `object-${ATTACHMENT_LIST_PAGE}`;
-    server.seedObjects(
-      ATTACHMENTS_BUCKET,
-      Array.from({ length: ATTACHMENT_LIST_PAGE + 1 }, (_, i) => ({
+    const last = `object-${FILES_LIST_PAGE}`;
+    server.seedFiles(
+      Array.from({ length: FILES_LIST_PAGE + 1 }, (_, i) => ({
         name: `object-${i}`,
         data: bytes('x'),
-        created_at: old,
+        uploaded: old,
       })),
     );
     // The household's one attachment is the object listed last, a page in.
     await engine.insert(ATTACHMENTS_SPEC, row, last);
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual([last]);
+    expect(server.files().map((o) => o.name)).toEqual([last]);
     expect(server.calls.filter((c) => c.op === 'list')).toHaveLength(2);
   });
 
@@ -430,7 +414,7 @@ describe('syncAttachmentFiles', () => {
       await added('a');
       await added('b');
       await syncAll();
-      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a', 'b']);
+      expect(server.files().map((o) => o.name)).toEqual(['a', 'b']);
 
       // Deleted here, and the server refuses the delete for good: every other
       // device keeps the row, so the file has to stay.
@@ -439,7 +423,7 @@ describe('syncAttachmentFiles', () => {
       at(new Date(Date.parse(T0) + 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString());
       await syncAll();
 
-      expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['a', 'b']);
+      expect(server.files().map((o) => o.name)).toEqual(['a', 'b']);
     } finally {
       stop();
     }
@@ -447,30 +431,30 @@ describe('syncAttachmentFiles', () => {
 
   it('stops at a bucket that cannot be listed or swept, leaving the objects alone', async () => {
     const old = new Date(Date.parse(T0) - 2 * ATTACHMENT_ORPHAN_MIN_AGE_MS).toISOString();
-    server.seedObjects(ATTACHMENTS_BUCKET, [
-      { name: 'orphan', data: bytes('x'), created_at: old },
-      { name: 'kept', data: bytes('x'), created_at: old },
+    server.seedFiles([
+      { name: 'orphan', data: bytes('x'), uploaded: old },
+      { name: 'kept', data: bytes('x'), uploaded: old },
     ]);
     await engine.insert(ATTACHMENTS_SPEC, row, 'kept');
 
-    server.fail('list', ATTACHMENTS_BUCKET, 'network down');
+    server.fail('list', FILES, 'network down');
     await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
     server.restore();
 
-    server.fail('remove', ATTACHMENTS_BUCKET, 'network down');
+    server.fail('remove', FILES, 'network down');
     await expect(syncAttachmentFiles(pulled)).rejects.toThrow('network down');
     server.restore();
 
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['orphan', 'kept']);
+    expect(server.files().map((o) => o.name)).toEqual(['orphan', 'kept']);
     await syncAttachmentFiles(pulled);
-    expect(server.objects(ATTACHMENTS_BUCKET).map((o) => o.name)).toEqual(['kept']);
+    expect(server.files().map((o) => o.name)).toEqual(['kept']);
   });
 
   it('a failure in the file work is logged and leaves the queue for next time', async () => {
     const stop = afterSync(syncAttachmentFiles);
     try {
       await added('a');
-      server.fail('upload', ATTACHMENTS_BUCKET, 'network down');
+      server.fail('upload', FILES, 'network down');
       await syncAll();
       expect(warn).toHaveBeenCalled();
       expect(await attachmentUploadState('a')).toBe('pending');
@@ -531,7 +515,7 @@ describe('making room', () => {
     });
 
     await syncAll();
-    server.fail('upload', ATTACHMENTS_BUCKET, 'Payload too large', { status: 413 });
+    server.fail('upload', FILES, 'Payload too large', { status: 413 });
     await uploadPending();
     expect(await attachmentFileUsage()).toMatchObject({ waiting: 1, failed: 1 });
   });

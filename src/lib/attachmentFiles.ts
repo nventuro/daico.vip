@@ -1,8 +1,10 @@
 // =============================================================================
 // The attachment files' side of sync. The rows travel with the tables; the
-// files go to and from the storage bucket here, one at a time, and always as
-// the opaque encrypted blob a file is — the keys never come near this module.
+// files go to and from the bucket here, through the files worker, one at a
+// time, and always as the opaque encrypted blob a file is — the keys never
+// come near this module.
 // =============================================================================
+import { FILES_URL } from '../config';
 import { supabase } from './supabase';
 import { isPermanentStatus } from './refusals';
 import * as engine from './offline/engine';
@@ -12,9 +14,6 @@ import { reportFiles } from './offline/sync';
 import type { AttachmentOwnerKind } from '../types';
 import { tooLargeMessage } from '../utils/textUtils';
 import { addDays, todayIso } from '../utils/dateUtils';
-
-/** The storage bucket holding the encrypted attachment files. */
-export const ATTACHMENTS_BUCKET = 'attachments';
 
 /** Largest file accepted as an attachment, in bytes. */
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
@@ -84,11 +83,6 @@ function tripsOverBefore(): string {
  * and this one hasn't pulled yet.
  */
 export const ATTACHMENT_ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
-
-/** Objects fetched per page when listing the attachments bucket. */
-export const ATTACHMENT_LIST_PAGE = 1000;
-
-const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
 
 /**
  * The attachment MIME type for `file`, or null when it is not one we take.
@@ -233,9 +227,36 @@ async function pruneAttachmentFiles(): Promise<void> {
 
 // ─── The bucket ──────────────────────────────────────────────────────────────
 
-/** The HTTP status a failed storage call reports, when it got as far as the server. */
-function statusOf(error: { message: string }): number | undefined {
-  return 'status' in error && typeof error.status === 'number' ? error.status : undefined;
+/** The files worker's address for an attachment's object. */
+function objectUrl(id: string): string {
+  return `${FILES_URL}/${id}`;
+}
+
+/** What every request to the files worker carries: the session's token, by
+ *  which the worker asks the server whether the caller is a member. With no
+ *  session there is no one to ask for, and the request is not made. */
+async function authorization(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('No session to reach the files with');
+  return { Authorization: `Bearer ${token}` };
+}
+
+/** A refused request, as an error naming the status it came back with. */
+function refusal(response: Response): Error {
+  return new Error(`${response.status} ${response.statusText}`.trim());
+}
+
+/** An object as the files worker lists it: its id, and when it went up. */
+interface ListedObject {
+  name: string;
+  uploaded: string;
+}
+
+/** A page of the bucket's objects, and where the next page starts, if any. */
+interface ObjectsPage {
+  objects: ListedObject[];
+  cursor: string | null;
 }
 
 /** Send every file still waiting for the bucket whose row the server has
@@ -253,31 +274,28 @@ export async function uploadPending(): Promise<void> {
      WHERE f.uploaded = 0 AND f.upload_error IS NULL`,
   );
   for (const { id, data } of waiting) {
-    const { error } = await bucket().upload(id, new Blob([data]), {
-      contentType: 'application/octet-stream',
-      upsert: false,
+    // An attempt whose answer was lost simply goes through again: an id is
+    // never reused, so what a second put writes is the same bytes.
+    const response = await fetch(objectUrl(id), {
+      method: 'PUT',
+      headers: { ...(await authorization()), 'Content-Type': 'application/octet-stream' },
+      body: data,
     });
-    if (!error) {
+    if (response.ok) {
       await markUploaded(id);
       continue;
     }
-    const status = statusOf(error);
-    // Already there: an earlier attempt went through before its answer was lost.
-    if (status === 409) {
-      await markUploaded(id);
-      continue;
-    }
-    if (isPermanentStatus(status)) {
+    if (isPermanentStatus(response.status)) {
       // Refused for good (too large, wrong type): recorded, never retried.
       await engine.localWrite(
         ATTACHMENT_FILES.table,
         `UPDATE ${ATTACHMENT_FILES.table} SET upload_error = ? WHERE id = ?`,
-        error.message,
+        refusal(response).message,
         id,
       );
       continue;
     }
-    throw error;
+    throw refusal(response);
   }
 }
 
@@ -293,12 +311,12 @@ async function markUploaded(id: string): Promise<void> {
  *  it (the device that added it hasn't uploaded it yet). A failure that may
  *  pass later — no session, throttled, the network — is thrown. */
 async function downloadObject(id: string): Promise<Uint8Array | null> {
-  const { data, error } = await bucket().download(id);
-  if (error) {
-    if (isPermanentStatus(statusOf(error))) return null;
-    throw error;
+  const response = await fetch(objectUrl(id), { headers: await authorization() });
+  if (!response.ok) {
+    if (isPermanentStatus(response.status)) return null;
+    throw refusal(response);
   }
-  return data ? new Uint8Array(await data.arrayBuffer()) : null;
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 /**
@@ -388,24 +406,26 @@ async function sweepOrphans(): Promise<void> {
   if (kept.size === 0) return;
   const cutoff = Date.now() - ATTACHMENT_ORPHAN_MIN_AGE_MS;
   const orphans: string[] = [];
-  for (let offset = 0; ; offset += ATTACHMENT_LIST_PAGE) {
-    const { data, error } = await bucket().list('', { limit: ATTACHMENT_LIST_PAGE, offset });
-    if (error) throw error;
-    for (const object of data ?? []) {
-      // An object of unknown age is kept: it can only be told stale by its age.
-      if (
-        !kept.has(object.name) &&
-        object.created_at != null &&
-        Date.parse(object.created_at) < cutoff
-      ) {
+  for (let cursor: string | null = null; ;) {
+    const url = new URL(FILES_URL);
+    if (cursor !== null) url.searchParams.set('cursor', cursor);
+    const response = await fetch(url, { headers: await authorization() });
+    if (!response.ok) throw refusal(response);
+    const page = (await response.json()) as ObjectsPage;
+    for (const object of page.objects) {
+      if (!kept.has(object.name) && Date.parse(object.uploaded) < cutoff) {
         orphans.push(object.name);
       }
     }
-    if (!data || data.length < ATTACHMENT_LIST_PAGE) break;
+    cursor = page.cursor;
+    if (cursor === null) break;
   }
-  if (orphans.length > 0) {
-    const { error } = await bucket().remove(orphans);
-    if (error) throw error;
+  for (const id of orphans) {
+    const response = await fetch(objectUrl(id), {
+      method: 'DELETE',
+      headers: await authorization(),
+    });
+    if (!response.ok) throw refusal(response);
   }
   writeSweptAt();
 }

@@ -4,6 +4,9 @@
 // them all could pass any of them on — to a subprocess, into a log.
 //
 //   node scripts/with-env.mjs VAR [VAR…] -- <command> [args…]
+//
+// `NAME=VAR` hands the command `.env`'s VAR under the name NAME, for a tool
+// that reads one fixed name when `.env` keeps more than one of its kind.
 // =============================================================================
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,10 +24,11 @@ const [command, ...args] = process.argv.slice(separator + 1);
 
 const env = { ...process.env };
 const file = fs.readFileSync(path.join(root, '.env'), 'utf8');
-for (const name of names) {
-  const match = new RegExp(`^${name}=(.*)$`, 'm').exec(file);
+for (const entry of names) {
+  const [name, variable = name] = entry.split('=');
+  const match = new RegExp(`^${variable}=(.*)$`, 'm').exec(file);
   if (!match) {
-    console.error(`${name} is not in .env`);
+    console.error(`${variable} is not in .env`);
     process.exit(2);
   }
   env[name] = match[1].trim();

@@ -21,11 +21,15 @@
     "db:migration:new": "supabase migration new",
     "guides:import": "node scripts/import-guides.mjs",
     "worker:test": "npm --prefix worker test && npm --prefix worker run check",
-    "worker:deploy": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN -- npx wrangler deploy",
-    "worker:secret": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN ANTHROPIC_API_KEY -- sh -c 'printf %s \"$ANTHROPIC_API_KEY\" | npx wrangler secret put ANTHROPIC_API_KEY'",
-    "worker:cert": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN -- npx wrangler cert upload certificate-authority --ca-cert ../supabase/ca.crt --name supabase-root",
-    "worker:hyperdrive": "node scripts/with-env.mjs CLOUDFLARE_API_TOKEN -- node scripts/trip-inbox-writer-password.mjs",
-    "worker:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN -- npx wrangler tail"
+    "worker:deploy": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- npx wrangler deploy",
+    "worker:secret": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN ANTHROPIC_API_KEY -- sh -c 'printf %s \"$ANTHROPIC_API_KEY\" | npx wrangler secret put ANTHROPIC_API_KEY'",
+    "worker:cert": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- npx wrangler cert upload certificate-authority --ca-cert ../supabase/ca.crt --name supabase-root",
+    "worker:hyperdrive": "node scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- node scripts/trip-inbox-writer-password.mjs",
+    "worker:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- npx wrangler tail",
+    "files:bucket": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler r2 bucket create attachments",
+    "files:deploy": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler deploy -c wrangler.files.jsonc",
+    "files:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler tail -c wrangler.files.jsonc",
+    "files:copy": "node scripts/with-env.mjs SUPABASE_SECRET_KEY CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- node scripts/copy-attachments.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

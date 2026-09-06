@@ -8,6 +8,13 @@
 export const SUPABASE_URL = 'https://qspcogwwvpifopuwrhne.supabase.co';
 export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_p9bzX2DL7L_nG2CuBsF4wQ_mV_04lVV';
 
+/** The app's own address: the one origin the files worker answers to. */
+export const APP_ORIGIN = 'https://daico.vip';
+
+/** The files worker, the only way to the bucket the attachment files live in;
+ *  an object is at `${FILES_URL}/${id}`. */
+export const FILES_URL = 'https://files.daico.vip';
+
 /** Privacy-enhanced YouTube embed base; append the video id. */
 export const YOUTUBE_EMBED_URL = 'https://www.youtube-nocookie.com/embed/';
 

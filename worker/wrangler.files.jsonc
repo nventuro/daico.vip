@@ -1,0 +1,19 @@
+// The files worker's deployment: `npx wrangler deploy -c wrangler.files.jsonc`
+// from this directory (`npm run files:deploy` at the root). Cloudflare does
+// not watch the repository: every change is a deploy.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "files",
+  "main": "src/files.ts",
+  "compatibility_date": "2026-08-31",
+  // Reached at the address the app's config names and nowhere else: no
+  // workers.dev URL and no preview URLs. That address is a custom domain
+  // given in the dashboard, never a route here: a route the deploy makes
+  // would need a token that may edit the zone's DNS, and no token may.
+  "workers_dev": false,
+  "preview_urls": false,
+  // The bucket, by binding: no key to hold. `npm run files:bucket` creates it.
+  "r2_buckets": [{ "binding": "ATTACHMENTS", "bucket_name": "attachments" }],
+  // Nothing the worker logs is kept; `files:tail` still shows it live.
+  "observability": { "enabled": false },
+}

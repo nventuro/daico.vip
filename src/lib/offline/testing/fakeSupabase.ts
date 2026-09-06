@@ -3,23 +3,26 @@
 // calls the app makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
 // and `.in('id', vs)`, `from(t).select(columns).order(c).limit(n)`, the
 // filtered reads `.eq(c, v)` / `.in(c, vs)` / `.gt(c, v)`, the one-row read
-// `from(t).select(columns).eq(c, v).maybeSingle()`, plus the Storage calls the
-// attachment files make: `storage.from(b).upload / download / remove / list`.
+// `from(t).select(columns).eq(c, v).maybeSingle()`, plus the files worker
+// the attachment files reach over `fetch`, standing in for it as the global.
 // It keeps the server's rules too: a write older than the stored row is
 // skipped, and a row once deleted is never taken again.
 // A test installs it with
 //   vi.mock('../supabase', () => import('./testing/fakeSupabase'))
-// and drives the server through `server`: seed rows and objects, inspect the
+// and drives the server through `server`: seed rows and files, inspect the
 // calls made, and hold or fail calls to reproduce timings between the app and
 // the network.
 // =============================================================================
+import { vi } from 'vitest';
+import { FILES_URL } from '../../../config';
+
 export type ServerRow = Record<string, unknown> & { id: string };
 export type ServerOp = 'upsert' | 'delete' | 'select' | 'upload' | 'download' | 'remove' | 'list';
 export interface ServerCall {
   op: ServerOp;
-  /** The table, or the bucket for a storage call. */
+  /** The table, or `FILES` for a call to the files worker. */
   table: string;
-  /** The row an upsert or delete targets; the object a storage call targets. */
+  /** The row an upsert or delete targets; the object a file call targets. */
   id?: string;
   /** How many rows a select asked for, when it said. */
   limit?: number;
@@ -27,17 +30,23 @@ export interface ServerCall {
   after?: string;
 }
 
-/** An object in a fake bucket. */
+/** The files worker, as a call's `table`. */
+export const FILES = 'files';
+
+/** Objects the fake worker lists per page, as many as the real one. */
+export const FILES_LIST_PAGE = 1000;
+
+/** An object in the fake bucket. */
 export interface ServerObject {
   name: string;
   data: Uint8Array<ArrayBuffer>;
-  /** ISO timestamp, or null for an object the bucket reports no age for. */
-  created_at: string | null;
+  /** When it went up, ISO. */
+  uploaded: string;
 }
 
-/** How a call can be refused: the HTTP status a storage call reports, the code
- *  PostgREST puts on a rejected row, or neither for a failure that never got
- *  an answer at all. `id` narrows the refusal to one row or object. */
+/** How a call can be refused: the HTTP status the files worker answers with,
+ *  the code PostgREST puts on a rejected row, or neither for a failure that
+ *  never got an answer at all. `id` narrows the refusal to one row or object. */
 export interface Refusal {
   status?: number;
   code?: string;
@@ -73,7 +82,7 @@ export class FakeServer {
   // The `deleted_rows` the server keeps: a row deleted from a table is never
   // taken again under that id.
   private deleted = new Map<string, Set<string>>();
-  private buckets = new Map<string, Map<string, ServerObject>>();
+  private objects = new Map<string, ServerObject>();
   private interceptors = new Set<Interceptor>();
   /** Every call made, in order. */
   readonly calls: ServerCall[] = [];
@@ -88,7 +97,7 @@ export class FakeServer {
   reset(): void {
     this.tables.clear();
     this.deleted.clear();
-    this.buckets.clear();
+    this.objects.clear();
     this.interceptors.clear();
     this.calls.length = 0;
     this.member = true;
@@ -117,12 +126,12 @@ export class FakeServer {
     return [...this.tombstones(table)];
   }
 
-  objects(bucket: string): ServerObject[] {
-    return [...this.bucket(bucket).values()].map((object) => ({ ...object }));
+  files(): ServerObject[] {
+    return [...this.objects.values()].map((object) => ({ ...object }));
   }
 
-  seedObjects(bucket: string, objects: ServerObject[]): void {
-    for (const object of objects) this.bucket(bucket).set(object.name, { ...object });
+  seedFiles(objects: ServerObject[]): void {
+    for (const object of objects) this.objects.set(object.name, { ...object });
   }
 
   /**
@@ -275,62 +284,62 @@ export class FakeServer {
     };
   }
 
-  storage(bucket: string) {
-    const objects = this.bucket(bucket);
-    const storageError = (error: Error | null) =>
-      error ? { message: error.message, status: (error as CallFailure).status } : null;
-    // The bucket is gated by the same membership policy as the tables.
-    const forbidden = (): CallFailure | null => {
-      if (this.member) return null;
-      const error: CallFailure = new Error('new row violates row-level security policy');
-      error.status = 403;
-      return error;
-    };
-    return {
-      upload: async (path: string, body: Blob, options?: { upsert?: boolean }) => {
-        let error = (await this.run({ op: 'upload', table: bucket, id: path })) ?? forbidden();
-        if (!error && objects.has(path) && !options?.upsert) {
-          const duplicate: CallFailure = new Error('The resource already exists');
-          duplicate.status = 409;
-          error = duplicate;
-        }
-        if (!error) {
-          objects.set(path, {
-            name: path,
-            data: new Uint8Array(await body.arrayBuffer()),
-            created_at: new Date().toISOString(),
-          });
-        }
-        return { data: error ? null : { path }, error: storageError(error) };
-      },
-      download: async (path: string) => {
-        const error = (await this.run({ op: 'download', table: bucket, id: path })) ?? forbidden();
-        const object = objects.get(path);
-        if (error) return { data: null, error: storageError(error) };
-        if (!object) {
-          const missing: CallFailure = new Error('Object not found');
-          missing.status = 404;
-          return { data: null, error: storageError(missing) };
-        }
-        return { data: new Blob([object.data]), error: null };
-      },
-      remove: async (paths: string[]) => {
-        const error = (await this.run({ op: 'remove', table: bucket })) ?? forbidden();
-        if (!error) for (const path of paths) objects.delete(path);
-        return { data: error ? null : [], error: storageError(error) };
-      },
-      list: async (_prefix?: string, options?: { limit?: number; offset?: number }) => {
-        const error = (await this.run({ op: 'list', table: bucket })) ?? forbidden();
-        if (error) return { data: null, error: storageError(error) };
-        const offset = options?.offset ?? 0;
-        const limit = options?.limit ?? 100;
-        const data = [...objects.values()]
-          .slice(offset, offset + limit)
-          .map(({ name, created_at }) => ({ name, created_at }));
-        return { data, error: null };
-      },
-    };
-  }
+  /**
+   * The files worker, as the app reaches it: `fetch` against `FILES_URL`. A
+   * request carries the session's token or is turned away; a call the fake
+   * refuses with a status is answered with it, and one it fails with none
+   * never gets an answer, as a lost connection has none.
+   */
+  readonly fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (!url.href.startsWith(FILES_URL)) throw new Error(`unexpected request to ${url.href}`);
+    if (!new Headers(init?.headers).get('Authorization')?.startsWith('Bearer ')) {
+      return new Response(null, { status: 401, statusText: 'Unauthorized' });
+    }
+    const method = init?.method ?? 'GET';
+    const id = url.pathname.slice(1);
+    const op: ServerOp =
+      id === ''
+        ? 'list'
+        : method === 'PUT'
+          ? 'upload'
+          : method === 'DELETE'
+            ? 'remove'
+            : 'download';
+    const error = await this.run({ op, table: FILES, ...(id === '' ? {} : { id }) });
+    if (error) {
+      const status = (error as CallFailure).status;
+      if (status === undefined) throw error;
+      return new Response(error.message, { status, statusText: error.message });
+    }
+    // The worker asks the server whether the caller is a member first.
+    if (!this.member) return new Response(null, { status: 403, statusText: 'Forbidden' });
+    switch (op) {
+      case 'list': {
+        const all = [...this.objects.values()];
+        const start = Number(url.searchParams.get('cursor') ?? 0);
+        const next = start + FILES_LIST_PAGE;
+        return Response.json({
+          objects: all.slice(start, next).map(({ name, uploaded }) => ({ name, uploaded })),
+          cursor: next < all.length ? String(next) : null,
+        });
+      }
+      case 'upload': {
+        const data = new Uint8Array(await new Response(init?.body).arrayBuffer());
+        this.objects.set(id, { name: id, data, uploaded: new Date().toISOString() });
+        return new Response(null, { status: 204 });
+      }
+      case 'download': {
+        const object = this.objects.get(id);
+        if (!object) return new Response(null, { status: 404, statusText: 'Not Found' });
+        return new Response(object.data, { status: 200 });
+      }
+      default: {
+        this.objects.delete(id);
+        return new Response(null, { status: 204 });
+      }
+    }
+  };
 
   private table(name: string): Map<string, ServerRow> {
     let rows = this.tables.get(name);
@@ -350,15 +359,6 @@ export class FakeServer {
     return ids;
   }
 
-  private bucket(name: string): Map<string, ServerObject> {
-    let objects = this.buckets.get(name);
-    if (!objects) {
-      objects = new Map();
-      this.buckets.set(name, objects);
-    }
-    return objects;
-  }
-
   private async run(call: ServerCall): Promise<Error | null> {
     this.calls.push(call);
     try {
@@ -374,5 +374,10 @@ export const server = new FakeServer();
 
 export const supabase = {
   from: (table: string) => server.from(table),
-  storage: { from: (bucket: string) => server.storage(bucket) },
+  // A session there always is: the fake decides membership, not sign-in.
+  auth: { getSession: () => Promise.resolve({ data: { session: { access_token: 'token' } } }) },
 };
+
+// The files worker is reached as the global `fetch`, so the fake stands in
+// for that too, for as long as it is installed.
+vi.stubGlobal('fetch', server.fetch);

@@ -210,14 +210,27 @@ gate, what a sync does with the files. These are the rules on top of it.
   fetched on demand. Adding a kind there puts its every file on every device
   and is a decision to write up, never a default; files are still never pulled
   wholesale and never put in `ALL_SPECS`.
-- **The bucket is private and gated like a table**: `storage.objects` has a
-  `private.is_member()` policy scoped to the bucket, it only takes
-  `application/octet-stream`, and its size limit is `ATTACHMENT_MAX_BYTES` plus
-  the encryption overhead. `db:verify` checks no bucket is public, every bucket
-  has such a policy, and no storage policy reaches `anon`.
-- **Tests**: `householdKey.test.ts` (Node's WebCrypto) and
-  `attachmentFiles.test.ts` (real SQLite + the fake server's `storage`). A
-  change to the file format, the queue states or the sweep must come with one.
+- **The bucket is R2, and the files worker (`worker/src/files.ts`) is the
+  only way in.** The bucket has no address of its own — never enable its
+  public development URL, never give it a domain — and the worker holds
+  nothing but its binding: no secret, no database. Every request carries the
+  session's token, and the worker asks the database's API, with that token,
+  for a count of `members`, so `private.is_member()` still decides. It takes
+  only `application/octet-stream`, no larger than `ATTACHMENT_MAX_BYTES` plus
+  the seal's overhead, under an id that is a UUID, and answers only the app's
+  origin. This gate lives outside the database, where `db:verify` cannot see
+  it: `worker/src/files.test.ts` is what pins it, and a change to what the
+  worker lets through comes with a test there. It is deployed on its own with
+  the `files:*` scripts, never by the app's deploy, and its address is a
+  custom domain given in the dashboard — never a route in its config, so
+  that no token has to edit the zone's DNS. `db:verify` still refuses
+  any Supabase Storage bucket that is public or not gated, and any storage
+  policy that reaches `anon`.
+- **Tests**: `householdKey.test.ts` (Node's WebCrypto),
+  `attachmentFiles.test.ts` (real SQLite + the fake server's stand-in for the
+  files worker) and `worker/src/files.test.ts` (the worker over a bucket in
+  memory). A change to the file format, the queue states, the sweep or the
+  worker's gate must come with one.
 
 ## Statements (Gastos) — read before touching them
 
@@ -313,12 +326,12 @@ and what becomes of a forwarded email. These are the rules on top of it.
   a chore does. Airport codes are typed by hand and offered from the curated
   list in `airports.ts` — never a lookup, which does not work offline, and never
   the full IATA set, which would be precached on every device.
-- **`trip_inbox` is staged by the worker in `worker/`, never made up by the
+- **`trip_inbox` is staged by the email worker in `worker/`, never made up by the
   app**, which only confirms a group of staged rows into real ones (through the
   offline engine, undoable for a moment, which stages the rows again as new
   rows — an id is never reused) or deletes them. Staged rows reach neither Buscar nor Próximo: they are suggestions, not
   commitments.
-- **The worker never holds the service key.** It connects as
+- **The email worker never holds the service key.** It connects as
   `trip_inbox_writer`, a role with exactly the grants and policies `db:verify`
   pins — its header says what it holds and why — lets through only mail from
   a member that passed DMARC in the receiving server's own verdict (the first

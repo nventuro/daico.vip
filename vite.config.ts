@@ -6,21 +6,22 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { SUPABASE_URL, YOUTUBE_EMBED_URL } from './src/config';
+import { FILES_URL, SUPABASE_URL, YOUTUBE_EMBED_URL } from './src/config';
 import { PDF_DECODERS, PDF_DECODERS_URL } from './src/lib/pdfDecoders';
 
 // The page's Content-Security-Policy, carried as a <meta> tag because the static
 // host can't set response headers. The point is `script-src`: no inline and no
 // third-party script can run, and a script can't send anything anywhere but
-// Supabase. `'wasm-unsafe-eval'` lets SQLite compile its wasm; `'unsafe-inline'`
-// on styles covers the inline `style` attributes React sets, which is not an
-// exfiltration path worth fighting. Injected at build only: the dev server
-// needs an inline script (Fast Refresh) and a websocket the policy would deny.
+// Supabase and the files worker. `'wasm-unsafe-eval'` lets SQLite compile its
+// wasm; `'unsafe-inline'` on styles covers the inline `style` attributes React
+// sets, which is not an exfiltration path worth fighting. Injected at build
+// only: the dev server needs an inline script (Fast Refresh) and a websocket
+// the policy would deny.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
   "worker-src 'self'",
-  `connect-src 'self' ${SUPABASE_URL}`,
+  `connect-src 'self' ${SUPABASE_URL} ${FILES_URL}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "img-src 'self' data: blob:",
