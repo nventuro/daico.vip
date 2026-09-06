@@ -7,17 +7,22 @@ import {
   yearMonthOf,
 } from '../utils/dateUtils';
 import { groupRuns } from '../utils/listUtils';
+import { compareTitles } from '../utils/listUtils';
 
 /** Soonest first; same-day entries by title. Does not modify the input. */
 export function sortUpcoming(items: Upcoming[]): Upcoming[] {
-  return [...items].sort(
-    (a, b) =>
-      a.on.localeCompare(b.on) || a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }),
-  );
+  return [...items].sort((a, b) => a.on.localeCompare(b.on) || compareTitles(a.title, b.title));
 }
 
 function sameMarks(a: Upcoming['marks'] = [], b: Upcoming['marks'] = []): boolean {
   return a.length === b.length && a.every((mark, i) => mark === b[i]);
+}
+
+/** What tells one listed entry from another: two rows can lead to the same
+ *  screen on the same day — a statement late from each card — and differ
+ *  only in what they say. */
+export function upcomingKey(row: Upcoming): string {
+  return `${row.to}|${row.on}|${row.title}`;
 }
 
 /** Whether two lists hold the same entries in the same order. */
@@ -63,7 +68,7 @@ export interface UpcomingGroup {
 
 function dayHeading(date: string, today: string, currentYear: number): Omit<UpcomingGroup, 'rows'> {
   const days = daysUntil(today, date);
-  if (days < 0) return { key: 'past', label: 'Vencidas', overdue: true };
+  if (days < 0) return { key: 'past', label: 'Vencidos', overdue: true };
   const withMonth = yearMonthOf(date) !== yearMonthOf(today);
   const day = formatWeekdayDay(date, withMonth);
   if (days === 0) return { key: date, label: `Hoy · ${day}`, overdue: false };

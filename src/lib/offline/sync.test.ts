@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from './sync';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
 import { server } from './testing/fakeSupabase';
@@ -8,9 +8,11 @@ import * as engine from './engine';
 import {
   afterSync,
   getSyncStatus,
+  type AfterSyncListener,
   listRefusals,
   resetSyncStatus,
   subscribeSyncStatus,
+  syncAfterWrite,
   syncAll,
   syncIfStale,
 } from './sync';
@@ -26,7 +28,7 @@ function runCalls(pushes: Record<string, string[]>): string[] {
   return ALL_SPECS.flatMap((spec) => [...(pushes[spec.table] ?? []), `select:${spec.table}`]);
 }
 
-let warn: ReturnType<typeof vi.spyOn>;
+let warn: MockInstance<typeof console.warn>;
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -195,18 +197,34 @@ describe('syncAll', () => {
     );
     await syncAll();
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toHaveLength(count);
-    expect(callLog().filter((c) => c === 'select:chores')).toHaveLength(2);
+    // Each page is the rows past the last id of the one before, so a row
+    // deleted from an earlier page while the pull is on shifts nothing.
+    const pages = server.calls.filter((c) => c.op === 'select' && c.table === 'chores');
+    expect(pages.map((c) => c.after)).toEqual([undefined, '00999']);
 
     // The rows past the first page must not read as deleted elsewhere.
     await syncAll();
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toHaveLength(count);
   });
 
+  it('skips a row naming a column the server does not have, and writes it down', async () => {
+    const ahead = await engine.insert(CHORES_SPEC, newChore);
+    const rest = await engine.insert(CHORES_SPEC, { ...newChore, title: 'Barrer' });
+    server.fail('upsert', 'chores', "Could not find the 'x' column of 'chores'", {
+      code: 'PGRST204',
+      id: ahead,
+    });
+    await syncAll();
+    expect(server.rows('chores').map((r) => r.id)).toEqual([rest]);
+    expect(await listRefusals()).toMatchObject([{ table: 'chores', id: ahead, code: 'PGRST204' }]);
+  });
+
   it('tells the after-sync work which tables came down', async () => {
     server.fail('select', 'chores');
     let seen: ReadonlySet<string> | null = null;
-    const stop = afterSync(async (synced) => {
+    const stop = afterSync((synced) => {
       seen = new Set(synced);
+      return Promise.resolve();
     });
     try {
       await syncAll();
@@ -263,6 +281,99 @@ describe('syncAll', () => {
   });
 });
 
+describe('after a write', () => {
+  const selects = () => callLog().filter((c) => c.startsWith('select:')).length;
+
+  it('pushes at once, and pulls only when the tables have not come down in a while', async () => {
+    await syncAll();
+    const pulled = selects();
+
+    const id = await engine.insert(CHORES_SPEC, newChore);
+    await syncAfterWrite();
+    expect(server.rows('chores')).toMatchObject([{ id }]);
+    expect(selects()).toBe(pulled);
+
+    at(new Date(Date.parse(T0) + SYNC_FRESH_MS).toISOString());
+    await engine.update(CHORES_SPEC, id, { title: 'Regar más' });
+    await syncAfterWrite();
+    expect(server.rows('chores')).toMatchObject([{ id, title: 'Regar más' }]);
+    expect(selects()).toBe(pulled * 2);
+  });
+
+  it('brings the tables down when nothing has yet', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    await engine.insert(CHORES_SPEC, newChore);
+    await syncAfterWrite();
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toHaveLength(2);
+    expect(getSyncStatus().completedAt).toBe(T0);
+  });
+
+  it('leaves the stamp of the last whole run alone', async () => {
+    await syncAll();
+    at(T1);
+    await engine.insert(CHORES_SPEC, newChore);
+    await syncAfterWrite();
+    expect(getSyncStatus().completedAt).toBe(T0);
+  });
+
+  it('is not what a screen that opens counts as recent', async () => {
+    await syncAll();
+    const pulled = selects();
+    at(new Date(Date.parse(T0) + SYNC_FRESH_MS / 2).toISOString());
+    await engine.insert(CHORES_SPEC, newChore);
+    await syncAfterWrite();
+    at(new Date(Date.parse(T0) + SYNC_FRESH_MS).toISOString());
+    await syncIfStale();
+    expect(selects()).toBe(pulled * 2);
+  });
+
+  it('does not demote a pull asked for while the push is on', async () => {
+    await syncAll();
+    const pulled = selects();
+    const push = server.hold('upsert', 'chores');
+    await engine.insert(CHORES_SPEC, newChore);
+    const first = syncAfterWrite();
+    await push.started;
+    const second = syncAll();
+    push.release();
+    await Promise.all([first, second]);
+    expect(selects()).toBe(pulled * 2);
+  });
+
+  it('runs the work that follows the tables, told that none came down', async () => {
+    await syncAll();
+    const listener = vi.fn<AfterSyncListener>(() => Promise.resolve());
+    const stop = afterSync(listener);
+    try {
+      await engine.insert(CHORES_SPEC, newChore);
+      await syncAfterWrite();
+    } finally {
+      stop();
+    }
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect([...listener.mock.calls[0][0]]).toEqual([]);
+  });
+});
+
+describe('a run asked for during the after-sync work', () => {
+  it('is honoured with one more pass', async () => {
+    let asked = false;
+    const stop = afterSync(async () => {
+      // A pendiente ticked while a picture is going up.
+      if (asked) return;
+      asked = true;
+      await engine.insert(CHORES_SPEC, newChore);
+      void syncAfterWrite();
+    });
+    try {
+      await syncAll();
+    } finally {
+      stop();
+    }
+    expect(server.rows('chores')).toMatchObject([{ title: 'Regar' }]);
+  });
+});
+
 describe('what the server settles', () => {
   it('cannot push an edit older than the one the server already took', async () => {
     server.seed('chores', [serverChore('a', T0)]);
@@ -305,6 +416,37 @@ describe('what the server settles', () => {
     expect(server.rows('chores')).toMatchObject([{ title: 'edited here' }]);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toMatchObject([{ title: 'edited here' }]);
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
+  });
+
+  it('a delete stands over an edit of the row pushed later from another device', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    await syncAll();
+    // Edited here, offline; deleted on the other device, which pushed first.
+    at(T1);
+    await engine.update(CHORES_SPEC, 'a', { title: 'edited here' });
+    server.deleteRow('chores', 'a');
+
+    await syncAll();
+    // The server took no row of that id again, and the pull took the copy
+    // here with it: the delete won, and every device agrees.
+    expect(server.rows('chores')).toEqual([]);
+    expect(server.deletedIds('chores')).toEqual(['a']);
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
+    expect(await bookkeeping('chores', 'a')).toBeNull();
+  });
+
+  it('a delete pushed from here stands over an older edit pushed later elsewhere', async () => {
+    server.seed('chores', [serverChore('a', T0)]);
+    await syncAll();
+    at(T2);
+    await engine.remove(CHORES_SPEC, 'a');
+    await syncAll();
+    // The other device's edit, stamped before the delete, arrives after it.
+    const { error } = await server.from('chores').upsert(serverChore('a', T1, { title: 'late' }));
+    expect(error).toBeNull();
+    await syncAll();
+    expect(server.rows('chores')).toEqual([]);
+    expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
   });
 
   it('keeps a queued write the server will not take from a session that is not a member', async () => {
@@ -465,9 +607,7 @@ describe('sync status', () => {
     expect(getSyncStatus().tables.shopping_items).toBe('done');
 
     server.restore();
-    const off = afterSync(async () => {
-      throw new Error('bucket down');
-    });
+    const off = afterSync(() => Promise.reject(new Error('bucket down')));
     await syncAll();
     off();
     expect(getSyncStatus().completedAt).toBeNull();

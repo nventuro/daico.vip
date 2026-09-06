@@ -3,13 +3,14 @@
 // and its assembly into a message the worker can send back.
 // =============================================================================
 import { createMimeMessage } from 'mimetext';
-import { INBOX_KINDS, type InboxKind } from './extract';
+import { INBOX_KINDS, NO_BOOKINGS_FOUND, type InboxKind } from './extract';
 
 /** Where the suggestions wait for review. */
 const VIAJES_URL = 'https://daico.vip/viajes';
 
-/** What is said when the model found nothing and did not say why. */
-export const NO_BOOKINGS_FOUND = 'No encontré ninguna reserva en este correo';
+/** The longest subject a reply carries: an encoded word longer than a line
+ *  is refused by the platform, and the member hears nothing. */
+const SUBJECT_MAX_CHARS = 200;
 
 const TRY_FORWARDING_AGAIN =
   'Si era una confirmación de verdad, probá reenviarla de nuevo tal cual llegó.';
@@ -39,9 +40,15 @@ function listed(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
 }
 
-/** The two lines of a successful reply: what was found, with how many PDFs
- *  were kept with it when any were, and where it went. */
-export function successBody(tripTitle: string, counts: KindCounts, files: number): string {
+/** The lines of a successful reply: what was found, with how many PDFs were
+ *  kept with it when any were, where it went, and how many attachments were
+ *  left out when any were. */
+export function successBody(
+  tripTitle: string,
+  counts: KindCounts,
+  files: number,
+  skipped = 0,
+): string {
   const total = INBOX_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
   const parts = INBOX_KINDS.filter((kind) => counts[kind] > 0).map((kind) =>
     phrase(kind, counts[kind]),
@@ -50,6 +57,22 @@ export function successBody(tripTitle: string, counts: KindCounts, files: number
   return [
     `Encontré ${total} ${total === 1 ? 'ítem' : 'ítems'} para «${tripTitle}»: ${listed(parts)}${kept}.`,
     `Quedaron para revisar en Viajes: ${VIAJES_URL}`,
+    ...(skipped > 0
+      ? [
+          skipped === 1
+            ? 'Dejé afuera un adjunto que no era un PDF o era demasiado grande.'
+            : `Dejé afuera ${skipped} adjuntos que no eran PDF o eran demasiado grandes.`,
+        ]
+      : []),
+  ].join('\n');
+}
+
+/** The two lines of a reply to an email that was staged before: nothing is
+ *  staged twice, and where the first time's suggestions are. */
+export function alreadyStagedBody(): string {
+  return [
+    'Este correo ya lo había recibido, así que no guardé nada de nuevo.',
+    `Las sugerencias de la primera vez están en Viajes: ${VIAJES_URL}`,
   ].join('\n');
 }
 
@@ -83,23 +106,33 @@ export interface ReplyEnvelope {
   references: string | null;
 }
 
+/** A header value as the original wrote it, on one line: a line break in
+ *  one would start a header of the sender's choosing. */
+function oneLine(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim();
+}
+
 function bracketed(messageId: string): string {
-  const id = messageId.trim();
+  const id = oneLine(messageId);
   return id.startsWith('<') ? id : `<${id}>`;
 }
 
-/** The reply as raw MIME: a plain-text message threaded under the original.
- *  The platform checks the threading: References has to be the original's
- *  References, when it had any, followed by its Message-ID. */
+/** The reply as raw MIME: a plain-text message threaded under the original,
+ *  marked as sent by a machine so a responder on the other side does not
+ *  answer it. The platform checks the threading: References has to be the
+ *  original's References, when it had any, followed by its Message-ID. */
 export function replyMime(envelope: ReplyEnvelope, body: string): string {
   const message = createMimeMessage();
   message.setSender(envelope.from);
   message.setRecipient(envelope.to);
-  message.setSubject(`Re: ${envelope.subject ?? ''}`.trimEnd());
+  message.setSubject(
+    `Re: ${oneLine(envelope.subject ?? '').slice(0, SUBJECT_MAX_CHARS)}`.trimEnd(),
+  );
+  message.setHeader('Auto-Submitted', 'auto-replied');
   if (envelope.inReplyTo !== null) {
     const id = bracketed(envelope.inReplyTo);
     message.setHeader('In-Reply-To', id);
-    const references = envelope.references?.trim();
+    const references = envelope.references && oneLine(envelope.references);
     message.setHeader('References', references ? `${references} ${id}` : id);
   }
   message.addMessage({ contentType: 'text/plain', data: body });

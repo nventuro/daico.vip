@@ -89,7 +89,7 @@ export function AppProvider({
   }, [isMember]);
 
   const signIn = useCallback(() => {
-    supabase.auth.signInWithOAuth({
+    void supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
     });

@@ -1,3 +1,8 @@
+// =============================================================================
+// A guide's images: too large to pull with the tables, so each is fetched on
+// its first use and kept in a local-only table, and a chapter keeps drawing
+// with no connection once it has been read once.
+// =============================================================================
 import { supabase } from '../../lib/supabase';
 import * as engine from '../../lib/offline/engine';
 import { GUIDE_IMAGE_CACHE } from '../../lib/offline/localTables';
@@ -43,7 +48,7 @@ export async function guideImageUrl(key: string): Promise<string | null> {
     .eq('key', key)
     .maybeSingle();
   if (error || !data) return null;
-  const image = data as CachedImage;
+  const image = data;
   await keep(key, image);
   return toDataUrl(image);
 }

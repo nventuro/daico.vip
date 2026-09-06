@@ -14,11 +14,11 @@ import { useEntry } from '../../hooks/useEntry';
 import { useLeave, useLeaveBack } from '../../hooks/useLeave';
 import { useTextSave } from '../../hooks/useTextSave';
 import { offerUndo } from '../../lib/undo';
-import { todayIso } from '../../utils/dateUtils';
 import { appPath, entryPath } from '../types';
 import { isDone, markMessage } from './recurrence';
 import RepeatFields, { type RepeatValue } from './RepeatFields';
 import { useChores } from './useChores';
+import { useToday } from '../../hooks/useToday';
 
 /** A chore, read and written on the same page: the title on blur, each
  *  control as it changes, the comments a moment after typing stops and on
@@ -31,11 +31,11 @@ export default function ChorePage() {
   const leave = useLeave();
   const leaveBack = useLeaveBack();
   const [deleting, setDeleting] = useState(false);
-  const today = todayIso();
+  const today = useToday();
 
   const commentsSave = useTextSave(async (text) => {
     if (chore) await save(chore.id, { comments: text || null });
-  });
+  }, chore?.id);
 
   // A chore that comes back has to come back on a day, so switching it on
   // gives an undated chore today's date rather than leaving it without one.

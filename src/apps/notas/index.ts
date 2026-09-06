@@ -17,8 +17,7 @@ const notas: AppModule = {
   specs: [NOTES_SPEC],
   routes: [
     { index: true, Component: NotesPage },
-    // A note is written on its own page now; the address it used to be
-    // edited at still leads to it.
+    // A note is written on its own page; `editar` leads there.
     { path: ':id/editar', Component: EditRedirect },
     // The optional segment is one of the note's attachments, open in the lightbox.
     { path: ':id/:attachmentId?', Component: NotePage },

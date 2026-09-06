@@ -5,16 +5,22 @@
 // the server under the master key — can undo. Nothing here is ever decrypted.
 //
 // The layout is the worker's own copy of the app's attachment file format,
-// written so that once the app re-wraps the file key under the master key the
-// sealed bytes are an ordinary attachment, untouched. A test on the app side
-// opens what this produces, which is what keeps the two copies in step.
+// bound to the staged file's row the way the app binds a file to its row, so
+// the app opens it as it opens any file: the two copies must agree to the
+// byte.
 // =============================================================================
 import { fromBase64, toBase64 } from './base64';
 
 /** First byte of a sealed file, so the layout can change later. */
-const FILE_FORMAT_VERSION = 1;
+const FILE_FORMAT_VERSION = 2;
 const NONCE_BYTES = 12;
 const FILE_KEY_BITS = 256;
+
+/** What a staged file is sealed as: the row of `trip_inbox_files` it is
+ *  staged under, named the way the app names a row. */
+export function inboxFileBinding(id: string): string {
+  return `trip_inbox_files/${id}`;
+}
 
 /** A sealed PDF and the wrapped key that opens it, as stored. */
 export interface SealedFile {
@@ -35,9 +41,13 @@ export async function importInboxPublicKey(spki: string): Promise<CryptoKey> {
 }
 
 /** `bytes` sealed under a fresh key of their own, that key wrapped under
- *  `publicKey`. Every call seals afresh: two seals of one PDF never share a
- *  key or a nonce. */
-export async function sealPdf(publicKey: CryptoKey, bytes: Uint8Array): Promise<SealedFile> {
+ *  `publicKey`, bound to `boundTo`. Every call seals afresh: two seals of one
+ *  PDF never share a key or a nonce. */
+export async function sealPdf(
+  publicKey: CryptoKey,
+  bytes: Uint8Array,
+  boundTo: string,
+): Promise<SealedFile> {
   // A symmetric algorithm yields one key, which the runtime's types do not
   // say on their own.
   const fileKey = (await crypto.subtle.generateKey(
@@ -49,7 +59,11 @@ export async function sealPdf(publicKey: CryptoKey, bytes: Uint8Array): Promise<
   // A buffer of the bytes' own, the one form every runtime's types agree on.
   const plain = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const cipher = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, fileKey, plain as ArrayBuffer),
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: new TextEncoder().encode(boundTo) },
+      fileKey,
+      plain as ArrayBuffer,
+    ),
   );
   const data = new Uint8Array(1 + NONCE_BYTES + cipher.length);
   data[0] = FILE_FORMAT_VERSION;

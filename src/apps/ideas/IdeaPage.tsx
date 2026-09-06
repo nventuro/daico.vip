@@ -27,7 +27,7 @@ export default function IdeaPage() {
 
   const bodySave = useTextSave(async (body) => {
     if (idea) await save(idea.id, { body });
-  });
+  }, idea?.id);
 
   async function removeIdea(id: string) {
     // The idea's pictures go with it; nothing else would ever list them.

@@ -26,10 +26,18 @@ export function cachedVerdict(userId: string): boolean | null {
 
 /** Keep the verdict the server just gave for the user. */
 export function rememberVerdict(userId: string, member: boolean): void {
-  storage()?.setItem(MEMBER_CACHE_PREFIX + userId, member ? '1' : '0');
+  try {
+    storage()?.setItem(MEMBER_CACHE_PREFIX + userId, member ? '1' : '0');
+  } catch {
+    // Storage full or refused: the verdict lives for the session and no longer.
+  }
 }
 
 /** Forget the verdict for the user, so the next session asks the server. */
 export function forgetVerdict(userId: string): void {
-  storage()?.removeItem(MEMBER_CACHE_PREFIX + userId);
+  try {
+    storage()?.removeItem(MEMBER_CACHE_PREFIX + userId);
+  } catch {
+    // Nothing was kept, then.
+  }
 }

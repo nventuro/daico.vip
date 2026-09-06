@@ -17,8 +17,7 @@ const ideas: AppModule = {
   specs: [IDEAS_SPEC],
   routes: [
     { index: true, Component: IdeasPage },
-    // An idea is written on its own page; the address it used to be edited
-    // at still leads to it.
+    // An idea is written on its own page; `editar` leads there.
     { path: ':id/editar', Component: EditRedirect },
     // The optional segment is one of the idea's attachments, open in the lightbox.
     { path: ':id/:attachmentId?', Component: IdeaPage },

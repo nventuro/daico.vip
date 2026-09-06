@@ -51,7 +51,13 @@ const TABLE_PRIVILEGES = {
   // The sealed PDFs an email brought: written by the worker, read and deleted
   // by the app, never edited.
   trip_inbox_files: ['select', 'delete'],
+  // Which emails the worker has staged, so none is staged twice: the
+  // worker's to write, and only ever read here.
+  trip_inbox_imports: ['select'],
   attachments: CRUD,
+  // The record of every deletion, written and read by the triggers on the
+  // app's behalf; the app itself only ever reads it.
+  deleted_rows: ['select'],
 };
 
 // The email worker's role: what the pipeline that stages trip suggestions may
@@ -64,6 +70,8 @@ const WRITER_ROLE = 'trip_inbox_writer';
 const WRITER_GRANTS = [
   ['trip_inbox', 'INSERT'],
   ['trip_inbox_files', 'INSERT'],
+  ['trip_inbox_imports', 'INSERT'],
+  ['trip_inbox_imports', 'SELECT'],
   ['members', 'SELECT'],
   ['inbox_key', 'SELECT'],
 ];
@@ -91,6 +99,39 @@ const ownerTables = OWNER_TABLES.map((table) => `'${table}'`).join(', ');
 const BUCKET_MIME_TYPES = ['application/octet-stream'];
 const BUCKET_MAX_BYTES = 10485789;
 
+// The one row each of the household's two keys: a second write must fail
+// rather than leave two, which is what these indexes are for.
+const WRITE_ONCE_INDEXES = [
+  ['household_key', 'household_key_single'],
+  ['inbox_key', 'inbox_key_single'],
+];
+
+// The body of the membership function, as its migration wrote it: everything
+// hangs off it, so a change to it must be a migration in the repository and
+// never an edit in the dashboard. Compared with whitespace collapsed.
+const IS_MEMBER_BODY = `
+  select exists (
+    select 1
+    from public.members m
+    join auth.identities i
+      on lower(i.identity_data ->> 'email') = lower(m.email)
+    where i.user_id = auth.uid()
+      and i.provider = 'google'
+      and coalesce((i.identity_data ->> 'email_verified')::boolean, false)
+  )
+`;
+const collapsed = (sql) => sql.replace(/\s+/g, ' ').trim().replace(/'/g, "''");
+
+// The triggers a table may carry, and nothing else: the last-write-wins guard
+// on every synced table, and the pair that makes a delete final on every
+// table the app may delete from. Postgres keeps a trigger's timing and events
+// as bits of tgtype: 1 row, 2 before, 4 insert, 8 delete, 16 update.
+const TRIGGERS = [
+  { name: 'last_write_wins', on: 'updated_at', tgtype: 1 | 2 | 16 },
+  { name: 'delete_wins', on: 'delete', tgtype: 1 | 2 | 4 },
+  { name: 'record_deletion', on: 'delete', tgtype: 1 | 8 },
+];
+
 const expectedPrivileges = Object.entries(TABLE_PRIVILEGES)
   .map(([table, privileges]) => {
     const listed = privileges.map((p) => p.toUpperCase()).sort();
@@ -104,13 +145,13 @@ const CHECKS = [
     name: 'every public base table has RLS enabled',
     sql: `select c.relname as violation
           from pg_class c join pg_namespace n on n.oid = c.relnamespace
-          where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`,
+          where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity`,
   },
   {
     name: 'every public base table has a private.is_member() policy',
     sql: `select c.relname as violation
           from pg_class c join pg_namespace n on n.oid = c.relnamespace
-          where n.nspname = 'public' and c.relkind = 'r'
+          where n.nspname = 'public' and c.relkind in ('r', 'p')
             and not exists (
               select 1 from pg_policies p
               where p.schemaname = 'public' and p.tablename = c.relname
@@ -147,7 +188,7 @@ const CHECKS = [
                present as (
                  select c.relname::text as table_name
                  from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                 where n.nspname = 'public' and c.relkind = 'r'
+                 where n.nspname = 'public' and c.relkind in ('r', 'p')
                ),
                granted as (
                  select table_name::text as table_name,
@@ -187,10 +228,10 @@ const CHECKS = [
                      and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}'
                      and not (p.qual is null and p.with_check is null))
             and not (p.roles = '{${WRITER_ROLE}}'::name[]
-                     and ((p.tablename in ('trip_inbox', 'trip_inbox_files') and p.cmd = 'INSERT'
-                           and p.qual is null and p.with_check = 'true')
-                          or (p.tablename in ('members', 'inbox_key') and p.cmd = 'SELECT'
-                              and p.qual = 'true' and p.with_check is null)))`,
+                     and ((p.tablename in ('trip_inbox', 'trip_inbox_files', 'trip_inbox_imports')
+                           and p.cmd = 'INSERT' and p.qual is null and p.with_check = 'true')
+                          or (p.tablename in ('members', 'inbox_key', 'trip_inbox_imports')
+                              and p.cmd = 'SELECT' and p.qual = 'true' and p.with_check is null)))`,
   },
   {
     name: 'a per-member table carries the owner policy and no other',
@@ -297,25 +338,70 @@ const CHECKS = [
   {
     // Sync integrity rather than access control: `updated_at` marks the
     // offline-synced tables, and without the guard a pushed stale edit would
-    // overwrite a newer row and devices would stop converging.
-    name: 'every public table with updated_at has the private.last_write_wins() trigger, enabled',
-    sql: `select c.relname as violation
+    // overwrite a newer row and devices would stop converging; without the
+    // deletion record an edit pushed after a delete would put the row back.
+    name: 'every synced table carries the last-write-wins guard, every deletable table the delete-wins pair, all enabled',
+    sql: `with expected(trigger_name, tgtype, wanted) as (values ${TRIGGERS.map(
+      ({ name, on, tgtype }) => `('${name}', ${tgtype}, '${on}')`,
+    ).join(', ')})
+          select c.relname || ': ' || e.trigger_name || ' missing, disabled or mistimed' as violation
           from pg_class c join pg_namespace n on n.oid = c.relnamespace
-          where n.nspname = 'public' and c.relkind = 'r'
-            and exists (select 1 from pg_attribute a
-                        where a.attrelid = c.oid and a.attname = 'updated_at'
-                          and not a.attisdropped)
+          cross join expected e
+          where n.nspname = 'public' and c.relkind in ('r', 'p')
+            and ((e.wanted = 'updated_at'
+                  and exists (select 1 from pg_attribute a
+                              where a.attrelid = c.oid and a.attname = 'updated_at'
+                                and not a.attisdropped))
+                 or (e.wanted = 'delete' and has_table_privilege('authenticated', c.oid, 'DELETE')))
             and not exists (
               select 1 from pg_trigger t
               join pg_proc p on p.oid = t.tgfoid
               join pg_namespace pn on pn.oid = p.pronamespace
               where t.tgrelid = c.oid and not t.tgisinternal
-                and pn.nspname = 'private' and p.proname = 'last_write_wins'
+                and pn.nspname = 'private' and p.proname = e.trigger_name
                 and t.tgenabled <> 'D'      -- a disabled trigger is no trigger
-                and (t.tgtype & 2) <> 0     -- before
-                and (t.tgtype & 16) <> 0    -- update
-                and (t.tgtype & 1) <> 0)    -- row
-          `,
+                and (t.tgtype & 31) = e.tgtype)`,
+  },
+  {
+    // A trigger nobody wrote up: one that bumps updated_at on the server
+    // would break the ordering of offline edits, and any other is drift.
+    name: 'no public table carries a trigger but the ones above',
+    sql: `select c.relname || ': ' || t.tgname as violation
+          from pg_trigger t
+          join pg_class c on c.oid = t.tgrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          join pg_proc p on p.oid = t.tgfoid
+          join pg_namespace pn on pn.oid = p.pronamespace
+          where n.nspname = 'public' and not t.tgisinternal
+            and not (pn.nspname = 'private'
+                     and (pn.nspname || '.' || p.proname, t.tgtype & 31) in (${TRIGGERS.map(
+                       ({ name, tgtype }) => `('private.${name}', ${tgtype})`,
+                     ).join(', ')}))`,
+  },
+  {
+    name: 'each of the household keys is held to one row by its unique index',
+    sql: `select t.table_name || ': ' || t.index_name || ' missing or not unique' as violation
+          from (values ${WRITE_ONCE_INDEXES.map(([t, i]) => `('${t}', '${i}')`).join(', ')})
+            as t(table_name, index_name)
+          where not exists (
+            select 1 from pg_indexes i
+            where i.schemaname = 'public' and i.tablename = t.table_name
+              and i.indexname = t.index_name
+              and i.indexdef like 'CREATE UNIQUE INDEX %((true))')`,
+  },
+  {
+    name: 'private.is_member() reads exactly as its migration wrote it',
+    sql: `select 'private.is_member(): ' || case
+                 when p.oid is null then 'missing'
+                 when not p.prosecdef then 'not security definer'
+                 when p.provolatile <> 's' then 'not stable'
+                 else 'body differs'
+               end as violation
+          from (select 1) as one
+          left join (pg_proc p join pg_namespace n on n.oid = p.pronamespace)
+            on n.nspname = 'private' and p.proname = 'is_member'
+          where p.oid is null or not p.prosecdef or p.provolatile <> 's'
+             or regexp_replace(btrim(p.prosrc, E' \\n\\t'), '\\s+', ' ', 'g') <> '${collapsed(IS_MEMBER_BODY)}'`,
   },
   {
     // Storage holds the attachment files: a public bucket would hand out
@@ -367,8 +453,8 @@ for (const check of CHECKS) {
     console.log(`  \x1b[32m✓\x1b[0m ${check.name}`);
   } else {
     failed++;
-    console.log(`  \x1b[31m✗\x1b[0m ${check.name}`);
-    for (const r of rows) console.log(`      → ${r.violation}`);
+    console.error(`  \x1b[31m✗\x1b[0m ${check.name}`);
+    for (const r of rows) console.error(`      → ${r.violation}`);
   }
 }
 await client.end();

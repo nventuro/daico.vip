@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { monthName, todayIso } from '../../utils/dateUtils';
+import { monthName } from '../../utils/dateUtils';
 import EntryPage from '../../components/EntryPage';
 import ErrorLine from '../../components/ErrorLine';
 import LinkRow from '../../components/LinkRow';
@@ -37,6 +37,7 @@ import BreakdownSkeleton from './BreakdownSkeleton';
 import CardMark from './CardMark';
 import Delta from './Delta';
 import MovementList from './MovementList';
+import { useToday } from '../../hooks/useToday';
 
 /**
  * One calendar month: what the household spent in it, wherever the bank
@@ -51,7 +52,7 @@ export default function MonthPage() {
   const masterKey = useMasterKey();
   const { select, dialog } = useRuleDialog(rulesStore);
   const month = useParams().month ?? '';
-  const today = todayIso();
+  const today = useToday();
 
   // Marking a movement rewrites the whole sealed payload of the statement it
   // is in, and what is on screen only catches up once that row is written and
@@ -90,12 +91,14 @@ export default function MonthPage() {
 
   const previousByCategory = useMemo(() => {
     const map = new Map<SpendingCategory | null, number>();
-    if (contents && previousMonth) {
+    // Compared only when the month is: half a month against a whole one
+    // says nothing, per category as little as in total.
+    if (contents && previousMonth && comparable) {
       for (const share of byCategory(movementsOfMonth(items, contents, previousMonth), rules))
         map.set(share.category, share.cents);
     }
     return map;
-  }, [items, contents, previousMonth, rules]);
+  }, [items, contents, previousMonth, comparable, rules]);
 
   function toggleOneOff(movement: Movement) {
     if (masterKey.status !== 'unlocked' || !contents) return;

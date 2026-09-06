@@ -11,7 +11,7 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import type { Attachment } from '../lib/offline/specs';
-import { isPdf } from '../lib/attachmentFiles';
+import { KEPT_OWNER_KINDS, isPdf } from '../lib/attachmentFiles';
 import { holdUpdates } from '../lib/appUpdate';
 import { useOnline } from '../hooks/useOnline';
 import { useObjectUrl } from '../hooks/useObjectUrl';
@@ -48,7 +48,7 @@ interface AttachmentLightboxProps {
   index: number;
   /** The entry's own page: the attachments' URLs hang under it, and closing returns to it. */
   ownerPath: string;
-  onRemove: (attachment: Attachment) => void;
+  onRemove: (attachment: Attachment) => Promise<unknown>;
 }
 
 /**
@@ -82,26 +82,30 @@ export default function AttachmentLightbox({
   const close = useCallback(() => {
     // Opened from the entry's page, that page is the previous history entry;
     // reached by a link from elsewhere, it is not, and takes this one's place.
-    if (isFromEntryPage(location.state)) navigate(-1);
-    else navigate(ownerPath, { replace: true });
+    if (isFromEntryPage(location.state)) void navigate(-1);
+    else void navigate(ownerPath, { replace: true });
   }, [location.state, navigate, ownerPath]);
 
   const show = useCallback(
-    (i: number) =>
-      navigate(`${ownerPath}/${attachments[i].id}`, { replace: true, state: location.state }),
+    (i: number) => {
+      const state: unknown = location.state;
+      void navigate(`${ownerPath}/${attachments[i].id}`, { replace: true, state });
+    },
     [attachments, location.state, navigate, ownerPath],
   );
   const hasPrev = index > 0;
   const hasNext = index < attachments.length - 1;
 
   useEffect(() => {
+    // Not while the delete question is up: the keys are its then.
+    if (deleting) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowLeft' && hasPrev) show(index - 1);
       if (e.key === 'ArrowRight' && hasNext) show(index + 1);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [show, index, hasPrev, hasNext]);
+  }, [show, index, hasPrev, hasNext, deleting]);
 
   function touchEnd(e: TouchEvent) {
     if (touchStartX.current === null) return;
@@ -132,7 +136,7 @@ export default function AttachmentLightbox({
 
   function handleRemove() {
     close();
-    onRemove(attachment);
+    void onRemove(attachment);
   }
 
   let hint: ReactNode = null;
@@ -154,9 +158,10 @@ export default function AttachmentLightbox({
     hint = online
       ? 'Todavía no se subió desde el dispositivo donde se agregó.'
       : `Sin conexión, y ${pdf ? 'este PDF no está guardado' : 'esta foto no está guardada'} en este dispositivo.`;
-  } else if (attachment.owner_kind === 'document' && uploadState === 'uploaded') {
-    // Said only of a document: being readable with no connection is what it
-    // is kept here for, not a side effect of having been opened once.
+  } else if (KEPT_OWNER_KINDS.includes(attachment.owner_kind) && uploadState === 'uploaded') {
+    // Said only of a file every device keeps: being readable with no
+    // connection is what it is kept here for, not a side effect of having
+    // been opened once.
     hint = (
       <span className="inline-flex items-center gap-1.5">
         <IconDeviceMobileCheck size={16} stroke={1.5} className="shrink-0" />
@@ -168,18 +173,10 @@ export default function AttachmentLightbox({
   }
 
   return (
-    <ModalDialog onClose={close} layout="full">
+    <ModalDialog onClose={close} layout="full" label={attachment.name || 'Adjunto'}>
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center justify-between px-2 py-2">
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Cerrar"
-            title="Cerrar"
-            className="flex items-center p-2 transition-opacity hover:opacity-70"
-          >
-            <IconX size={22} stroke={1.75} />
-          </button>
+          <IconButton label="Cerrar" icon={IconX} size={22} tone="band" onClick={close} />
           <span className="text-sm opacity-70">
             {index + 1} / {attachments.length}
           </span>
@@ -223,26 +220,24 @@ export default function AttachmentLightbox({
             </span>
           )}
           {hasPrev && (
-            <button
-              type="button"
+            <IconButton
+              label="Anterior"
+              icon={IconChevronLeft}
+              size={32}
+              tone="band"
               onClick={() => show(index - 1)}
-              aria-label="Anterior"
-              title="Anterior"
-              className="absolute top-1/2 left-0 -translate-y-1/2 p-3 opacity-70 transition-opacity hover:opacity-100"
-            >
-              <IconChevronLeft size={32} stroke={1.5} />
-            </button>
+              className="absolute top-1/2 left-0 -translate-y-1/2 p-3"
+            />
           )}
           {hasNext && (
-            <button
-              type="button"
+            <IconButton
+              label="Siguiente"
+              icon={IconChevronRight}
+              size={32}
+              tone="band"
               onClick={() => show(index + 1)}
-              aria-label="Siguiente"
-              title="Siguiente"
-              className="absolute top-1/2 right-0 -translate-y-1/2 p-3 opacity-70 transition-opacity hover:opacity-100"
-            >
-              <IconChevronRight size={32} stroke={1.5} />
-            </button>
+              className="absolute top-1/2 right-0 -translate-y-1/2 p-3"
+            />
           )}
         </div>
 

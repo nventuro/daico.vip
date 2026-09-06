@@ -8,7 +8,7 @@ import { HueContext, hueStyle } from './hue';
  * box in the middle, for a question. `full`: the whole screen at any width,
  * dark, for looking at a picture.
  */
-export type DialogLayout = 'sheet' | 'confirm' | 'full';
+type DialogLayout = 'sheet' | 'confirm' | 'full';
 
 const LAYOUT_CLASS: Record<DialogLayout, string> = {
   sheet:
@@ -20,9 +20,12 @@ const LAYOUT_CLASS: Record<DialogLayout, string> = {
 
 interface ModalDialogProps {
   /** Called when the browser closes the dialog on its own — Escape, a phone's
-   *  back gesture — so the caller can unmount it. */
+   *  back gesture, a tap beside it — so the caller can unmount it. */
   onClose: () => void;
   layout: DialogLayout;
+  /** What the dialog is, for a screen reader: the question it asks, the
+   *  thing it is about. */
+  label: string;
   children: ReactNode;
 }
 
@@ -34,7 +37,7 @@ interface ModalDialogProps {
  * so as a page load. Being outside the app's frame, it is painted in the
  * app's hue on its own, so its chips and check squares show.
  */
-export default function ModalDialog({ onClose, layout, children }: ModalDialogProps) {
+export default function ModalDialog({ onClose, layout, label, children }: ModalDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const hue = useContext(HueContext);
   const onCloseRef = useRef(onClose);
@@ -72,8 +75,15 @@ export default function ModalDialog({ onClose, layout, children }: ModalDialogPr
       // Focusable so the dialog itself can hold the focus, and drawn without
       // the ring that would then be around the whole box.
       tabIndex={-1}
+      aria-label={label}
       className={`${LAYOUT_CLASS[layout]} outline-none`}
       style={hueStyle(hue)}
+      // A tap on the backdrop lands on the dialog element itself, outside
+      // its box: a question or a sheet is put away by it, as by Escape. The
+      // full-screen one has no backdrop to tap.
+      onClick={(e) => {
+        if (layout !== 'full' && e.target === e.currentTarget) e.currentTarget.close();
+      }}
     >
       {children}
     </dialog>,

@@ -34,13 +34,15 @@ export function useStatements() {
    *  could not be written. */
   const add = useCallback(
     (contents: StatementContents, masterKey: CryptoKey): Promise<string | undefined> =>
-      mutate(async () =>
-        engine.insert(STATEMENTS_SPEC, {
-          ...columns(contents),
-          paid: false,
-          ...(await sealContents(masterKey, contents)),
-        }),
-      ),
+      mutate(async () => {
+        // The id first: the contents are sealed for the row they will be in.
+        const id = crypto.randomUUID();
+        return engine.insert(
+          STATEMENTS_SPEC,
+          { ...columns(contents), paid: false, ...(await sealContents(masterKey, contents, id)) },
+          id,
+        );
+      }),
     [mutate],
   );
 
@@ -50,7 +52,7 @@ export function useStatements() {
       mutate(async () =>
         engine.update(STATEMENTS_SPEC, id, {
           ...columns(contents),
-          ...(await sealContents(masterKey, contents)),
+          ...(await sealContents(masterKey, contents, id)),
         }),
       ),
     [mutate],

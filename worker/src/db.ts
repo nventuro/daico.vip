@@ -1,10 +1,23 @@
 // =============================================================================
 // The database as the worker sees it: a connection as `trip_inbox_writer`
 // through Hyperdrive, the members list for the gate, the household's inbox
-// public key, and the one insert that stages an email.
+// public key, which emails were staged before, and the one insert that
+// stages an email.
 // =============================================================================
 import pg from 'pg';
 import type { InboxRow } from './extract';
+
+/** The unique violation Postgres reports, as pg hands it over. */
+const UNIQUE_VIOLATION = '23505';
+
+/** An email whose Message-ID was staged before: its sender was answered
+ *  then, and a second delivery of it is answered again, never staged again. */
+export class AlreadyStagedError extends Error {
+  constructor() {
+    super('already staged');
+    this.name = 'AlreadyStagedError';
+  }
+}
 
 /** One connection, opened per email and always ended by the caller; the
  *  pool behind it is Hyperdrive's. */
@@ -27,6 +40,14 @@ export async function inboxPublicKey(db: pg.Client): Promise<string | null> {
     'select public_key from inbox_key limit 1',
   );
   return rows[0]?.public_key ?? null;
+}
+
+/** Whether an email with this Message-ID was staged before. */
+export async function alreadyStaged(db: pg.Client, messageId: string): Promise<boolean> {
+  const { rows } = await db.query('select 1 from trip_inbox_imports where message_id = $1', [
+    messageId,
+  ]);
+  return rows.length > 0;
 }
 
 /** A PDF as it is staged beside the rows it belongs to: sealed, under the
@@ -83,17 +104,30 @@ function insertStatement(
 }
 
 /**
- * Stages one email under a shared `import_id`: its sealed PDFs, then its
- * rows, in one transaction, so an email is either wholly staged or not at
- * all — never a row naming a file that is not there.
+ * Stages one email under a shared `import_id`: the email's own record, its
+ * sealed PDFs, then its rows, in one transaction, so an email is either
+ * wholly staged or not at all — never a row naming a file that is not there,
+ * and never twice: a second delivery of the same Message-ID fails on the
+ * record, as AlreadyStagedError. An email with no Message-ID has no record
+ * and is staged as often as it comes.
  */
 export async function insertRows(
   db: pg.Client,
   importId: string,
   rows: InboxRow[],
   files: InboxFile[],
+  messageId: string | null,
 ): Promise<void> {
   const inserts = [
+    ...(messageId !== null
+      ? [
+          insertStatement(
+            'trip_inbox_imports',
+            ['message_id', 'import_id'],
+            [[messageId, importId]],
+          ),
+        ]
+      : []),
     ...(files.length > 0
       ? [
           insertStatement(
@@ -139,6 +173,16 @@ export async function insertRows(
     // The failure is the one reported; a rollback that fails on top of it
     // is the connection's, and ending the connection ends the transaction.
     await db.query('rollback').catch(() => undefined);
+    if (messageId !== null && isUniqueViolation(error)) throw new AlreadyStagedError();
     throw error;
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
 }

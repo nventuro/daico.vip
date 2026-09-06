@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { Link, Outlet, useLocation, useNavigationType } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
+import { Link, NavigationType, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { IconSearch, IconSettings } from '@tabler/icons-react';
 import IconButton from '../components/IconButton';
 import UndoNotice from '../components/UndoNotice';
@@ -21,13 +21,20 @@ export default function MainLayout() {
   const { session, isMember } = useAppContext();
   const dbOwnership = useDbOwnership();
   const masterKey = useMasterKey();
-  const sync = useSyncStatus();
+  const syncing = useSyncStatus((status) => status.syncing);
+  const completedAt = useSyncStatus((status) => status.completedAt);
   const [enteredEarly, setEnteredEarly] = useState(false);
   // Every screen's way out reads this record, so every screen is told to it —
   // whichever gate below the layout stops at.
   const { key, pathname } = useLocation();
   const navigationType = useNavigationType();
   useEffect(() => recordVisit(key, pathname, navigationType), [key, pathname, navigationType]);
+  // A screen opens at its top: what is arrived at is a new screen, however far
+  // down the last one was; what is gone back to, the browser puts back where
+  // it was.
+  useLayoutEffect(() => {
+    if (navigationType !== NavigationType.Pop) window.scrollTo(0, 0);
+  }, [key, navigationType]);
 
   if (!session) return <LoginScreen />;
   if (!isMember) return <NoAccessScreen />;
@@ -44,7 +51,7 @@ export default function MainLayout() {
   if (masterKey.status === 'locked') return <UnlockScreen />;
   // A device that has never brought everything down shows what is on its way,
   // unless the member would rather go in meanwhile.
-  if (sync.completedAt === null && !enteredEarly)
+  if (completedAt === null && !enteredEarly)
     return <FirstSyncScreen onEnter={() => setEnteredEarly(true)} />;
 
   return (
@@ -56,7 +63,7 @@ export default function MainLayout() {
             <Link to="/" title="Inicio" className="font-display text-2xl font-black tracking-tight">
               daico
             </Link>
-            {sync.syncing && (
+            {syncing && (
               <span
                 role="status"
                 aria-label="Sincronizando"

@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { IconChevronRight } from '@tabler/icons-react';
-import { todayIso } from '../utils/dateUtils';
 import SectionLabel from '../components/SectionLabel';
 import SkeletonRows from '../components/SkeletonRows';
+import { upcomingKey } from './upcoming';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
+import { useToday } from '../hooks/useToday';
 
 /** Most upcoming entries the home screen shows before offering the full list. */
 const UPCOMING_MAX_ROWS = 4;
@@ -17,7 +18,7 @@ const PENDING_ROWS = 3;
  *  are more. Holds its place while the apps' tables are read, so the tiles
  *  under it don't move; hidden once it is known there is nothing to show. */
 export default function UpcomingStrip() {
-  const today = todayIso();
+  const today = useToday();
 
   return (
     <UpcomingRows>
@@ -31,9 +32,9 @@ export default function UpcomingStrip() {
           rows.length > 0 && (
             <section>
               <SectionLabel>Próximo</SectionLabel>
-              <ul className="divide-y divide-border">
-                {rows.slice(0, UPCOMING_MAX_ROWS).map((row, i) => (
-                  <UpcomingRow key={i} row={row} today={today} />
+              <ul>
+                {rows.slice(0, UPCOMING_MAX_ROWS).map((row) => (
+                  <UpcomingRow key={upcomingKey(row)} row={row} today={today} />
                 ))}
               </ul>
               {rows.length > UPCOMING_MAX_ROWS && (

@@ -4,7 +4,7 @@ import type { AppHue } from '../apps/types';
 /** What one of the shell's own screens is painted with: the shell's colour.
  *  Próximo included — it shows the apps' entries, each named by its own
  *  colour, so the frame around them stays the shell's. */
-export type ShellHue = 'primary';
+type ShellHue = 'primary';
 
 /** Every colour a screen can be painted in. */
 export type Hue = AppHue | ShellHue;

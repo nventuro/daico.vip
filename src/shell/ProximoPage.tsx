@@ -1,14 +1,14 @@
-import { groupByDay } from './upcoming';
-import { todayIso } from '../utils/dateUtils';
+import { groupByDay, upcomingKey } from './upcoming';
 import EmptyState from '../components/EmptyState';
 import SectionLabel from '../components/SectionLabel';
 import UpcomingRow from './UpcomingRow';
 import UpcomingRows from './UpcomingRows';
 import SkeletonRows from '../components/SkeletonRows';
+import { useToday } from '../hooks/useToday';
 
 /** Everything coming up across the apps, grouped by day. */
 export default function ProximoPage() {
-  const today = todayIso();
+  const today = useToday();
 
   return (
     <UpcomingRows>
@@ -22,9 +22,9 @@ export default function ProximoPage() {
             <SectionLabel className={group.overdue ? 'text-error' : 'text-muted'}>
               {group.label}
             </SectionLabel>
-            <ul className="divide-y divide-border">
-              {group.rows.map((row, i) => (
-                <UpcomingRow key={i} row={row} today={today} />
+            <ul>
+              {group.rows.map((row) => (
+                <UpcomingRow key={upcomingKey(row)} row={row} today={today} />
               ))}
             </ul>
           </section>

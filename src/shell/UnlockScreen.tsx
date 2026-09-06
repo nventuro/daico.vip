@@ -25,7 +25,9 @@ const UNIQUE_VIOLATION = '23505';
 
 /** Typing the phrase on a device that has the household's wrapped key. */
 function UnlockForm({ wrapped }: { wrapped: HouseholdKey }) {
-  const [words, setWords] = useState<string[]>(() => Array(HOUSEHOLD_PHRASE_WORDS).fill(''));
+  const [words, setWords] = useState<string[]>(() =>
+    Array.from({ length: HOUSEHOLD_PHRASE_WORDS }, () => ''),
+  );
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -54,7 +56,7 @@ function UnlockForm({ wrapped }: { wrapped: HouseholdKey }) {
       title="Este dispositivo está cerrado"
       text="Los documentos están cifrados. Escribí las seis palabras de la frase de la casa, en orden, para leerlos acá."
     >
-      <form onSubmit={handleSubmit} className="mt-7 flex w-full flex-col">
+      <form onSubmit={(e) => void handleSubmit(e)} className="mt-7 flex w-full flex-col">
         <PhraseWords words={words} onChange={setWords} />
         <ErrorLine problem={problem} className="mt-3 text-left" />
         <Button type="submit" disabled={busy} className="mt-4 w-full">
@@ -88,7 +90,8 @@ function NewPhraseForm() {
           : `No se pudo guardar: ${error.message}`,
       );
       setBusy(false);
-      // Pulls the phrase someone else created, which turns this into the unlock screen.
+      // Pulls the wrapped key someone else created, which turns this into the
+      // unlock screen.
       void syncAll();
       return;
     }
@@ -113,7 +116,7 @@ function NewPhraseForm() {
         Ya las anoté
       </CheckRow>
       <ErrorLine problem={problem} className="mt-3 self-start text-left" />
-      <Button onClick={finish} disabled={!noted || busy} className="mt-4 w-full">
+      <Button onClick={() => void finish()} disabled={!noted || busy} className="mt-4 w-full">
         {busy ? 'Guardando...' : 'Listo'}
       </Button>
     </Gate>

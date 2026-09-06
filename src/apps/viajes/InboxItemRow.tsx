@@ -15,7 +15,7 @@ interface InboxItemRowProps {
  *  third line, since there is no screen of its own to read it on. */
 export default function InboxItemRow({ item, today }: InboxItemRowProps) {
   const { icon: Icon } = TRIP_KIND_SHAPES[item.kind];
-  const subtitle = itemSubtitle({ ...item, trip_id: '', done: false }, today);
+  const subtitle = itemSubtitle(item, today);
   return (
     <li className="flex items-center gap-2 border-b border-border py-3">
       <Icon size={18} stroke={1.5} className="shrink-0 text-muted" />

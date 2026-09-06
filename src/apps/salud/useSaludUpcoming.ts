@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { daysUntil, todayIso } from '../../utils/dateUtils';
+import { withinNotice } from '../../utils/dateUtils';
 import { entryPath, upcomingFrom, type Upcoming } from '../types';
 import { useCheckups } from './useCheckups';
 import { checkupMarks } from './marks';
 import { isDone } from './recurrence';
+import { useToday } from '../../hooks/useToday';
 
 /** How many days ahead a checkup shows on the home screen: the week before,
  *  time enough to book it, the same for every checkup. A study never shows —
@@ -14,13 +15,13 @@ const CHECKUP_NOTICE_DAYS = 7;
  *  home screen. */
 export function useSaludUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useCheckups();
-  const today = todayIso();
+  const today = useToday();
   return useMemo(
     () =>
       upcomingFrom({ items, loading }, (checkup) =>
         !isDone(checkup) &&
         checkup.due_on != null &&
-        daysUntil(today, checkup.due_on) <= CHECKUP_NOTICE_DAYS
+        withinNotice(today, checkup.due_on, CHECKUP_NOTICE_DAYS)
           ? {
               title: checkup.title,
               on: checkup.due_on,

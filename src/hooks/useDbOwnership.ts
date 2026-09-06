@@ -15,7 +15,7 @@ export function useDbOwnership(): DbOwnership {
 
   useEffect(() => {
     let active = true;
-    checkDbOwnership().then((owner) => {
+    void checkDbOwnership().then((owner) => {
       if (active) setState(owner ? 'owner' : 'blocked');
     });
     return () => {

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAlertTriangle, IconChevronRight, IconReceipt, IconTags } from '@tabler/icons-react';
 import { SPENDING_CATEGORIES } from '../../lib/offline/specs';
-import { todayIso } from '../../utils/dateUtils';
 import EmptyState from '../../components/EmptyState';
 import FormField from '../../components/FormField';
 import LinkRow from '../../components/LinkRow';
@@ -25,6 +24,7 @@ import {
   monthTitle,
   percentDelta,
 } from './labels';
+import { useToday } from '../../hooks/useToday';
 
 /**
  * What Gastos opens on: the household's spending month by calendar month.
@@ -37,7 +37,7 @@ export default function MonthsPage() {
   const { contents, error: openError } = useStatementsContents(items);
   const { rules } = useMerchantRules();
   const [pick, setPick] = useState<TrendPick>('total');
-  const today = todayIso();
+  const today = useToday();
 
   const cards = useMemo(
     () => (contents ? coverageByCard([...contents.values()], today) : []),

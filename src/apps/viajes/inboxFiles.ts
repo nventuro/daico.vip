@@ -12,8 +12,9 @@ import { INBOX_FILES } from '../../lib/offline/localTables';
 import { TRIP_INBOX_SPEC, type TripInboxItem } from '../../lib/offline/specs';
 import { fromBase64 } from '../../lib/householdKey';
 
-/** The server's table of staged files. */
-const INBOX_FILES_TABLE = 'trip_inbox_files';
+/** The server's table of staged files, and the name a file is bound to a row
+ *  of it under. */
+export const INBOX_FILES_TABLE = 'trip_inbox_files';
 
 /**
  * How old a staged file no row lists must be before the sweep removes it from
@@ -83,19 +84,25 @@ async function keepInboxFile(file: InboxFile): Promise<void> {
   );
 }
 
-/** Fetch `ids` from the server and keep them here. One the server no longer
- *  has is simply not among what comes back; a call that fails throws. */
+/** Fetch `ids` from the server and keep them here, one at a time: a file is
+ *  megabytes, and several in one answer is more than a phone should hold at
+ *  once. One the server no longer has is simply not among what comes back; a
+ *  call that fails throws. */
 async function fetchInboxFiles(ids: string[]): Promise<InboxFile[]> {
-  const { data, error } = await supabase
-    .from(INBOX_FILES_TABLE)
-    .select('id, import_id, name, size, data, wrapped_key, created_at')
-    .in('id', ids);
-  if (error) throw error;
-  const files = ((data ?? []) as ServerInboxFile[]).map((row) => ({
-    ...row,
-    data: fromBase64(row.data),
-  }));
-  for (const file of files) await keepInboxFile(file);
+  const files: InboxFile[] = [];
+  for (const id of ids) {
+    const { data, error } = await supabase
+      .from(INBOX_FILES_TABLE)
+      .select('id, import_id, name, size, data, wrapped_key, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) continue;
+    const row: ServerInboxFile = data;
+    const file = { ...row, data: fromBase64(row.data) };
+    await keepInboxFile(file);
+    files.push(file);
+  }
   return files;
 }
 

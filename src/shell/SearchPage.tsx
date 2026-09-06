@@ -7,6 +7,8 @@ import ErrorLine from '../components/ErrorLine';
 import LinkRow from '../components/LinkRow';
 import SectionLabel from '../components/SectionLabel';
 import { hueStyle } from '../components/hue';
+import TextInput from '../components/TextInput';
+import { ADD_BAR_INPUT_CLASS } from '../components/controlClasses';
 
 /** Pause in typing (ms) before the search box runs a search. */
 const SEARCH_DEBOUNCE_MS = 200;
@@ -72,8 +74,8 @@ export default function SearchPage() {
           {module.name}
         </SectionLabel>
         <ul>
-          {hits.map((hit, i) => (
-            <LinkRow key={i} to={hit.to} title={hit.title} subtitle={hit.subtitle} />
+          {hits.map((hit) => (
+            <LinkRow key={hit.to} to={hit.to} title={hit.title} subtitle={hit.subtitle} />
           ))}
         </ul>
       </section>
@@ -83,7 +85,7 @@ export default function SearchPage() {
   return (
     <div className="flex flex-col gap-5">
       <form onSubmit={submit}>
-        <input
+        <TextInput
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -91,7 +93,7 @@ export default function SearchPage() {
           enterKeyHint="search"
           aria-label="Buscar"
           placeholder="Buscar en todo..."
-          className="w-full border border-border bg-surface-raised px-4 py-3 text-base transition-colors outline-none placeholder:text-muted focus:border-primary"
+          className={`${ADD_BAR_INPUT_CLASS} w-full`}
         />
       </form>
 

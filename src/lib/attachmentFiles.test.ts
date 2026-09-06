@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import {
   ATTACHMENT_LIST_PAGE,
   ATTACHMENT_ORPHAN_MIN_AGE_MS,
@@ -86,7 +86,7 @@ const uploads = () => server.calls.filter((c) => c.op === 'upload').length;
 /** A run in which the attachments table came down, as a healthy one does. */
 const pulled = new Set([ATTACHMENTS_SPEC.table]);
 
-let warn: ReturnType<typeof vi.spyOn>;
+let warn: MockInstance<typeof console.warn>;
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });

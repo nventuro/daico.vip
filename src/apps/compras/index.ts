@@ -13,6 +13,8 @@ const compras: AppModule = {
   specs: [SHOPPING_SPEC],
   routes: [{ index: true, Component: ShoppingPage }],
   search: searchShopping,
+  // No `useUpcoming`: nothing on the list has a day, and the list itself is
+  // one tap from the home screen.
 };
 
 export default compras;

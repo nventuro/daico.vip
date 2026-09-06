@@ -36,7 +36,7 @@ function unsavedWork({ pending, files }: DeviceStatus): string | null {
 
 export default function SettingsPage() {
   const { status, error, reload } = useDeviceStatus();
-  const { completedAt } = useSyncStatus();
+  const completedAt = useSyncStatus((status) => status.completedAt);
   const online = useOnline();
   const updateWaiting = useUpdateWaiting();
   const { signOut } = useAppContext();

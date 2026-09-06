@@ -36,7 +36,8 @@ seedSql.push(
   `INSERT INTO dates (id, title, created_at, updated_at, pending_op, synced)
     VALUES ('gone', 'Vacuna', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', 'delete', 1)`,
   // `shopping_items` with a column the spec no longer has: left in place it
-  // would refuse every insert that does not fill it.
+  // would refuse every insert that does not fill it. One row is the server's,
+  // the other an edit made offline and not pushed yet.
   `CREATE TABLE shopping_items (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -50,7 +51,8 @@ seedSql.push(
   )`,
   `INSERT INTO shopping_items
     (id, name, checked, position, quantity, created_at, updated_at, pending_op, synced)
-    VALUES ('old', 'Pan', 0, 'a0', '1 kg', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1)`,
+    VALUES ('old', 'Pan', 0, 'a0', '1 kg', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1),
+           ('queued', 'Leche', 1, 'a1', '2 l', '2026-01-01T00:00:00.000Z', '2026-01-03T00:00:00.000Z', 'upsert', 1)`,
 );
 
 /** The table's columns, in the order they are declared. */
@@ -144,11 +146,12 @@ describe('table migration', () => {
   });
 
   it('forgets that deletion once it has been pushed', async () => {
+    expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual(['gone']);
     await engine.markDeleted(DATES_SPEC, 'gone');
     expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual([]);
   });
 
-  it('makes the table again when it has a column the spec dropped', async () => {
+  it('drops a column the spec no longer has and keeps the rows, queued edits included', async () => {
     await engine.listVisible(SHOPPING_SPEC);
     expect(await columnsOf('shopping_items')).toEqual([
       'id',
@@ -160,6 +163,12 @@ describe('table migration', () => {
       'pending_op',
       'synced',
     ]);
-    expect(await rowsOf('shopping_items')).toEqual([]);
+    // A build a migration got ahead of is swapped in while the app is not
+    // running, which is when an edit made offline is most likely still queued.
+    expect(await rowsOf('shopping_items')).toMatchObject([
+      { id: 'old', name: 'Pan', pending_op: null },
+      { id: 'queued', name: 'Leche', checked: 1, pending_op: 'upsert' },
+    ]);
+    expect(await engine.getPendingUpserts(SHOPPING_SPEC)).toMatchObject([{ id: 'queued' }]);
   });
 });

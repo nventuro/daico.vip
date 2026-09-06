@@ -13,6 +13,7 @@ import {
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import PdfWorkerScript from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker';
+import { PDF_DECODERS_URL } from './pdfDecoders';
 
 export type PdfDocument = PDFDocumentProxy;
 export type PdfPage = PDFPageProxy;
@@ -33,7 +34,7 @@ function sharedWorker(): PDFWorker {
  * opened. The caller closes it once done with its pages.
  */
 export function openPdf(data: Uint8Array): Promise<PdfDocument> {
-  return getDocument({ data, worker: sharedWorker() }).promise;
+  return getDocument({ data, worker: sharedWorker(), wasmUrl: PDF_DECODERS_URL }).promise;
 }
 
 /** Let go of everything held for `pdf`, here and in the worker. */

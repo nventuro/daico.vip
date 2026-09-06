@@ -5,7 +5,7 @@ import { useSession } from '../../hooks/useSession';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a study; the row's own columns minus the
- *  engine-managed ones and whose it is. What the study says is its pictures. */
+ *  engine-managed ones and whose it is. What the study says is its files. */
 export interface HealthRecordInput {
   title: string;
   /** yyyy-mm-dd: the day it was done. */
@@ -19,7 +19,7 @@ export function useHealthRecords() {
   const owner = useSession()?.user.id ?? null;
 
   /** Creates a study of the signed-in member's, resolving the new id so the
-   *  caller can open it to add its pictures; undefined for a blank title, no
+   *  caller can open it to add its files; undefined for a blank title, no
    *  session, or a failed write. */
   const add = useCallback(
     (input: HealthRecordInput): Promise<string | undefined> => {

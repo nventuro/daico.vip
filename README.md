@@ -60,13 +60,16 @@ this work:
   VFS — the header of `sahpoolWorker.ts` says why that one and not the default.
   It allows a single connection per browser, so one tab owns the database at a
   time. `engine.ts` is what the UI reads and writes.
-- **Sync engine** (`sync.ts`). On load, on reconnect, on app focus and after
-  every local change it pushes what is queued and pulls the server's state.
-  Rows carry a client-generated UUID, so one created offline has its identity
-  before it reaches the server, and conflicts are **last-write-wins** by an
-  `updated_at` set at edit time and enforced on both sides; a delete wins over
-  a concurrent edit. A row the server refuses for good is skipped, so it does
-  not hold up its table, and shown in Ajustes.
+- **Sync engine** (`sync.ts`). On load, on reconnect and on app focus it
+  pushes what is queued and pulls the server's state; after a local change it
+  pushes at once and pulls only when the last pull is not recent. Rows carry
+  a client-generated UUID, so one created offline has its identity before it
+  reaches the server, and conflicts are **last-write-wins** by an `updated_at`
+  set at edit time and enforced on both sides. A delete wins over an edit of
+  the row whenever that edit is pushed: the server keeps a record of every
+  deletion (`deleted_rows`) and takes no row of that id again. A row the
+  server refuses for good is skipped, so it does not hold up its table, and
+  shown in Ajustes.
 
 The membership check is offline-tolerant too: the verdict cached per user
 answers first and the live read then confirms or revokes it, so no signal never
@@ -77,11 +80,12 @@ data is wiped on sign-out.
 
 1. Migration: create the table with a `uuid` primary key (client-supplied) and an
    `updated_at` timestamp, plus the usual RLS + `private.is_member()` policy +
-   `authenticated` grants and the `private.last_write_wins()` trigger every synced
-   table has. `db:verify` checks all of it.
+   `authenticated` grants, the `private.last_write_wins()` trigger every synced
+   table has and, when the app may delete from it, the `delete_wins` and
+   `record_deletion` pair. `db:verify` checks all of it.
 2. Add a `TableSpec` to `src/lib/offline/specs.ts` (and to `ALL_SPECS`), and list
    it in the `specs` of the module that owns it (`src/apps/<id>/index.ts`).
-3. Add a thin typed hook (see `useShoppingList` / `useChores`) over
+3. Add a thin typed hook (see `useDocuments` / `useChores`) over
    `useOfflineTable`. No new sync code needed.
 
 ### Adding a column to an existing offline table
@@ -139,8 +143,10 @@ dates, its two totals, whether it was paid — while every purchase and
 installment travels in `payload`, gzipped and encrypted under the household key
 like an attachment's file. Purchases are filed into a fixed set of categories
 on display, by `merchant_rules`, an encrypted pattern each. A statement is born
-from its PDF, not the bar. Próximo lists every statement still to be paid, and
-a statement that is late to be imported.
+from its PDF, not the bar, and its page is the one whose head is not an
+`EntryHead`: a statement has no title to change, and «Pagado» is a switch on
+the page rather than the square that marks and leaves. Próximo lists every
+statement still to be paid, and a statement that is late to be imported.
 
 **Salud** — `checkups` and `health_records`, each row one member's and hidden
 from the others by the server. A checkup is a health check to have done — a
@@ -213,9 +219,12 @@ leave it, so the server only ever stores ciphertext.
   immutable: a different picture is a new attachment.
 - **Keys**: a six-word phrase derives the key that wraps the household's master
   key, stored wrapped in `household_key`; the master key wraps one key per file;
-  the file key encrypts the file with AES-GCM. A device unwraps the master key
-  once, when the phrase is typed, and keeps it non-extractable in IndexedDB. The
-  phrase exists only on paper: losing it loses every attachment.
+  the file key encrypts the file with AES-GCM, bound to the row that carries it,
+  so a file and its key moved to another row open nowhere. A device unwraps the
+  master key once, when the phrase is typed, and keeps it non-extractable in
+  IndexedDB. The phrase exists only on paper: losing it loses every attachment.
+  What the server can still tell is a size: how long a note is, roughly how
+  many lines a statement has.
 - **The phrase gate**: a device without the master key stops right after login,
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
@@ -233,14 +242,16 @@ leave it, so the server only ever stores ciphertext.
 A confirmation email forwarded to the household's address reaches the worker in
 `worker/` (its header says what it holds and why). It lets through only mail
 from a member, has a model read the bookings out of it, and stages one row per
-booking in `trip_inbox`, always replying to the sender. The PDFs the email
-carries are staged beside the rows in `trip_inbox_files`, sealed to the
-household's inbox key: a pair in `inbox_key` whose public half the worker seals
-to and whose private half is sealed under the master key like any file, so the
-worker never holds anything that opens one. Every device fetches the staged
-files after a sync, so a group is confirmed with no connection; confirming
-makes the rows a trip's and the PDFs their attachments, and discarding drops
-both.
+booking in `trip_inbox`, always replying to the sender; an email delivered
+twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
+and answered both times. The PDFs the email carries are staged beside the rows
+in `trip_inbox_files`, sealed to the household's inbox key: a pair in
+`inbox_key` whose public half the worker seals to and whose private half is
+sealed under the master key like any file, so the worker never holds anything
+that opens one. Every device fetches the staged files after a sync, so a group
+is confirmed with no connection; confirming makes the rows a trip's and the
+PDFs their attachments — each opened with the inbox key and sealed again for
+the attachment it becomes — and discarding drops both.
 
 ## Importing guides
 

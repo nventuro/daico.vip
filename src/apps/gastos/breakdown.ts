@@ -32,7 +32,8 @@ export function isLaterInstallment(line: StatementLine): boolean {
 /** What the purchase behind a line came to, in pesos: a line paid in one go is
  *  itself, and a first installment stands for the whole purchase — the bank
  *  charges the same amount every month for the life of the plan, so the price
- *  is known from the statement that first bills it. */
+ *  is known from the statement that first bills it, to the cent or two the
+ *  bank rounds the first installment up by, which no figure drawn shows. */
 export function purchaseCents(line: StatementLine, usdRate: number | null): number {
   return lineCents(line, usdRate) * (line.installment?.of ?? 1);
 }

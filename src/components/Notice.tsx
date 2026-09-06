@@ -16,7 +16,7 @@ export default function Notice({
   icon: Icon,
   iconClassName = 'text-warning',
   children,
-  className = 'mb-4',
+  className = '',
 }: NoticeProps) {
   return (
     <div

@@ -78,6 +78,13 @@ export function tripSubtitle(trip: Trip, pending: number, today: string): string
   return joined([tripDatesLabel(trip, today), pending > 0 ? pendingLabel(pending) : undefined]);
 }
 
+/** What of a row its line reads: its class and its days, hours and airports —
+ *  which a staged row carries as a trip's row does. */
+export type ItemLine = Pick<
+  TripItem,
+  'kind' | 'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'from_code' | 'to_code'
+>;
+
 /** A moment as a row says it: the day the way a person would, and the hour
  *  after it when there is one. */
 function dayAndTime(day: string | null, time: string | null, today: string): string | undefined {
@@ -86,7 +93,7 @@ function dayAndTime(day: string | null, time: string | null, today: string): str
 }
 
 /** Where a pasaje goes, by the codes it carries; nothing while it has none. */
-function routeLabel(item: TripItem): string | undefined {
+function routeLabel(item: ItemLine): string | undefined {
   const codes = [item.from_code, item.to_code].filter((code) => code);
   return codes.length > 0 ? codes.join(' → ') : undefined;
 }
@@ -94,7 +101,7 @@ function routeLabel(item: TripItem): string | undefined {
 /** A pasaje's «sáb 12 sep, 8:40 – 11:05» — the arrival day repeated only when
  *  it is another one, which is what keeps an overnight flight from reading as
  *  landing before it left. */
-function journeyLabel(item: TripItem, today: string): string | undefined {
+function journeyLabel(item: ItemLine, today: string): string | undefined {
   const departs = dayAndTime(item.on_date, item.at_time, today);
   const sameDay = item.ends_on === null || item.ends_on === item.on_date;
   const arrives = dayAndTime(sameDay ? null : item.ends_on, item.ends_at, today);
@@ -103,14 +110,14 @@ function journeyLabel(item: TripItem, today: string): string | undefined {
 }
 
 /** How long an alojamiento is for: «12 → 19 sep · 7 noches». */
-function stayLabel(item: TripItem, today: string): string | undefined {
+function stayLabel(item: ItemLine, today: string): string | undefined {
   if (!item.on_date || !item.ends_on) return dayAndTime(item.on_date, null, today);
   return `${formatDayRange(item.on_date, item.ends_on)} · ${nightsLabel(daysUntil(item.on_date, item.ends_on))}`;
 }
 
 /** The line under a row of a trip: everything of it that fits on one line, and
  *  nothing at all for a lugar, which is only an idea. */
-export function itemSubtitle(item: TripItem, today: string): string | undefined {
+export function itemSubtitle(item: ItemLine, today: string): string | undefined {
   switch (item.kind) {
     case 'ticket':
       return joined([routeLabel(item), journeyLabel(item, today)]);

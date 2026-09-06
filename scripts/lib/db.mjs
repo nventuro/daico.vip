@@ -30,6 +30,11 @@ export function connectionString() {
     throw new Error('supabase/.temp/pooler-url missing — run `npm run db:link` first');
   }
   const url = new URL(fs.readFileSync(file, 'utf8').trim());
+  // pg takes the string's own parameters over the options given beside it,
+  // and one of them (`sslmode`) would switch the certificate check off.
+  if (url.search !== '') {
+    throw new Error(`${file} carries parameters (${url.search}); it must be the bare pooler URL`);
+  }
   url.password = encodeURIComponent(readPassword());
   return url.toString();
 }

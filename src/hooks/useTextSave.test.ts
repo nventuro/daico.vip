@@ -48,4 +48,16 @@ describe('saving a text as it is typed', () => {
     flush();
     expect(save.mock.calls).toEqual([['']]);
   });
+
+  it('asks for the text once it saves, not on every keystroke', () => {
+    const { save, onChange } = saver();
+    const serialise = vi.fn(() => 'hola');
+    onChange(serialise);
+    onChange(serialise);
+    onChange(serialise);
+    expect(serialise).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(TEXT_SAVE_DELAY_MS);
+    expect(serialise).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls).toEqual([['hola']]);
+  });
 });

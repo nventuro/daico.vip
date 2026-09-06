@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { SyncedRow } from '../types';
 import type { RowInput, TableSpec } from '../lib/offline/specs';
 import * as engine from '../lib/offline/engine';
-import { syncAll, syncIfStale } from '../lib/offline/sync';
+import { syncAfterWrite, syncIfStale } from '../lib/offline/sync';
 import { holdUpdates } from '../lib/appUpdate';
 import { errorMessage } from '../utils/textUtils';
 
@@ -30,7 +30,7 @@ export function useOfflineTable<Row extends SyncedRow>(spec: TableSpec<Row>) {
   // just ended, so that moving between screens doesn't sync at every tap.
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       await reload();
       if (active) setLoading(false);
       await syncIfStale();
@@ -44,23 +44,25 @@ export function useOfflineTable<Row extends SyncedRow>(spec: TableSpec<Row>) {
   // writes, another instance's, or a sync merge.
   useEffect(() => engine.subscribe(spec.table, () => void reload()), [spec.table, reload]);
 
-  // Every mutation writes locally first (instant), then nudges a sync. The
-  // write's change event is what refreshes `items`, on this and every other
-  // instance alike. A failed mutation stays reported until the next one: the
-  // reloads that follow it must not wipe the message before it is even seen.
+  // Every mutation writes locally first (instant), then gets it onto the
+  // server. The write's change event is what refreshes `items`, on this and
+  // every other instance alike. A failed mutation stays reported until the
+  // next one: the reloads that follow it must not wipe the message before it
+  // is even seen.
   const mutate = useCallback(async <R>(op: () => Promise<R>): Promise<R | undefined> => {
     setError(null);
-    let result: R | undefined;
+    let result: R;
     // A build waiting to go in does not reload the page over a write half made.
     const release = holdUpdates();
     try {
       result = await op();
     } catch (e) {
       setError(errorMessage(e));
+      return undefined;
     } finally {
       release();
     }
-    void syncAll();
+    void syncAfterWrite();
     return result;
   }, []);
 

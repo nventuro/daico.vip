@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DateEntry } from '../../lib/offline/specs';
-import { todayIso } from '../../utils/dateUtils';
 import CompletedSection from '../../components/CompletedSection';
 import SectionLabel from '../../components/SectionLabel';
 import AddBar from '../../components/AddBar';
@@ -12,12 +11,13 @@ import { entryPath } from '../types';
 import { useDates } from './useDates';
 import { groupByMonth, splitByToday } from './recurrence';
 import DateRow from './DateRow';
+import { useToday } from '../../hooks/useToday';
 
 export default function DatesPage() {
   const { items, loading, error, add } = useDates();
   const navigate = useNavigate();
 
-  const today = todayIso();
+  const today = useToday();
 
   const { upcoming, past } = useMemo(() => splitByToday(items, today), [items, today]);
   const groups = useMemo(() => groupByMonth(upcoming, today), [upcoming, today]);
@@ -32,7 +32,7 @@ export default function DatesPage() {
       repeat_unit: null,
       comments: null,
     });
-    if (id) navigate(entryPath('fechas', id));
+    if (id) void navigate(entryPath('fechas', id));
   }
 
   function renderEntry(entry: DateEntry) {

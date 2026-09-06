@@ -1,10 +1,10 @@
 import { daysUntil, isPast, monthLabel, yearMonthOf } from '../../utils/dateUtils';
 import { nextOccurrenceOnOrAfter } from '../../utils/recurrence';
 import type { DateEntry } from '../../lib/offline/specs';
-import { groupRuns } from '../../utils/listUtils';
+import { compareTitles, groupRuns } from '../../utils/listUtils';
 
 function byTitle(a: DateEntry, b: DateEntry): number {
-  return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+  return compareTitles(a.title, b.title);
 }
 
 /** The date an entry is shown under: its next occurrence, or the anchor itself. */

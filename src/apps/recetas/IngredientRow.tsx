@@ -1,5 +1,6 @@
 import { IconCheck, IconShoppingCartPlus } from '@tabler/icons-react';
 import CheckSquare from '../../components/CheckSquare';
+import IconButton from '../../components/IconButton';
 
 interface IngredientRowProps {
   label: string;
@@ -33,20 +34,14 @@ export default function IngredientRow({ label, have, sent, onToggle, onSend }: I
           {label}
         </span>
       </button>
-      <button
-        type="button"
+      <IconButton
+        label={sendLabel}
+        icon={sent ? IconCheck : IconShoppingCartPlus}
+        size={18}
         onClick={onSend}
         disabled={sent}
-        aria-label={sendLabel}
-        title={sendLabel}
-        className="flex shrink-0 items-center px-3 text-muted transition-colors hover:text-primary disabled:hover:text-muted"
-      >
-        {sent ? (
-          <IconCheck size={18} stroke={1.5} />
-        ) : (
-          <IconShoppingCartPlus size={18} stroke={1.5} />
-        )}
-      </button>
+        className="px-3"
+      />
     </li>
   );
 }

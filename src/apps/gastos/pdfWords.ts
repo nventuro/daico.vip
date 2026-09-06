@@ -21,8 +21,9 @@ export async function readPdfPages(file: File): Promise<PageLine[][]> {
       const rows: { y: number; words: PositionedWord[] }[] = [];
       for (const item of items) {
         if (!('str' in item) || !item.str.trim()) continue;
-        const x0 = item.transform[4];
-        const y = item.transform[5];
+        const transform = item.transform as number[];
+        const x0 = transform[4];
+        const y = transform[5];
         let row = rows.find((r) => Math.abs(r.y - y) <= LINE_TOLERANCE);
         if (!row) {
           row = { y, words: [] };

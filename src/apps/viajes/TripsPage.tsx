@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Trip } from '../../lib/offline/specs';
-import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
 import EmptyState from '../../components/EmptyState';
@@ -16,6 +15,7 @@ import { tripSubtitle } from './labels';
 import { useTripInbox } from './useTripInbox';
 import { useTripItems } from './useTripItems';
 import { NEW_TRIP, useTrips } from './useTrips';
+import { useToday } from '../../hooks/useToday';
 
 export default function TripsPage() {
   const { items: trips, loading, error, add } = useTrips();
@@ -23,7 +23,7 @@ export default function TripsPage() {
   const { groups } = useTripInbox();
   const navigate = useNavigate();
 
-  const today = todayIso();
+  const today = useToday();
   const pending = useMemo(() => pendingCounts(items), [items]);
   const { upcoming, undated, past } = useMemo(() => splitTrips(trips, today), [trips, today]);
 
@@ -31,7 +31,7 @@ export default function TripsPage() {
    *  to be filled. */
   async function addTrip(title: string) {
     const id = await add({ ...NEW_TRIP, title });
-    if (id) navigate(entryPath('viajes', id));
+    if (id) void navigate(entryPath('viajes', id));
   }
 
   function renderTrip(trip: Trip) {

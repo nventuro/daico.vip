@@ -19,14 +19,14 @@ function fillers(columns: number): number {
 export default function HomePage() {
   const narrow = fillers(COLUMNS.narrow);
   const wide = fillers(COLUMNS.wide);
-  const { completedAt } = useSyncStatus();
+  const completedAt = useSyncStatus((status) => status.completedAt);
 
   return (
     <div className="flex flex-col gap-5 pt-5">
-      <UpdateNotice className="" />
+      <UpdateNotice />
       {/* With no connection, what the screen shows is as old as the last run
           that brought everything down: said here, once, for every app. */}
-      <OfflineBanner className="">
+      <OfflineBanner>
         {completedAt &&
           `Sin conexión — lo último es de ${relativeDayTime(todayIso(), completedAt)}.`}
       </OfflineBanner>

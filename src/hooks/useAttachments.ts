@@ -2,26 +2,25 @@ import { useCallback, useMemo } from 'react';
 import { ATTACHMENTS_SPEC, type Attachment } from '../lib/offline/specs';
 import type { AttachmentOwner, AttachmentOwnerKind } from '../types';
 import * as engine from '../lib/offline/engine';
-import { encryptFile } from '../lib/householdKey';
+import { encryptFile, rowBinding } from '../lib/householdKey';
 import {
   attachmentProblem,
+  attachmentSizeProblem,
   attachmentType,
   deleteAttachmentFile,
   putAttachmentFile,
-  removeAttachmentObject,
 } from '../lib/attachmentFiles';
 import { useOfflineTable } from './useOfflineTable';
 import { lowercaseTrimmed } from '../utils/textUtils';
 
-/** A file already sealed in the attachment format, its key wrapped under the
- *  master key: what a file sealed outside the app becomes once re-keyed. */
-export interface SealedAttachment {
+/** A file as it is attached: what it is called, what it is, and its bytes in
+ *  the clear, to be sealed under the attachment it becomes. */
+export interface AttachmentSource {
   name: string;
   mime: string;
-  /** Of the file itself, before sealing, in bytes. */
+  /** Of the file itself, in bytes. */
   size: number;
-  data: Uint8Array;
-  wrappedFileKey: string;
+  plain: Uint8Array;
 }
 
 /** The entries of `kind` that have at least one attachment — what tells a row
@@ -33,19 +32,54 @@ export function ownersWithAttachments(
   return new Set(attachments.filter((a) => a.owner_kind === kind).map((a) => a.owner_id));
 }
 
-/** The row, this device's copy of the file, and (best effort) the bucket's
- *  object. */
+/** `source` sealed under `masterKey` for a fresh attachment of `owner`'s,
+ *  kept here until the next sync uploads it; resolves the new id. */
+async function addAttachment(
+  owner: AttachmentOwner,
+  source: AttachmentSource,
+  masterKey: CryptoKey,
+): Promise<string> {
+  const problem = attachmentSizeProblem(source.size);
+  if (problem) throw new Error(problem);
+  // The id first: the file is sealed for the row it will be in, and kept
+  // under that id before the row exists, so a crash in between leaves an
+  // orphan file to prune, never a row with nothing to show.
+  const id = crypto.randomUUID();
+  const { data, wrappedFileKey } = await encryptFile(
+    masterKey,
+    source.plain,
+    rowBinding(ATTACHMENTS_SPEC.table, id),
+  );
+  await putAttachmentFile(id, data, false);
+  return engine.insert(
+    ATTACHMENTS_SPEC,
+    {
+      owner_kind: owner.kind,
+      owner_id: owner.id,
+      name: lowercaseTrimmed(source.name),
+      mime: source.mime,
+      size: source.size,
+      wrapped_file_key: wrappedFileKey,
+    },
+    id,
+  );
+}
+
+/** The row and this device's copy of the file. The bucket's object is the
+ *  sweep's to take, once the delete has been pushed: taken now, another
+ *  device that still held the row would find its file gone — for good, if
+ *  the delete were then refused. */
 async function removeAttachment(id: string): Promise<void> {
   await engine.remove(ATTACHMENTS_SPEC, id);
   await deleteAttachmentFile(id);
-  void removeAttachmentObject(id);
 }
 
 /**
  * Local-first attachments: every entry's when `owner` is not given, one
  * entry's otherwise. Adding (to `owner`) encrypts the file under
  * `masterKey` and keeps it here until the next sync uploads it; removing
- * takes the row, the local file and (best effort) the bucket's object.
+ * takes the row and the local file, and leaves the bucket's object to the
+ * sweep.
  */
 export function useAttachments(owner?: AttachmentOwner) {
   const { items: all, loading, error, mutate } = useOfflineTable<Attachment>(ATTACHMENTS_SPEC);
@@ -65,53 +99,26 @@ export function useAttachments(owner?: AttachmentOwner) {
         if (kind === undefined || ownerId === undefined) {
           throw new Error('No se puede adjuntar nada sin una entrada.');
         }
+        const problem = attachmentProblem(file);
+        if (problem) throw new Error(problem);
         const mime = attachmentType(file);
-        if (!mime) throw new Error(attachmentProblem(file) ?? 'No se pudo adjuntar el archivo.');
-        const { data, wrappedFileKey } = await encryptFile(
+        if (!mime) throw new Error('No se pudo adjuntar el archivo.');
+        const plain = new Uint8Array(await file.arrayBuffer());
+        return addAttachment(
+          { kind, id: ownerId },
+          { name, mime, size: file.size, plain },
           masterKey,
-          new Uint8Array(await file.arrayBuffer()),
-        );
-        // The file first, under the id the row will carry: a crash in between
-        // leaves an orphan file to prune, never a row with nothing to show.
-        const id = crypto.randomUUID();
-        await putAttachmentFile(id, data, false);
-        return engine.insert(
-          ATTACHMENTS_SPEC,
-          {
-            owner_kind: kind,
-            owner_id: ownerId,
-            name: lowercaseTrimmed(name),
-            mime,
-            size: file.size,
-            wrapped_file_key: wrappedFileKey,
-          },
-          id,
         );
       }),
     [mutate, kind, ownerId],
   );
 
-  /** Keep a file that is already sealed, under a row of its own on `owner`:
-   *  the bytes go in as they are, waiting for the next sync to upload them.
-   *  Returns the new attachment's id, or undefined when it could not be added. */
-  const addSealed = useCallback(
-    (owner: AttachmentOwner, file: SealedAttachment) =>
-      mutate(async () => {
-        const id = crypto.randomUUID();
-        await putAttachmentFile(id, file.data, false);
-        return engine.insert(
-          ATTACHMENTS_SPEC,
-          {
-            owner_kind: owner.kind,
-            owner_id: owner.id,
-            name: lowercaseTrimmed(file.name),
-            mime: file.mime,
-            size: file.size,
-            wrapped_file_key: file.wrappedFileKey,
-          },
-          id,
-        );
-      }),
+  /** Attach a file already in hand as bytes to `owner`, whichever entry that
+   *  is: what a staged PDF becomes at confirm. Returns the new attachment's
+   *  id, or undefined when it could not be added. */
+  const addOpened = useCallback(
+    (owner: AttachmentOwner, source: AttachmentSource, masterKey: CryptoKey) =>
+      mutate(() => addAttachment(owner, source, masterKey)),
     [mutate],
   );
 
@@ -141,5 +148,5 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate],
   );
 
-  return { items, loading, error, add, addSealed, remove, removeAll, removeByIds };
+  return { items, loading, error, add, addOpened, remove, removeAll, removeByIds };
 }

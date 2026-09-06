@@ -1,10 +1,12 @@
 // =============================================================================
 // In-memory stand-in for the Supabase client, covering exactly the PostgREST
 // calls the app makes: `from(t).upsert(row)`, `from(t).delete().eq('id', v)`
-// and `.in('id', vs)`, `from(t).select(columns).order(c).range(from, to)`, the
-// filtered reads `.eq(c, v)` / `.in(c, vs)`, the one-row read
+// and `.in('id', vs)`, `from(t).select(columns).order(c).limit(n)`, the
+// filtered reads `.eq(c, v)` / `.in(c, vs)` / `.gt(c, v)`, the one-row read
 // `from(t).select(columns).eq(c, v).maybeSingle()`, plus the Storage calls the
 // attachment files make: `storage.from(b).upload / download / remove / list`.
+// It keeps the server's rules too: a write older than the stored row is
+// skipped, and a row once deleted is never taken again.
 // A test installs it with
 //   vi.mock('../supabase', () => import('./testing/fakeSupabase'))
 // and drives the server through `server`: seed rows and objects, inspect the
@@ -19,8 +21,10 @@ export interface ServerCall {
   table: string;
   /** The row an upsert or delete targets; the object a storage call targets. */
   id?: string;
-  /** The rows a select asked for, when it asked for a range of them. */
-  range?: { from: number; to: number };
+  /** How many rows a select asked for, when it said. */
+  limit?: number;
+  /** The id a select asked for the rows past, when it did. */
+  after?: string;
 }
 
 /** An object in a fake bucket. */
@@ -66,6 +70,9 @@ function rowLevelSecurity(): CallFailure {
 
 export class FakeServer {
   private tables = new Map<string, Map<string, ServerRow>>();
+  // The `deleted_rows` the server keeps: a row deleted from a table is never
+  // taken again under that id.
+  private deleted = new Map<string, Set<string>>();
   private buckets = new Map<string, Map<string, ServerObject>>();
   private interceptors = new Set<Interceptor>();
   /** Every call made, in order. */
@@ -80,6 +87,7 @@ export class FakeServer {
 
   reset(): void {
     this.tables.clear();
+    this.deleted.clear();
     this.buckets.clear();
     this.interceptors.clear();
     this.calls.length = 0;
@@ -97,6 +105,16 @@ export class FakeServer {
 
   seed(table: string, rows: ServerRow[]): void {
     for (const row of rows) this.table(table).set(row.id, { ...row });
+  }
+
+  /** A row deleted on the server by some other device. */
+  deleteRow(table: string, id: string): void {
+    if (this.table(table).delete(id)) this.tombstones(table).add(id);
+  }
+
+  /** The ids the table has a deletion on record for. */
+  deletedIds(table: string): string[] {
+    return [...this.tombstones(table)];
   }
 
   objects(bucket: string): ServerObject[] {
@@ -156,9 +174,11 @@ export class FakeServer {
         const error = await this.run({ op: 'upsert', table, id: row.id });
         if (error) return { error };
         if (!this.member) return { error: rowLevelSecurity() };
-        // The `last_write_wins` trigger every synced table carries: a write
-        // arriving with an older stamp than the stored row is skipped, and
-        // says nothing about it.
+        // The triggers every synced table carries, both of which skip the
+        // write and say nothing about it: `delete_wins` takes no row of an id
+        // deleted before, and `last_write_wins` no write arriving with an
+        // older stamp than the stored row.
+        if (this.tombstones(table).has(row.id)) return { error: null };
         const stored = this.table(table).get(row.id);
         if (stored && stamp(row) < stamp(stored)) return { error: null };
         this.table(table).set(row.id, { ...row });
@@ -168,7 +188,7 @@ export class FakeServer {
         const remove = async (column: string, value: string) => {
           if (column !== 'id') throw new Error(`fake server: unsupported filter column ${column}`);
           const error = await this.run({ op: 'delete', table, id: value });
-          if (!error && this.member) this.table(table).delete(value);
+          if (!error && this.member) this.deleteRow(table, value);
           return { error };
         };
         return {
@@ -187,19 +207,27 @@ export class FakeServer {
       // request goes out when the caller awaits it.
       select: (columns: string) => {
         let orderBy: string | null = null;
-        let range: { from: number; to: number } | null = null;
+        let limit: number | null = null;
+        let after: string | null = null;
         const filters: ((row: ServerRow) => boolean)[] = [];
         const run = async () => {
-          const error = await this.run({ op: 'select', table, range: range ?? undefined });
+          const error = await this.run({
+            op: 'select',
+            table,
+            limit: limit ?? undefined,
+            after: after ?? undefined,
+          });
           if (error) return { data: null, error };
           let rows = this.member ? this.rows(table) : [];
           rows = rows.filter((row) => filters.every((keep) => keep(row)));
           if (orderBy !== null) {
-            rows.sort((a, b) => String(a[orderBy!]).localeCompare(String(b[orderBy!])));
+            // By code point, as ids — uuids — order on the server.
+            const key = orderBy;
+            rows.sort((a, b) => (String(a[key]) < String(b[key]) ? -1 : 1));
           }
           // PostgREST answers a plain select with its first page and says
-          // nothing about the rest; a range asks for the page it names.
-          rows = rows.slice(range?.from ?? 0, (range?.to ?? DEFAULT_MAX_ROWS - 1) + 1);
+          // nothing about the rest; a limit asks for that many.
+          rows = rows.slice(0, limit ?? DEFAULT_MAX_ROWS);
           // `*` answers with every column the row has, as PostgREST does;
           // anything else is the projection it names.
           if (columns.trim() === '*') return { data: rows.map((row) => ({ ...row })), error: null };
@@ -218,12 +246,17 @@ export class FakeServer {
             filters.push((row) => values.includes(row[column]));
             return builder;
           },
+          gt: (column: string, value: string) => {
+            if (column === 'id') after = value;
+            filters.push((row) => String(row[column]) > value);
+            return builder;
+          },
           order: (column: string) => {
             orderBy = column;
             return builder;
           },
-          range: (from: number, to: number) => {
-            range = { from, to };
+          limit: (count: number) => {
+            limit = count;
             return builder;
           },
           // The row the filters name, or null when there is none — PostgREST
@@ -306,6 +339,15 @@ export class FakeServer {
       this.tables.set(name, rows);
     }
     return rows;
+  }
+
+  private tombstones(table: string): Set<string> {
+    let ids = this.deleted.get(table);
+    if (!ids) {
+      ids = new Set();
+      this.deleted.set(table, ids);
+    }
+    return ids;
   }
 
   private bucket(name: string): Map<string, ServerObject> {

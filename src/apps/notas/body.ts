@@ -3,8 +3,8 @@
 // small enough to travel with its table, then encrypted under a key of its own
 // like an attachment's file, then base64 for the text column.
 // =============================================================================
-import type { Note } from '../../lib/offline/specs';
-import { decryptFile, encryptFile, fromBase64, toBase64 } from '../../lib/householdKey';
+import { NOTES_SPEC, type Note } from '../../lib/offline/specs';
+import { decryptFile, encryptFile, fromBase64, rowBinding, toBase64 } from '../../lib/householdKey';
 import { gunzip, gzip } from '../../lib/compress';
 
 /**
@@ -20,14 +20,20 @@ interface SealedBody {
   text: string;
 }
 
-/** The body and wrapped key that carry `text`, sealed under `masterKey`. */
+/** The body and wrapped key that carry `text`, sealed under `masterKey` for
+ *  the note `id`. */
 export async function sealBody(
   masterKey: CryptoKey,
   text: string,
+  id: string,
 ): Promise<Pick<Note, 'body' | 'wrapped_key'>> {
   const sealed: SealedBody = { schema: NOTE_BODY_SCHEMA, text };
   const packed = await gzip(new TextEncoder().encode(JSON.stringify(sealed)));
-  const { data, wrappedFileKey } = await encryptFile(masterKey, packed);
+  const { data, wrappedFileKey } = await encryptFile(
+    masterKey,
+    packed,
+    rowBinding(NOTES_SPEC.table, id),
+  );
   return { body: toBase64(data), wrapped_key: wrappedFileKey };
 }
 
@@ -35,9 +41,14 @@ export async function sealBody(
  *  when the body was altered, or when it was sealed by a newer version. */
 export async function openBody(
   masterKey: CryptoKey,
-  note: Pick<Note, 'body' | 'wrapped_key'>,
+  note: Pick<Note, 'id' | 'body' | 'wrapped_key'>,
 ): Promise<string> {
-  const packed = await decryptFile(masterKey, note.wrapped_key, fromBase64(note.body));
+  const packed = await decryptFile(
+    masterKey,
+    note.wrapped_key,
+    fromBase64(note.body),
+    rowBinding(NOTES_SPEC.table, note.id),
+  );
   const plain = await gunzip(packed);
   const sealed = JSON.parse(new TextDecoder().decode(plain)) as SealedBody;
   if (sealed.schema !== NOTE_BODY_SCHEMA)

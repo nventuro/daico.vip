@@ -42,8 +42,8 @@ export default function RulesImportDialog({ onSave, onClose }: RulesImportDialog
   }
 
   return (
-    <ModalDialog onClose={onClose} layout="sheet">
-      <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
+    <ModalDialog onClose={onClose} layout="sheet" label="Pegar reglas">
+      <form onSubmit={(e) => void handleSubmit(e)} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">Pegar reglas</span>
 
         <FormField label="Reglas">

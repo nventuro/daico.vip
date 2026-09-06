@@ -10,9 +10,9 @@ export function hasChanges<T extends object>(draft: T, saved: { [K in keyof T]: 
 }
 
 /**
- * The half of an edit form that is the same in every one: whether the draft is
- * worth saving — it is complete, and it differs from what is stored — and the
- * submit that saves it. The fields themselves stay the form's own.
+ * The half of an edit form that is not its fields — a recipe's is the one
+ * left: whether the draft is worth saving, because it is complete and differs
+ * from what is stored, and the submit that saves it.
  */
 export function entryForm<Input extends object>(
   input: Input,

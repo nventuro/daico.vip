@@ -8,6 +8,11 @@ import {
 import * as engine from '../../lib/offline/engine';
 import { entryPath, type SearchHit } from '../types';
 
+/** How many letters a query needs before the chapters' bodies are looked
+ *  through: every one is folded on every keystroke, and one or two letters
+ *  would match every chapter there is. */
+const GUIDE_BODY_SEARCH_MIN_CHARS = 3;
+
 /**
  * Guides whose title mentions `query`, then chapters that mention it in their
  * title (shown under their guide's name) or body (shown with the matching
@@ -31,7 +36,7 @@ export async function searchGuides(query: string): Promise<SearchHit[]> {
     if (guideTitle === undefined) return [];
     const to = entryPath('guias', chapter.guide_id, chapter.id);
     if (matches(chapter.title, query)) return [{ title: chapter.title, subtitle: guideTitle, to }];
-    if (matches(chapter.body, query)) {
+    if (query.trim().length >= GUIDE_BODY_SEARCH_MIN_CHARS && matches(chapter.body, query)) {
       return [
         { title: chapter.title, subtitle: excerpt(chapter.body, query, SEARCH_EXCERPT_RADIUS), to },
       ];

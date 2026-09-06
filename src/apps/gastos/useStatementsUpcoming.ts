@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import type { Upcoming } from '../types';
-import { addDays, todayIso } from '../../utils/dateUtils';
+import { addDays } from '../../utils/dateUtils';
 import { STATEMENTS_PATH, statementPath } from './paths';
 import { useStatements } from './useStatements';
 import { useStatementsContents } from './useStatementsContents';
 import { toPayCents } from './breakdown';
 import { CARD_LATE_DAYS, cardCloses } from './coverage';
 import { FORMAT_LABELS, formatArsCompact } from './labels';
+import { useToday } from '../../hooks/useToday';
 
 /** What Gastos puts on the home screen: the statements still to be paid,
  *  however far off they are due — each as one amount in pesos, the dollars
@@ -18,7 +19,7 @@ import { FORMAT_LABELS, formatArsCompact } from './labels';
  *  knows what is being spent until it is in. */
 export function useStatementsUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useStatements();
-  const today = todayIso();
+  const today = useToday();
   const unpaid = useMemo(() => items.filter((statement) => !statement.paid), [items]);
   // The rate is in the sealed payload; only the statements shown are opened.
   const { contents } = useStatementsContents(unpaid);

@@ -13,6 +13,22 @@ import { toBase64 } from './base64';
 
 const MODEL = 'claude-opus-5';
 const MAX_TOKENS = 16000;
+/** How long one reading of an email may take, and how many times a failed
+ *  one is sent again: every retry sends the whole email — PDFs and all —
+ *  and is billed again. */
+const EXTRACTION_TIMEOUT_MS = 5 * 60 * 1000;
+const EXTRACTION_MAX_RETRIES = 1;
+
+/** The longest a title, a trip's name, a comment or the model's own words
+ *  may be: they are shown to the member and written into rows as they come. */
+const TITLE_MAX_CHARS = 120;
+const TRIP_TITLE_MAX_CHARS = 80;
+const COMMENTS_MAX_CHARS = 1000;
+const PROBLEM_MAX_CHARS = 300;
+
+/** What is said when the model found nothing and did not say why; also the
+ *  example it is given of saying so. */
+export const NO_BOOKINGS_FOUND = 'No encontré ninguna reserva en este correo';
 
 /** What a confirmation email can contain: the booked classes, never a
  *  pendiente or a lugar. Also the order the reply lists them in. */
@@ -143,7 +159,7 @@ nothing to add:
 
 Nothing to extract:
   { "trip_title": null, "items": [],
-    "problem": "No encontré ninguna reserva en este correo" }`;
+    "problem": "${NO_BOOKINGS_FOUND}" }`;
 
 /** One PDF attached to the email: what it was called, extension off, and
  *  its bytes. */
@@ -163,13 +179,17 @@ export interface EmailContent {
 /**
  * Has the model read the email; null when it refused to answer. The PDFs go
  * first as documents, each titled by its number, the subject and text after
- * them as one text block.
+ * them as one text block. An answer cut short is a failure, not an answer.
  */
 export async function extractBookings(
   apiKey: string,
   content: EmailContent,
 ): Promise<Extraction | null> {
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({
+    apiKey,
+    maxRetries: EXTRACTION_MAX_RETRIES,
+    timeout: EXTRACTION_TIMEOUT_MS,
+  });
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: MAX_TOKENS,
@@ -194,12 +214,13 @@ export async function extractBookings(
     ],
   });
   if (response.stop_reason === 'refusal') return null;
+  if (response.stop_reason === 'max_tokens') throw new Error('the answer was cut short');
   return response.parsed_output;
 }
 
-/** A row of `trip_inbox` as the worker writes it: every column but the ids
- *  and the timestamps, which the insert and the table fill in. `file_ids`
- *  are the ids of the PDFs the row is printed in, in the email's order. */
+/** A row of `trip_inbox` as the worker decides it: every column but the ids
+ *  and the timestamps, which are not its to decide. `file_ids` are the ids of
+ *  the PDFs the row is printed in, in the email's order. */
 export interface InboxRow {
   email_subject: string;
   trip_title: string;
@@ -226,22 +247,45 @@ const SHAPES: Record<
   booking: { time: true, ends: 'none', airports: false },
 };
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME = /^\d{2}:\d{2}$/;
+const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME = /^(\d{2}):(\d{2})$/;
+const AIRPORT_CODE = /^[a-z]{3}$/i;
 
-// A value the model did not write as asked is dropped rather than sent to
-// the database, which would refuse the whole email over one field.
+// A value the model did not write as asked — or wrote as asked but of a day
+// or an hour there is not — is dropped rather than sent to the database,
+// which would refuse the whole email over one field and quote it back.
 function dateOrNull(value: string | null): string | null {
-  return value !== null && DATE.test(value) ? value : null;
+  const m = value === null ? null : DATE.exec(value);
+  if (!m) return null;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const real =
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return real ? value : null;
 }
 
 function timeOrNull(value: string | null): string | null {
-  return value !== null && TIME.test(value) ? value : null;
+  const m = value === null ? null : TIME.exec(value);
+  if (!m) return null;
+  return Number(m[1]) < 24 && Number(m[2]) < 60 ? value : null;
 }
 
-function textOrNull(value: string | null): string | null {
-  const trimmed = value?.trim() ?? '';
+function textOrNull(value: string | null, max: number): string | null {
+  const trimmed = value?.trim().slice(0, max) ?? '';
   return trimmed === '' ? null : trimmed;
+}
+
+/** Three letters, as an airport is coded, in capitals; null for anything else. */
+function codeOrNull(value: string | null): string | null {
+  const trimmed = value?.trim() ?? '';
+  return AIRPORT_CODE.test(trimmed) ? trimmed.toUpperCase() : null;
+}
+
+/** The model's account of what was wrong, as it can be shown to the member:
+ *  cut to length, and with no address in it — a line the household's own
+ *  address sends is a line worth forging. */
+function problemOrNull(value: string | null): string | null {
+  return textOrNull(value?.replace(/\bhttps?:\/\/\S+/gi, '') ?? null, PROBLEM_MAX_CHARS);
 }
 
 /** The ids of the PDFs an item names, in the email's order: a number that
@@ -266,8 +310,8 @@ export function rowsFromExtraction(
   fileIds: string[],
 ): InboxRow[] {
   return items.flatMap((item): InboxRow[] => {
-    const title = item.title.trim();
-    if (title === '') return [];
+    const title = textOrNull(item.title, TITLE_MAX_CHARS);
+    if (title === null) return [];
     const shape = SHAPES[item.kind];
     return [
       {
@@ -279,9 +323,9 @@ export function rowsFromExtraction(
         at_time: shape.time ? timeOrNull(item.at_time) : null,
         ends_on: shape.ends === 'none' ? null : dateOrNull(item.ends_on),
         ends_at: shape.ends === 'day-time' ? timeOrNull(item.ends_at) : null,
-        from_code: shape.airports ? textOrNull(item.from_code) : null,
-        to_code: shape.airports ? textOrNull(item.to_code) : null,
-        comments: textOrNull(item.comments),
+        from_code: shape.airports ? codeOrNull(item.from_code) : null,
+        to_code: shape.airports ? codeOrNull(item.to_code) : null,
+        comments: textOrNull(item.comments, COMMENTS_MAX_CHARS),
         file_ids: fileIdsOf(item.pdfs, fileIds),
       },
     ];
@@ -297,8 +341,8 @@ export type Decision =
  *  trip, and reported no problem — and at least one item survived mapping.
  *  `fileIds` are the ids the email's PDFs will be staged under, in order. */
 export function decide(output: Extraction, subject: string | null, fileIds: string[]): Decision {
-  if (output.problem !== null) return { ok: false, problem: output.problem };
-  const tripTitle = output.trip_title?.trim() ?? '';
+  if (output.problem !== null) return { ok: false, problem: problemOrNull(output.problem) };
+  const tripTitle = textOrNull(output.trip_title, TRIP_TITLE_MAX_CHARS) ?? '';
   if (output.items.length === 0 || tripTitle === '') return { ok: false, problem: null };
   const rows = rowsFromExtraction(output.items, tripTitle, subject, fileIds);
   if (rows.length === 0) return { ok: false, problem: null };

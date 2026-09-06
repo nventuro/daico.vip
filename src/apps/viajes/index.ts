@@ -29,8 +29,7 @@ const viajes: AppModule = {
     // One email's suggestions, reviewed as a group.
     { path: 'inbox/:importId', Component: InboxReviewPage },
     { path: ':tripId', Component: TripPage },
-    // A trip is written on its own page; the address it used to be edited at
-    // still leads to it.
+    // A trip is written on its own page; `editar` leads there.
     { path: ':tripId/editar', Component: EditRedirect },
     // The optional segment is one of the row's pictures, open in the lightbox.
     { path: ':tripId/:itemId/:attachmentId?', Component: ItemPage },

@@ -10,12 +10,12 @@ import FormField from '../../components/FormField';
 import { useLeave, useLeaveBack } from '../../hooks/useLeave';
 import { useTextSave } from '../../hooks/useTextSave';
 import { offerUndo } from '../../lib/undo';
-import { todayIso } from '../../utils/dateUtils';
 import { appPath } from '../types';
 import { SALUD_KIND_LABELS } from './kinds';
 import { isDone, markMessage } from './recurrence';
 import RepeatFields, { type RepeatValue } from './RepeatFields';
 import type { CheckupInput } from './useCheckups';
+import { useToday } from '../../hooks/useToday';
 
 interface CheckupPageProps {
   checkup: Checkup;
@@ -30,7 +30,7 @@ interface CheckupPageProps {
 /** A checkup, read and written on the same page: the title on blur, each
  *  control as it changes, the comments a moment after typing stops and on
  *  leaving. The one control that leaves the page is the square that marks
- *  it. No pictures: the row re-dates itself, and a picture pinned to it
+ *  it. No attachments: the row re-dates itself, and a file pinned to it
  *  would outlive the check it was about — what was done is kept as a study. */
 export default function CheckupPage({
   checkup,
@@ -43,13 +43,13 @@ export default function CheckupPage({
   const leave = useLeave();
   const leaveBack = useLeaveBack();
   const [deleting, setDeleting] = useState(false);
-  const today = todayIso();
+  const today = useToday();
   const repeats = checkup.repeat_every !== null;
   const labels = SALUD_KIND_LABELS.checkup;
 
   const commentsSave = useTextSave(async (text) => {
     await save(checkup.id, { comments: text || null });
-  });
+  }, checkup.id);
 
   // A checkup that comes back has to come back on a day, so switching it on
   // gives an undated one today's date rather than leaving it without one.

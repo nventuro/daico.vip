@@ -12,6 +12,10 @@ export const FIELD_CLASS = 'flex flex-col gap-1 text-sm text-muted';
 export const CONTROL_CLASS =
   'border border-border bg-surface-raised px-3 py-2 text-base text-on-surface outline-none transition-colors focus:border-primary';
 
+/** A control set inside something drawn as the control — a labelled box, a
+ *  chip — which takes no look of its own. */
+export const INSET_CONTROL_CLASS = 'min-w-0 flex-1 bg-transparent outline-none';
+
 /** The shape of a chip; pair with one of the two colour sets below. */
 export const CHIP_BASE_CLASS = 'inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm';
 

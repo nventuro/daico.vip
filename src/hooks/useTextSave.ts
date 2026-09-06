@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { TEXT_SAVE_DELAY_MS } from '../components/editor/constants';
 
+/** A text, or the way to get it: an editor's serialising of its whole
+ *  document is work worth doing once it is saved, not on every keystroke. */
+export type TextOrGetter = string | (() => string);
+
 /** What a page hands its text to as it is typed. */
 export interface TextSaver {
   /** Every change; nothing is written until typing stops. */
-  onChange: (text: string) => void;
+  onChange: (text: TextOrGetter) => void;
   /** Saves whatever is pending at once. */
   flush: () => void;
 }
@@ -20,15 +24,16 @@ export function createTextSaver(
   save: (text: string) => Promise<unknown>,
   delay = TEXT_SAVE_DELAY_MS,
 ): TextSaver {
-  let pending: string | null = null;
+  let pending: TextOrGetter | null = null;
   let saved: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   function run() {
     timer = null;
     if (pending === null) return;
-    const text = pending;
+    const written = typeof pending === 'function' ? pending() : pending;
     pending = null;
+    const text = written.trim() === '' ? '' : written;
     if (text === saved) return;
     saved = text;
     save(text).catch((err: unknown) => {
@@ -38,7 +43,7 @@ export function createTextSaver(
 
   return {
     onChange(text) {
-      pending = text.trim() === '' ? '' : text;
+      pending = text;
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(run, delay);
     },
@@ -53,9 +58,11 @@ export function createTextSaver(
  * How a page saves the text written on it: a moment after typing stops, and
  * always on leaving — the page unmounting, the app going to the background,
  * the tab being closed — so nothing typed is ever lost to the back button.
- * `save` may change between renders; the latest is the one called.
+ * `save` may change between renders; the latest is the one called. What was
+ * written is `entryId`'s: when the page moves on to another entry, whatever
+ * is still pending is saved to the one it was written on first.
  */
-export function useTextSave(save: (text: string) => Promise<unknown>): TextSaver {
+export function useTextSave(save: (text: string) => Promise<unknown>, entryId?: string): TextSaver {
   const saveRef = useRef(save);
   useEffect(() => {
     saveRef.current = save;
@@ -79,7 +86,11 @@ export function useTextSave(save: (text: string) => Promise<unknown>): TextSaver
     };
   }, []);
 
-  const onChange = useCallback((text: string) => saverRef.current?.onChange(text), []);
+  // Runs before `saveRef` moves on to the next entry's save: the cleanup of
+  // one render's effects comes before the next render's effects.
+  useEffect(() => () => saverRef.current?.flush(), [entryId]);
+
+  const onChange = useCallback((text: TextOrGetter) => saverRef.current?.onChange(text), []);
   const flush = useCallback(() => saverRef.current?.flush(), []);
   return useMemo(() => ({ onChange, flush }), [onChange, flush]);
 }

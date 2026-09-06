@@ -1,10 +1,10 @@
-import type { SealedAttachment } from '../../hooks/useAttachments';
+import type { AttachmentSource } from '../../hooks/useAttachments';
 import { PDF_TYPE } from '../../lib/attachmentFiles';
-import { openInboxKey, rewrapInboxFileKey, type InboxKeyPair } from '../../lib/householdKey';
+import { openInboxFile, openInboxKey, rowBinding, type InboxKeyPair } from '../../lib/householdKey';
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { AttachmentOwner } from '../../types';
 import { CREATE_TRIP_CHOICE, type InboxGroup } from './grouping';
-import { inboxFileIds, readInboxFiles } from './inboxFiles';
+import { INBOX_FILES_TABLE, inboxFileIds, readInboxFiles } from './inboxFiles';
 import type { InboxUndo } from './inboxUndo';
 import { inboxAddedLabel } from './labels';
 import { withKindFields, type TripItemInput } from './useTripItems';
@@ -18,7 +18,7 @@ export type TripItemWrite = TripItemInput & { trip_id: string };
 export interface InboxWrites {
   addTrip: (input: TripInput) => Promise<string | undefined>;
   addItem: (input: TripItemWrite) => Promise<string | undefined>;
-  addAttachment: (owner: AttachmentOwner, file: SealedAttachment) => Promise<string | undefined>;
+  addAttachment: (owner: AttachmentOwner, file: AttachmentSource) => Promise<string | undefined>;
   removeStaged: (id: string) => Promise<unknown>;
   /** Let go of staged files, here and on the server. */
   removeFiles: (fileIds: string[]) => Promise<void>;
@@ -53,17 +53,17 @@ export function groupFileIds(group: InboxGroup): string[] {
 
 /**
  * The group's files as the attachments they will be, by staged file id: this
- * device's copies (fetched when it lacks some), their keys re-wrapped under
- * the master key so the bytes go in as they are. Throws, in the member's
- * words, when a file cannot be had or the household has no inbox key here to
- * open it with; nothing is written either way.
+ * device's copies (fetched when it lacks some), opened with the inbox key so
+ * each can be sealed again for the attachment it becomes. Throws, in the
+ * member's words, when a file cannot be had or the household has no inbox
+ * key here to open it with; nothing is written either way.
  */
-export async function sealedFilesOf(
+export async function openedFilesOf(
   group: InboxGroup,
   masterKey: CryptoKey,
   pair: InboxKeyPair | undefined,
-): Promise<Map<string, SealedAttachment>> {
-  const files = new Map<string, SealedAttachment>();
+): Promise<Map<string, AttachmentSource>> {
+  const files = new Map<string, AttachmentSource>();
   const ids = groupFileIds(group);
   if (ids.length === 0) return files;
   if (!pair)
@@ -75,8 +75,12 @@ export async function sealedFilesOf(
       name: file.name,
       mime: PDF_TYPE,
       size: file.size,
-      data: file.data,
-      wrappedFileKey: await rewrapInboxFileKey(privateKey, masterKey, file.wrapped_key),
+      plain: await openInboxFile(
+        privateKey,
+        file.wrapped_key,
+        file.data,
+        rowBinding(INBOX_FILES_TABLE, file.id),
+      ),
     });
   }
   return files;
@@ -85,16 +89,19 @@ export async function sealedFilesOf(
 /**
  * Puts a group into the chosen trip — created first, without dates, when the
  * choice is to create one — in the group's own order, each row with the
- * files it was printed in as its attachments, then clears the staged rows.
- * The staged files stay where they are: they go once the undo is over.
- * Resolves what it did, for the undo; undefined when the trip could not be
- * created, in which case nothing was written.
+ * files it was printed in as its attachments, each staged row cleared as
+ * soon as its own row is written. A write that fails stops it there: what
+ * was written stays, what was not stays staged to be confirmed again, and
+ * closing the app mid-way leaves at most one row to be confirmed twice. The
+ * staged files stay where they are: they go once the undo is over. Resolves
+ * what it did, for the undo; undefined when the trip could not be created,
+ * in which case nothing was written.
  */
 export async function confirmInbox(
   group: InboxGroup,
   choice: string,
   writes: InboxWrites,
-  files: ReadonlyMap<string, SealedAttachment> = new Map(),
+  files: ReadonlyMap<string, AttachmentSource> = new Map(),
 ): Promise<InboxUndo | undefined> {
   const tripCreated = choice === CREATE_TRIP_CHOICE;
   const tripId = tripCreated
@@ -103,9 +110,10 @@ export async function confirmInbox(
   if (tripId === undefined) return undefined;
   const itemIds: string[] = [];
   const attachmentIds: string[] = [];
-  for (const row of group.items) {
+  const staged: TripInboxItem[] = [];
+  rows: for (const row of group.items) {
     const id = await writes.addItem(tripItemFrom(row, tripId));
-    if (id === undefined) continue;
+    if (id === undefined) break;
     itemIds.push(id);
     // A file printed on two rows is attached to each: an attachment is one
     // entry's, and either row is looked up on its own.
@@ -113,17 +121,19 @@ export async function confirmInbox(
       const file = files.get(fileId);
       if (!file) continue;
       const attachmentId = await writes.addAttachment({ kind: 'trip_item', id }, file);
-      if (attachmentId !== undefined) attachmentIds.push(attachmentId);
+      if (attachmentId === undefined) break rows;
+      attachmentIds.push(attachmentId);
     }
+    await writes.removeStaged(row.id);
+    staged.push(row);
   }
-  for (const row of group.items) await writes.removeStaged(row.id);
   return {
     label: inboxAddedLabel(itemIds.length),
     tripCreated,
     tripId,
     itemIds,
     attachmentIds,
-    staged: group.items,
+    staged,
     fileIds: groupFileIds(group),
   };
 }

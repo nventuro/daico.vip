@@ -8,7 +8,7 @@ interface Draft {
 }
 
 describe('hasChanges', () => {
-  const saved = { title: 'a', due_on: null, notes: 'n', done: false };
+  const saved = { title: 'a', due_on: null, notes: 'n' };
 
   it('is false when every draft field matches', () => {
     const draft: Draft = { title: 'a', due_on: null, notes: 'n' };

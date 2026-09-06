@@ -28,7 +28,7 @@ function App() {
       setSession(session);
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
       hold(session);
       setAuthLoading(false);
     });

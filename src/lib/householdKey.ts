@@ -11,15 +11,18 @@
 // that has unwrapped the master key keeps it non-extractable, so page code can
 // use it but never read its bytes.
 //
-// The master key is a level of its own so that a phrase change re-wraps 40
-// bytes instead of re-encrypting every file; each file has a key of its own so
-// a GCM nonce is never reused and a file can one day be shared on its own.
+// The master key is a level of its own so the phrase is only ever used to
+// unwrap it — what a device keeps is the key, never the phrase — and each file
+// has a key of its own so a GCM nonce is never reused and a file can one day
+// be shared on its own. Every sealed thing is bound to the row that carries
+// it: sealing takes the row's name as associated data, so a blob and its key
+// moved to another row open nowhere but under the row they were sealed for.
 //
 // One branch hangs off it for what arrives sealed from outside: the inbox
 // key, a pair whose public half is published for the email worker to seal a
-// PDF's file key to, and whose private half is sealed under the master key
-// like any file. A file sealed that way becomes an ordinary attachment by
-// having its key re-wrapped; the bytes are never touched.
+// PDF to, and whose private half is sealed under the master key like any
+// file. A file sealed that way is opened here once, at confirm, to be sealed
+// again as the attachment it becomes.
 // =============================================================================
 import { normalize } from '../utils/textUtils';
 import { PHRASE_WORDS } from './phraseWords';
@@ -32,8 +35,22 @@ const HOUSEHOLD_KEY_KDF_ITERATIONS = 600_000;
 
 const SALT_BYTES = 16;
 const NONCE_BYTES = 12;
-/** First byte of an encrypted file, so the layout can change later. */
-const FILE_FORMAT_VERSION = 1;
+/** First byte of an encrypted file, so the layout can change later. Under
+ *  this version what the file is sealed for is bound into it. */
+const FILE_FORMAT_VERSION = 2;
+/** The version before rows were bound in; a file sealed under it still opens. */
+const UNBOUND_FILE_FORMAT_VERSION = 1;
+
+/**
+ * What a sealed thing is bound to: the row that carries it, as `table/id`.
+ * The same row, and nothing else, opens it.
+ */
+export function rowBinding(table: string, id: string): string {
+  return `${table}/${id}`;
+}
+
+/** What the inbox key's private half is bound to: the household has one. */
+export const INBOX_KEY_BINDING = 'inbox_key';
 
 const WORD_BY_NORMALIZED = new Map(PHRASE_WORDS.map((word) => [normalize(word), word]));
 
@@ -68,7 +85,10 @@ export function toBase64(bytes: Uint8Array): string {
 
 /** The bytes a base64 text stands for. */
 export function fromBase64(text: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(atob(text), (ch) => ch.charCodeAt(0));
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /** The bytes of a view as a buffer of their own, the form WebCrypto takes. */
@@ -101,7 +121,7 @@ export function parsePhrase(words: string[]): string[] | null {
     .filter(Boolean)
     .map((w) => WORD_BY_NORMALIZED.get(normalize(w)));
   if (canonical.length !== HOUSEHOLD_PHRASE_WORDS) return null;
-  return canonical.every((w) => w !== undefined) ? (canonical as string[]) : null;
+  return canonical.every((w) => w !== undefined) ? canonical : null;
 }
 
 async function phraseKey(
@@ -182,15 +202,32 @@ export async function unwrapMasterKey(
 
 // ─── Files ───────────────────────────────────────────────────────────────────
 
-/** `plain` encrypted under a fresh key of its own, that key wrapped under `masterKey`. */
-export async function encryptFile(masterKey: CryptoKey, plain: Uint8Array): Promise<EncryptedFile> {
+/** `boundTo` as the bytes the cipher binds in. */
+function binding(boundTo: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(boundTo);
+}
+
+/**
+ * `plain` encrypted under a fresh key of its own, that key wrapped under
+ * `masterKey`, bound to `boundTo` — the row that will carry it, from
+ * `rowBinding`.
+ */
+export async function encryptFile(
+  masterKey: CryptoKey,
+  plain: Uint8Array,
+  boundTo: string,
+): Promise<EncryptedFile> {
   const fileKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
     'encrypt',
     'decrypt',
   ]);
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
   const cipher = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, fileKey, buffer(plain)),
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: binding(boundTo) },
+      fileKey,
+      buffer(plain),
+    ),
   );
   const data = new Uint8Array(1 + NONCE_BYTES + cipher.length);
   data[0] = FILE_FORMAT_VERSION;
@@ -202,16 +239,35 @@ export async function encryptFile(masterKey: CryptoKey, plain: Uint8Array): Prom
   return { data, wrappedFileKey };
 }
 
-/** The contents of an encrypted file. Throws when the key is not the file's
- *  or the data was altered. */
+/** The contents of a sealed file, opened with its own key. Throws when the
+ *  key is not the file's, the data was altered, or the file was sealed for
+ *  another row. */
+async function openSealed(
+  fileKey: CryptoKey,
+  data: Uint8Array,
+  boundTo: string,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const version = data[0];
+  if (version !== FILE_FORMAT_VERSION && version !== UNBOUND_FILE_FORMAT_VERSION) {
+    throw new Error(`Unknown attachment file format ${version}`);
+  }
+  const nonce = buffer(data.subarray(1, 1 + NONCE_BYTES));
+  const cipher = buffer(data.subarray(1 + NONCE_BYTES));
+  const params: AesGcmParams =
+    version === FILE_FORMAT_VERSION
+      ? { name: 'AES-GCM', iv: nonce, additionalData: binding(boundTo) }
+      : { name: 'AES-GCM', iv: nonce };
+  return new Uint8Array(await crypto.subtle.decrypt(params, fileKey, cipher));
+}
+
+/** The contents of an encrypted file bound to `boundTo`. Throws when the key
+ *  is not the file's, the data was altered, or the file is another row's. */
 export async function decryptFile(
   masterKey: CryptoKey,
   wrappedFileKey: string,
   data: Uint8Array,
+  boundTo: string,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  if (data[0] !== FILE_FORMAT_VERSION) {
-    throw new Error(`Unknown attachment file format ${data[0]}`);
-  }
   const fileKey = await crypto.subtle.unwrapKey(
     'raw',
     fromBase64(wrappedFileKey),
@@ -221,11 +277,7 @@ export async function decryptFile(
     false,
     ['decrypt'],
   );
-  const nonce = buffer(data.subarray(1, 1 + NONCE_BYTES));
-  const cipher = buffer(data.subarray(1 + NONCE_BYTES));
-  return new Uint8Array(
-    await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, fileKey, cipher),
-  );
+  return openSealed(fileKey, data, boundTo);
 }
 
 // ─── The inbox key ───────────────────────────────────────────────────────────
@@ -258,7 +310,7 @@ export async function createInboxKey(masterKey: CryptoKey): Promise<InboxKeyPair
   );
   const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
   const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
-  const sealed = await encryptFile(masterKey, pkcs8);
+  const sealed = await encryptFile(masterKey, pkcs8, INBOX_KEY_BINDING);
   return {
     public_key: toBase64(spki),
     private_key: toBase64(sealed.data),
@@ -266,32 +318,71 @@ export async function createInboxKey(masterKey: CryptoKey): Promise<InboxKeyPair
   };
 }
 
-/** The private half opened with `masterKey`: non-extractable, and only ever
- *  unwraps a file key. Throws when the master key is not the pair's. */
+/**
+ * The private half opened with `masterKey`: non-extractable, and only ever
+ * unwraps a file key. Throws when the master key is not the pair's, and when
+ * the public half published beside it is not this key's other half — then
+ * whatever the worker sealed to it was sealed for someone else.
+ */
 export async function openInboxKey(masterKey: CryptoKey, pair: InboxKeyPair): Promise<CryptoKey> {
-  const pkcs8 = await decryptFile(masterKey, pair.wrapped_key, fromBase64(pair.private_key));
-  return crypto.subtle.importKey('pkcs8', pkcs8, INBOX_KEY_ALGORITHM, false, ['unwrapKey']);
+  const pkcs8 = await decryptFile(
+    masterKey,
+    pair.wrapped_key,
+    fromBase64(pair.private_key),
+    INBOX_KEY_BINDING,
+  );
+  const privateKey = await crypto.subtle.importKey('pkcs8', pkcs8, INBOX_KEY_ALGORITHM, false, [
+    'unwrapKey',
+  ]);
+  // A key wrapped under the public half must come back out under this one:
+  // nothing is exported to compare, the pair is simply asked to work.
+  try {
+    const publicKey = await crypto.subtle.importKey(
+      'spki',
+      fromBase64(pair.public_key),
+      INBOX_KEY_ALGORITHM,
+      false,
+      ['wrapKey'],
+    );
+    const probe = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+      'encrypt',
+    ]);
+    const wrapped = await crypto.subtle.wrapKey('raw', probe, publicKey, INBOX_KEY_ALGORITHM.name);
+    await crypto.subtle.unwrapKey(
+      'raw',
+      wrapped,
+      privateKey,
+      INBOX_KEY_ALGORITHM.name,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt'],
+    );
+  } catch {
+    throw new Error('La clave pública del correo no es la de este par.');
+  }
+  return privateKey;
 }
 
 /**
- * A file key wrapped under the public half, re-wrapped under `masterKey`:
- * what turns a file sealed outside into an attachment, its bytes as they are.
- * The key is in the clear only for the call. Throws when `wrappedKey` was not
- * wrapped for this pair.
+ * A file sealed outside to the public half, opened: its key unwrapped with
+ * `privateKey`, in the clear only for the call, and the bytes opened as any
+ * file's are, under `boundTo`. Throws when `wrappedKey` was not wrapped for
+ * this pair, or the file is not the row's.
  */
-export async function rewrapInboxFileKey(
+export async function openInboxFile(
   privateKey: CryptoKey,
-  masterKey: CryptoKey,
   wrappedKey: string,
-): Promise<string> {
+  data: Uint8Array,
+  boundTo: string,
+): Promise<Uint8Array<ArrayBuffer>> {
   const fileKey = await crypto.subtle.unwrapKey(
     'raw',
     fromBase64(wrappedKey),
     privateKey,
     INBOX_KEY_ALGORITHM.name,
     { name: 'AES-GCM', length: 256 },
-    true,
+    false,
     ['decrypt'],
   );
-  return toBase64(new Uint8Array(await crypto.subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW')));
+  return openSealed(fileKey, data, boundTo);
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { guideImageUrl } from './guideImages';
 import LoadingLine from '../../components/LoadingLine';
 import Motif from '../../components/Motif';
+import { useOnline } from '../../hooks/useOnline';
 
 interface GuideImageProps {
   imageKey: string;
@@ -18,12 +19,14 @@ const JUSTIFY = { left: 'justify-start', center: 'justify-center', right: 'justi
  * is. Mount with `key={imageKey}` so a different image gets a fresh instance.
  */
 export default function GuideImage({ imageKey, width, align }: GuideImageProps) {
-  // undefined while resolving, null when unavailable (offline and never fetched).
+  // undefined while resolving, null when unavailable (offline and never
+  // fetched, or an image the store does not have).
   const [src, setSrc] = useState<string | null | undefined>(undefined);
+  const online = useOnline();
 
   useEffect(() => {
     let active = true;
-    guideImageUrl(imageKey).then((url) => {
+    void guideImageUrl(imageKey).then((url) => {
       if (active) setSrc(url);
     });
     return () => {
@@ -43,7 +46,7 @@ export default function GuideImage({ imageKey, width, align }: GuideImageProps) 
           <Motif band />
           {src === null ? (
             <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-sm">
-              Imagen no disponible sin conexión
+              {online ? 'Imagen no disponible' : 'Imagen no disponible sin conexión'}
             </span>
           ) : (
             <LoadingLine className="absolute inset-x-0 bottom-0" />

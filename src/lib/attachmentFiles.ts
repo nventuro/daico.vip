@@ -17,7 +17,7 @@ import { addDays, todayIso } from '../utils/dateUtils';
 export const ATTACHMENTS_BUCKET = 'attachments';
 
 /** Largest file accepted as an attachment, in bytes. */
-const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /** The type of a PDF attachment; every other type accepted is a picture. */
 export const PDF_TYPE = 'application/pdf';
@@ -32,6 +32,10 @@ export const ATTACHMENT_FILE_TYPES: Readonly<Record<string, string>> = {
   'image/gif': 'gif',
   [PDF_TYPE]: 'pdf',
 };
+
+/** The other ways a file of a type above gets named, by the extension it
+ *  leaves with. */
+const EXTENSION_ALIASES: Readonly<Record<string, string>> = { jpeg: 'jpg', jpe: 'jpg' };
 
 /** Whether an attachment of type `mime` is a PDF rather than a picture. */
 export function isPdf(mime: string): boolean {
@@ -65,7 +69,8 @@ const keptKindsSql = KEPT_OWNER_KINDS.map((kind) => `'${kind}'`).join(', ');
  */
 const keptSql = `(a.owner_kind IN (${keptKindsSql})
   AND NOT EXISTS (
-    SELECT 1 FROM ${TRIP_ITEMS_SPEC.table} i JOIN ${TRIPS_SPEC.table} t ON t.id = i.trip_id
+    SELECT 1 FROM ${engine.visibleSql(TRIP_ITEMS_SPEC)} i
+      JOIN ${engine.visibleSql(TRIPS_SPEC)} t ON t.id = i.trip_id
      WHERE a.owner_kind = 'trip_item' AND i.id = a.owner_id AND t.ends_on < ?))`;
 
 /** The day `keptSql` takes, as of today. */
@@ -93,9 +98,15 @@ const bucket = () => supabase.storage.from(ATTACHMENTS_BUCKET);
  */
 export function attachmentType(file: File): string | null {
   if (file.type in ATTACHMENT_FILE_TYPES) return file.type;
-  const extension = file.name.split('.').pop()?.toLowerCase();
+  const named = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const extension = EXTENSION_ALIASES[named] ?? named;
   const match = Object.entries(ATTACHMENT_FILE_TYPES).find(([, ext]) => ext === extension);
   return match ? match[0] : null;
+}
+
+/** Why a file of `size` bytes cannot be attached, or null when it can. */
+export function attachmentSizeProblem(size: number): string | null {
+  return size > ATTACHMENT_MAX_BYTES ? tooLargeMessage(size, ATTACHMENT_MAX_BYTES) : null;
 }
 
 /** Why `file` cannot be attached, in the user's words, or null when it can. */
@@ -103,10 +114,7 @@ export function attachmentProblem(file: File): string | null {
   if (!attachmentType(file)) {
     return 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) o PDF.';
   }
-  if (file.size > ATTACHMENT_MAX_BYTES) {
-    return tooLargeMessage(file.size, ATTACHMENT_MAX_BYTES);
-  }
-  return null;
+  return attachmentSizeProblem(file.size);
 }
 
 // ─── The copy this device holds ──────────────────────────────────────────────
@@ -208,7 +216,7 @@ export async function dropCachedFiles(): Promise<void> {
     ATTACHMENT_FILES.table,
     `DELETE FROM ${ATTACHMENT_FILES.table}
       WHERE uploaded = 1
-        AND id IN (SELECT a.id FROM ${ATTACHMENTS_SPEC.table} a WHERE NOT ${keptSql})`,
+        AND id IN (SELECT a.id FROM ${engine.visibleSql(ATTACHMENTS_SPEC)} a WHERE NOT ${keptSql})`,
     tripsOverBefore(),
   );
 }
@@ -241,8 +249,8 @@ export async function uploadPending(): Promise<void> {
   // sent again.
   const waiting = await engine.localQuery<Pick<AttachmentFileRow, 'id' | 'data'>>(
     `SELECT f.id, f.data FROM ${ATTACHMENT_FILES.table} f
-      JOIN ${ATTACHMENTS_SPEC.table} a ON a.id = f.id
-     WHERE f.uploaded = 0 AND f.upload_error IS NULL AND a.pending_op IS NULL`,
+      JOIN ${engine.settledSql(ATTACHMENTS_SPEC)} a ON a.id = f.id
+     WHERE f.uploaded = 0 AND f.upload_error IS NULL`,
   );
   for (const { id, data } of waiting) {
     const { error } = await bucket().upload(id, new Blob([data]), {
@@ -321,9 +329,8 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
  */
 async function fetchKeptFiles(): Promise<void> {
   const missing = await engine.localQuery<{ id: string }>(
-    `SELECT a.id FROM ${ATTACHMENTS_SPEC.table} a
-      WHERE a.pending_op IS NOT 'delete'
-        AND ${keptSql}
+    `SELECT a.id FROM ${engine.visibleSql(ATTACHMENTS_SPEC)} a
+      WHERE ${keptSql}
         AND a.id NOT IN (SELECT id FROM ${ATTACHMENT_FILES.table})
       ORDER BY ${ATTACHMENTS_SPEC.orderBy}`,
     tripsOverBefore(),
@@ -337,23 +344,39 @@ async function fetchKeptFiles(): Promise<void> {
   }
 }
 
-/** Remove an attachment's object from the bucket, best effort: what this
- *  misses (no connection), the orphan sweep removes later. */
-export async function removeAttachmentObject(id: string): Promise<void> {
+/** localStorage key of when the sweep last went through on this device. */
+const SWEPT_AT_KEY = 'daico.attachmentsSweptAt';
+
+// Storage may be absent (tests) or refuse (a storage policy); either reads as
+// "never", and the sweep runs.
+function readSweptAt(): number | null {
   try {
-    await bucket().remove([id]);
+    const stored = localStorage.getItem(SWEPT_AT_KEY);
+    return stored === null ? null : Date.parse(stored);
   } catch {
-    // Left for the sweep.
+    return null;
+  }
+}
+
+function writeSweptAt(): void {
+  try {
+    localStorage.setItem(SWEPT_AT_KEY, new Date().toISOString());
+  } catch {
+    // Then it runs again next time.
   }
 }
 
 /**
  * Remove bucket objects no attachment refers to any more — a delete pushed
- * from a device that never got to remove the object, or a crash between the
- * two steps of adding one. Only objects older than the grace period: a young
- * one may belong to a row another device created and this one hasn't pulled.
+ * from any device, or a crash between the two steps of adding one. Only
+ * objects older than the grace period: a young one may belong to a row
+ * another device created and this one hasn't pulled. It lists the whole
+ * bucket, and nothing becomes an orphan sooner than the grace period, so it
+ * runs at most once per period.
  */
 async function sweepOrphans(): Promise<void> {
+  const sweptAt = readSweptAt();
+  if (sweptAt !== null && Date.now() - sweptAt < ATTACHMENT_ORPHAN_MIN_AGE_MS) return;
   const kept = new Set((await engine.listVisible<Attachment>(ATTACHMENTS_SPEC)).map((a) => a.id));
   // A row waiting to be deleted is still a row everywhere else: until the
   // server takes the delete, another device holds the attachment and will
@@ -380,9 +403,11 @@ async function sweepOrphans(): Promise<void> {
     }
     if (!data || data.length < ATTACHMENT_LIST_PAGE) break;
   }
-  if (orphans.length === 0) return;
-  const { error } = await bucket().remove(orphans);
-  if (error) throw error;
+  if (orphans.length > 0) {
+    const { error } = await bucket().remove(orphans);
+    if (error) throw error;
+  }
+  writeSweptAt();
 }
 
 /** Everything the files need after the tables of `synced` have come down.

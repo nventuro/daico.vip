@@ -74,7 +74,6 @@ export default function RepeatFields({ value, onChange, lastDoneOn }: RepeatFiel
             inputMode="numeric"
             min={CHECKUP_REPEAT_EVERY_MIN}
             max={CHECKUP_REPEAT_EVERY_MAX}
-            required
             value={typed ?? every ?? ''}
             onChange={(e) => setTyped(e.target.value)}
             onBlur={leaveInterval}

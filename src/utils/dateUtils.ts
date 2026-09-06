@@ -101,6 +101,12 @@ export function daysUntil(today: string, date: string): number {
   return (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / MS_PER_DAY;
 }
 
+/** Whether `date` is close enough to `today` to be announced: within `days`
+ *  of it, or already gone by — what is overdue needs announcing most. */
+export function withinNotice(today: string, date: string, days: number): boolean {
+  return daysUntil(today, date) <= days;
+}
+
 /** The yyyy-mm-dd date `days` calendar days after `date` (negative goes back). */
 export function addDays(date: string, days: number): string {
   const [year, month, day] = parseIso(date);

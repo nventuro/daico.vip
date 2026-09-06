@@ -54,7 +54,7 @@ describe('groupByDay', () => {
       TODAY,
     );
     expect(groups.map((g) => [g.label, g.rows.length, g.overdue])).toEqual([
-      ['Vencidas', 2, true],
+      ['Vencidos', 2, true],
       ['Hoy · Sábado 14', 1, false],
       ['Mañana · Domingo 15', 1, false],
       ['Martes 17', 1, false],

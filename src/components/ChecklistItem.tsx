@@ -44,10 +44,6 @@ interface ChecklistItemProps {
  * drag handle); a row with `to` splits into a check square that toggles and
  * a body that opens the item, so a thumb landing on the text never completes
  * anything by accident.
- *
- * If you find yourself adding another prop here, consider splitting this into
- * separate components instead: it is already large, and the props are starting
- * to read as a configuration language rather than as one row.
  */
 export default function ChecklistItem({
   checked,
@@ -90,8 +86,10 @@ export default function ChecklistItem({
         <>
           {/* Padded to a target of its own, so it is deliberate to hit. */}
           <button
+            type="button"
             onClick={onToggle}
             aria-label={toggleLabel}
+            aria-pressed={checked}
             title={toggleLabel}
             className={`flex shrink-0 items-center py-3 pr-3 ${dragHandle ? 'pl-1' : 'pl-0'}`}
           >
@@ -105,8 +103,10 @@ export default function ChecklistItem({
         </>
       ) : (
         <button
+          type="button"
           onClick={onToggle}
           aria-label={toggleLabel}
+          aria-pressed={checked}
           title={toggleLabel}
           className={`flex flex-1 items-center gap-3 py-3 text-left ${dragHandle ? 'pl-1' : ''}`}
         >

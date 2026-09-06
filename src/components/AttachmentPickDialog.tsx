@@ -23,7 +23,7 @@ interface AttachmentPickDialogProps {
  */
 export default function AttachmentPickDialog({ onPick, onClose }: AttachmentPickDialogProps) {
   return (
-    <ModalDialog onClose={onClose} layout="confirm">
+    <ModalDialog onClose={onClose} layout="confirm" label="Agregar">
       <HiddenFileInput
         accept="image/*"
         multiple

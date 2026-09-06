@@ -5,7 +5,6 @@ import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachment
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
 import { endUndo, offerUndo, type UndoOffer } from '../../lib/undo';
-import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
 import DatePicker from '../../components/DatePicker';
@@ -28,6 +27,7 @@ import { inboxRowInput, inboxUndoOf, settleInboxUndo, type InboxUndo } from './i
 import { useTripInbox } from './useTripInbox';
 import { NEW_TRIP_ITEM, useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
+import { useToday } from '../../hooks/useToday';
 
 /** The classes a row can be born as, each with the icon its section wears. */
 const KIND_OPTIONS = TRIP_KINDS.map((kind) => ({
@@ -57,7 +57,9 @@ export default function TripPage() {
   const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
   const navigate = useNavigate();
   const leave = useLeave();
-  const { state, pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const state: unknown = location.state;
   // The undo of what the review just put in, while this screen offers it.
   const inboxOffer = useRef<UndoOffer | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -97,7 +99,7 @@ export default function TripPage() {
     };
     inboxOffer.current = offer;
     offerUndo(offer);
-    navigate(pathname, { replace: true, state: null });
+    void navigate(pathname, { replace: true, state: null });
   }, [arrived, undoInbox, navigate, pathname]);
 
   // That undo needs this screen — it may take the trip, and the screen with
@@ -125,7 +127,7 @@ export default function TripPage() {
     leave(appPath('viajes'));
   }
 
-  const today = todayIso();
+  const today = useToday();
   const { sections, done } = useMemo(() => tripSections(items), [items]);
 
   /** A row is born from its title and its class, chosen now and never again,
@@ -133,7 +135,7 @@ export default function TripPage() {
   async function addItem(title: string, kind: TripKind) {
     setNaming(null);
     const id = await add(tripId, { ...NEW_TRIP_ITEM, kind, title, done: false });
-    if (id) navigate(entryPath('viajes', tripId, id));
+    if (id) void navigate(entryPath('viajes', tripId, id));
   }
 
   function renderItem(item: TripItem) {
@@ -180,17 +182,33 @@ export default function TripPage() {
                 deleteLabel="Eliminar viaje"
               />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* A trip ends no sooner than it starts: a day moved past the
+                    other takes the other along. */}
                 <FormField label="Desde">
                   <DatePicker
                     value={trip.starts_on}
-                    onChange={(day) => void saveTrip(trip.id, { starts_on: day })}
+                    onChange={(day) =>
+                      void saveTrip(trip.id, {
+                        starts_on: day,
+                        ...(day !== null && trip.ends_on !== null && trip.ends_on < day
+                          ? { ends_on: day }
+                          : {}),
+                      })
+                    }
                     label="Desde"
                   />
                 </FormField>
                 <FormField label="Hasta">
                   <DatePicker
                     value={trip.ends_on}
-                    onChange={(day) => void saveTrip(trip.id, { ends_on: day })}
+                    onChange={(day) =>
+                      void saveTrip(trip.id, {
+                        ends_on: day,
+                        ...(day !== null && trip.starts_on !== null && trip.starts_on > day
+                          ? { starts_on: day }
+                          : {}),
+                      })
+                    }
                     label="Hasta"
                   />
                 </FormField>

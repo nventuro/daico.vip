@@ -20,10 +20,13 @@ Chromium-only APIs are available everywhere.
 - **`private.is_member()` binds membership to a verified Google identity**, not to
   the raw JWT `email` claim: it returns true only when the calling user
   (`auth.uid()`) has a row in `auth.identities` with `provider = 'google'`,
-  marked verified, whose email is in `members` (case-insensitive). A non-Google
-  credential registered for a member's address can never pass, whatever auth
-  providers happen to be enabled. The Email auth provider is also disabled in
-  the dashboard (Google-only) — keep it that way.
+  marked verified, whose email is in `members` (case-insensitive). It binds to
+  the user, not to how the session signed in: the auth server links a new
+  verified identity to the existing user with the same email, so a session
+  opened with another provider's credential for a member's address would pass
+  too. **Google is the only provider enabled in the dashboard — keep it that
+  way**; that toggle, which no migration or `db:verify` can see, is what makes
+  «Google only» true.
 - **Never add an anon grant or a public view.** There is no public data. The anon
   role must always resolve to zero access; `db:verify` fails on any privilege
   it holds.
@@ -38,6 +41,8 @@ Chromium-only APIs are available everywhere.
 to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   replacement: a role with a policy but no GRANT gets "permission denied for
   table ..." before the policy is ever evaluated. **Never grant to `anon`.**
+  A table that grants `delete` also gets the two triggers under «Offline-first»
+  below, and `db:verify` refuses any other trigger on any table.
 - **Every policy is `private.is_member()` and nothing else, with two
   exceptions.** A table whose rows are one member's (`checkups`,
   `health_records`) carries `owner uuid`, the auth user id of whoever created
@@ -78,8 +83,14 @@ are the rules on top of it.
   offline. The one trigger every synced table **must** have is
   `private.last_write_wins()` (`before update`): it skips an update carrying an
   older `updated_at` than the stored row, so a stale offline edit can't
-  overwrite a newer one on push and devices converge. `db:verify` checks every
-  table with `updated_at` has it.
+  overwrite a newer one on push and devices converge. A table the app may
+  delete from also carries `private.record_deletion()` (`after delete`, into
+  `deleted_rows`) and `private.delete_wins()` (`before insert`, which skips a
+  row of an id deleted before): that is what makes a delete win over an edit
+  of the row whenever the edit is pushed. An id is therefore never reused —
+  what an undo puts back is a new row. `db:verify` checks every table with
+  `updated_at` has the first trigger, every deletable table the other two,
+  and no table any other.
 - **A synced table is described in one place: `src/lib/offline/specs.ts`** — its
   row type (extending `SyncedRow`), the values any enumerated column may take,
   and its `TableSpec`, whose `columns` is keyed by column name so a column
@@ -98,9 +109,10 @@ are the rules on top of it.
   `ALL_SPECS`.
 - **What asks for a sync is installed once** (`installSyncTriggers`, from the
   shell's `AppProvider`, while a member is in): the connection coming back, and
-  the app returning to the foreground. A table's hook asks for a run after
-  each of its own writes and when its screen opens (`syncIfStale`) — never
-  through listeners of its own. Nothing syncs before the member is in: there
+  the app returning to the foreground. A table's hook asks to push after each
+  of its own writes (`syncAfterWrite`, which pulls only when the last pull is
+  stale) and for a run when its screen opens (`syncIfStale`) — never through
+  listeners of its own. Nothing syncs before the member is in: there
   is nothing to sync for anyone else, and a run after a sign-out would build
   the local store again right after the sign-out wiped it.
 - **The engine and sync are tested against real SQLite and a stand-in server**
@@ -150,6 +162,14 @@ gate, what a sync does with the files. These are the rules on top of it.
   anywhere else: a device keeps the master key as a non-extractable `CryptoKey`
   in IndexedDB (`masterKeyStore.ts`), and `useMasterKey` is the one place the
   app reads it.
+- **Every sealed thing is bound to its row.** `encryptFile` takes what the
+  blob is sealed for (`rowBinding(table, id)`, or `INBOX_KEY_BINDING`) as
+  associated data, and `decryptFile` opens it under that name only, so a
+  blob and its key moved to another row — by whoever can write rows, which
+  the server can — open nowhere. A row is therefore given its id before it is
+  sealed (`crypto.randomUUID()` ahead of the insert) and resealed under the
+  same id. Files sealed before this (format byte 1) still open; a new seal is
+  always format 2.
 - **`household_key` is written once, directly to the server, online** (the
   first member's setup in `UnlockScreen`), never through the engine's queue: the
   unique index makes a racing second setup fail instead of leaving two keys.
@@ -173,7 +193,9 @@ gate, what a sync does with the files. These are the rules on top of it.
   straight to the server). The worker never holds anything that opens a file.
   `householdKey.ts` stays the only crypto code in the app; the worker's
   `seal.ts` is the one copy of the file format outside it, pinned by the round
-  trip in `householdKey.test.ts`.
+  trip in `householdKey.test.ts`. `openInboxKey` refuses a published public
+  half that is not the private half's other half, so a replaced public key
+  is caught before a file sealed to it is trusted.
 - **Which files every device keeps is `KEPT_OWNER_KINDS`** in
   `attachmentFiles.ts`: documents and trip rows, the latter until
   `TRIP_FILES_KEPT_DAYS` past the trip — the one exception to files being
@@ -199,7 +221,8 @@ clear. These are the rules on top of it.
   `src/apps/gastos/payload.ts` (gzip, then `encryptFile` from `householdKey.ts`
   — never other crypto); a merchant rule's `pattern` is sealed the same way.
   **Never add a column that names a merchant or an amount of a line**, and never
-  log or persist opened contents outside `openOnce`'s in-memory cache. **Gastos
+  log or persist opened contents outside the in-memory cache of what has been
+  opened under the key (`src/lib/opened.ts`, emptied when the key goes). **Gastos
   contributes nothing to search** for the same reason: search reads the local
   tables as they are stored, and looking through statements would mean unsealing
   every one on every keystroke. **Who made a purchase is not kept at all**, not
@@ -282,24 +305,34 @@ and what becomes of a forwarded email. These are the rules on top of it.
   a chore does. Airport codes are typed by hand and offered from the curated
   list in `airports.ts` — never a lookup, which does not work offline, and never
   the full IATA set, which would be precached on every device.
-- **`trip_inbox` is staged by the worker in `worker/`, never by the app**, which
-  only confirms a group of staged rows into real ones (through the offline
-  engine, undoable for a moment, which puts the staged rows back) or deletes
-  them. Staged rows reach neither Buscar nor Próximo: they are suggestions, not
+- **`trip_inbox` is staged by the worker in `worker/`, never made up by the
+  app**, which only confirms a group of staged rows into real ones (through the
+  offline engine, undoable for a moment, which stages the rows again as new
+  rows — an id is never reused) or deletes them. Staged rows reach neither Buscar nor Próximo: they are suggestions, not
   commitments.
 - **The worker never holds the service key.** It connects as
   `trip_inbox_writer`, a role with exactly the grants and policies `db:verify`
   pins — its header says what it holds and why — lets through only mail from
   a member that passed DMARC in the receiving server's own verdict (the first
   `Authentication-Results` header, and only when it is headed by that
-  server's name), logs nothing of an email, and always replies to the sender.
-  It is deployed on its own with the `worker:*` scripts, never by the app's
-  deploy.
-- **The app never decrypts a staged file**: it re-wraps the file key at confirm
-  (`sealedFilesOf`). `trip_inbox_files` is never in `ALL_SPECS`: the module's
-  `afterSync` (`syncInboxFiles`) fetches every listed file into the local
-  `INBOX_FILES`, the one other table fetched whole, few and short-lived. The
-  staged files are deleted only once the confirm can no longer be undone
+  server's name, checked before the database is even opened), logs nothing of
+  an email, and always replies to the sender — a reply marked
+  `Auto-Submitted`, and never to a mail that is itself a machine's. An email
+  is staged once: its Message-ID goes into `trip_inbox_imports` with its
+  rows, and a second delivery is answered without being read again. What
+  reaches the model is bounded (PDF count and bytes, text length, one retry),
+  and what comes back is cut to length and checked for real dates before it
+  is written. It is deployed on its own with the `worker:*` scripts, never by
+  the app's deploy.
+- **A staged file is opened only at confirm** (`openedFilesOf`), to be sealed
+  again for the attachment it becomes: a file is bound to its own row, so it
+  cannot move from a staged row to an attachment as it is. `trip_inbox_files`
+  is never in `ALL_SPECS`: the module's `afterSync` (`syncInboxFiles`) fetches
+  every listed file into the local `INBOX_FILES`, one file per request, the
+  one other table fetched whole, few and short-lived. A confirm clears each
+  staged row as soon as its own row is written, and stops at a write that
+  fails, so what is left staged is what is still to confirm. The staged files
+  are deleted only once the confirm can no longer be undone
   (`settleInboxUndo`), at discard, or by the sweep a month on.
 
 ## Salud — read before touching them
@@ -344,6 +377,8 @@ the rules on top of it.
 - Keep everything generic: `member`, `user`, `household`. All personal data lives
   only in the database (e.g. the `members` table). **Migrations must never seed real
   emails or names** — add real members manually via the Supabase SQL editor.
+  The one name in the repository is the LICENSE's: a licence needs a holder,
+  and that is the one place a name appears.
 - UI copy must be generic and non-identifying.
 
 ## Conventions
@@ -426,7 +461,8 @@ the rules on top of it.
   square writes, offers the same undo, and leaves back to where the page was
   opened from (`useLeaveBack`), so the page never shows the after-state.
 - **Every free text is `Body`** (`src/components/editor/`), never a
-  `TextArea`, never a second markdown renderer. A text that is the entry
+  `TextArea`, never a second markdown renderer; the one box that is not a
+  text but a paste — Gastos' rules import — is a `TextArea` on purpose. A text that is the entry
   itself takes the field's name as its placeholder («Contenido»); what is
   written _about_ an entry is drawn by `Comments`, headed like the sections
   around it, and a page that takes comments never draws a `Body` of its own.
@@ -434,9 +470,12 @@ the rules on top of it.
   reader until the editor's chunk arrives, so any block the two draw
   differently jumps on screen. They share
   `src/components/markdown/classes.ts`, the editor has no height of its own,
-  a soft line break reads as the space it is on both sides, and what the
-  editor does not model — a GFM table, a directive, an image by address — is
-  kept as the text it is. The round trip is tested headlessly in `BodyEditor.test.ts`.
+  a soft line break reads as the space it is on both sides, every other space
+  is kept on both, and what the editor does not model — a GFM table, a
+  directive, an image by address — is kept as the text it is. The round trip
+  is tested headlessly in `BodyEditor.test.ts`, and that the two draw the same
+  elements in `parity.test.tsx`: a change to how either draws a block must
+  keep that test green.
 - **A page is left, never stacked on**: `useLeave` for every delete and the
   header's arrow, `useLeaveBack` for the mark that leaves; a plain link or
   `navigate` only going down, from a list to an entry. `src/lib/visited.ts`

@@ -35,7 +35,7 @@ const LOCAL_DB_PATH = 'daico-local.sqlite3';
 type DbRow = Record<string, unknown>;
 
 // Lazily created so the worker/OPFS only spin up once an offline table is
-// actually used (never for non-members, who never reach this code).
+// actually used.
 let ready: Promise<SQLocal> | null = null;
 
 /**
@@ -71,8 +71,9 @@ function db(): Promise<SQLocal> {
 /**
  * Every table brought to the shape its spec declares. A table a client created
  * under an older spec can be a column short or a column over: a column the
- * spec has gained is added in place where SQLite takes it, which keeps the
- * rows and whatever is queued on them, and anything else is settled by
+ * spec has gained is added in place and one it has lost is dropped in place,
+ * which keeps the rows and whatever is queued on them. Only a gained column
+ * SQLite cannot add — one every row must have a value for — is settled by
  * emptying the table.
  */
 async function migrateTables(c: SQLocal): Promise<void> {
@@ -83,7 +84,7 @@ async function migrateTables(c: SQLocal): Promise<void> {
     const expected = new Set(columns.map(([name]) => name));
     const missing = columns.filter(([name]) => !present.has(name));
     const over = [...present].filter((name) => !expected.has(name));
-    if (over.length > 0 || missing.some(([, ddl]) => !addable(ddl))) {
+    if (missing.some(([, ddl]) => !addable(ddl))) {
       // A queued edit cannot be carried over: a row stored without a column
       // the shape now requires has no value to give it, and the server would
       // not take it either. A queued deletion is carried over, because it is
@@ -98,6 +99,9 @@ async function migrateTables(c: SQLocal): Promise<void> {
       await c.sql(`DROP TABLE IF EXISTS ${spec.table}`);
       await c.sql(createTableSql(spec));
       continue;
+    }
+    for (const name of over) {
+      await c.sql(`ALTER TABLE ${spec.table} DROP COLUMN ${name}`);
     }
     for (const [name, ddl] of missing) {
       await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${name} ${ddl}`);
@@ -224,7 +228,25 @@ export async function listVisible<Row extends SyncedRow>(spec: TableSpec<Row>): 
   const rows = await c.sql<DbRow>(
     `SELECT * FROM ${spec.table} WHERE pending_op IS NOT 'delete' ORDER BY ${spec.orderBy}`,
   );
-  return rows.map((r) => toObject<Row>(spec, r));
+  const list = rows.map((r) => toObject<Row>(spec, r));
+  return spec.compare ? list.sort(spec.compare.bind(spec)) : list;
+}
+
+/**
+ * A synced table's visible rows — every row but the ones queued for deletion —
+ * as a subquery to select from, for a query that joins a synced table with a
+ * local-only one. How the engine keeps a queued deletion is its own.
+ */
+export function visibleSql(spec: TableSpec): string {
+  return `(SELECT * FROM ${spec.table} WHERE pending_op IS NOT 'delete')`;
+}
+
+/**
+ * A synced table's settled rows — the ones with nothing queued, which the
+ * server holds in this very version — as a subquery to select from.
+ */
+export function settledSql(spec: TableSpec): string {
+  return `(SELECT * FROM ${spec.table} WHERE pending_op IS NULL)`;
 }
 
 // ─── Local mutations (instant, offline-safe) ─────────────────────────────────
@@ -390,6 +412,7 @@ export async function markDeleted(spec: TableSpec, id: string): Promise<void> {
  * formats ("...Z" vs "...+00:00").
  */
 export async function reconcile(spec: TableSpec, remote: DbRow[]): Promise<void> {
+  const cols = columnsOf(spec);
   const insertCols = [
     'id',
     ...columnNames(spec),
@@ -398,57 +421,54 @@ export async function reconcile(spec: TableSpec, remote: DbRow[]): Promise<void>
     'pending_op',
     'synced',
   ];
-  const insertPlaceholders = insertCols.map(() => '?').join(', ');
+  const insertSql = `INSERT INTO ${spec.table} (${insertCols.join(', ')})
+    VALUES (${insertCols.map(() => '?').join(', ')})`;
+  const setCols = [...columnNames(spec), 'created_at', 'updated_at'];
+  const updateSql = `UPDATE ${spec.table}
+    SET ${setCols.map((name) => `${name} = ?`).join(', ')}, synced = 1 WHERE id = ?`;
   const c = await db();
   let changed = false;
   await c.transaction(async (tx) => {
+    // The table is read once, whole, as the server's copy of it came: one
+    // trip to the worker rather than one per row.
+    const rows = await tx.sql<DbRow>(`SELECT * FROM ${spec.table}`);
+    const locals = new Map(rows.map((row) => [row.id as string, row]));
     const remoteIds = new Set<string>();
 
     for (const r of remote) {
       const id = r.id as string;
       remoteIds.add(id);
-      const existing = await tx.sql<DbRow>(`SELECT * FROM ${spec.table} WHERE id = ?`, id);
-      const local = existing[0];
-
+      const local = locals.get(id);
+      const values = cols.map(([name, col]) => toDb(col, r[name]));
       if (!local) {
-        await tx.sql(
-          `INSERT INTO ${spec.table} (${insertCols.join(', ')}) VALUES (${insertPlaceholders})`,
-          id,
-          ...columnsOf(spec).map(([name, col]) => toDb(col, r[name])),
-          r.created_at,
-          r.updated_at,
-          null,
-          1,
-        );
+        await tx.sql(insertSql, id, ...values, r.created_at, r.updated_at, null, 1);
         changed = true;
-      } else if (local.pending_op === null) {
-        if (Date.parse(r.updated_at as string) > Date.parse(local.updated_at as string)) {
-          const setCols = [...columnNames(spec), 'created_at', 'updated_at'];
-          const sets = setCols.map((name) => `${name} = ?`).concat('synced = 1');
-          await tx.sql(
-            `UPDATE ${spec.table} SET ${sets.join(', ')} WHERE id = ?`,
-            ...columnsOf(spec).map(([name, col]) => toDb(col, r[name])),
-            r.created_at,
-            r.updated_at,
-            id,
-          );
-          changed = true;
-        } else if (local.synced === 0) {
-          // Server already has it; mark so a later delete pushes a tombstone.
-          await tx.sql(`UPDATE ${spec.table} SET synced = 1 WHERE id = ?`, id);
-        }
+        continue;
       }
-      // Rows with a pending op keep their local change; sync will push it.
+      // A row with a queued change keeps it; the push settles the two.
+      if (local.pending_op !== null) continue;
+      const remoteAt = Date.parse(r.updated_at as string);
+      const localAt = Date.parse(local.updated_at as string);
+      if (remoteAt < localAt) continue;
+      // A clean row is a copy of the server's, so a newer one replaces it —
+      // and so does one of the same instant that reads differently: two
+      // devices writing in the one millisecond leave the server holding one
+      // version and this device the other, and the server's is the one every
+      // other device has.
+      const same =
+        remoteAt === localAt &&
+        cols.every(([name], i) => local[name] === values[i]) &&
+        Date.parse(local.created_at as string) === Date.parse(r.created_at as string);
+      if (same) continue;
+      await tx.sql(updateSql, ...values, r.created_at, r.updated_at, id);
+      changed = true;
     }
 
     // Delete detection: a previously-synced, unmodified row absent from the
     // server set was deleted elsewhere — remove it locally too.
-    const clean = await tx.sql<{ id: string }>(
-      `SELECT id FROM ${spec.table} WHERE synced = 1 AND pending_op IS NULL`,
-    );
-    for (const row of clean) {
-      if (!remoteIds.has(row.id)) {
-        await tx.sql(`DELETE FROM ${spec.table} WHERE id = ?`, row.id);
+    for (const [id, local] of locals) {
+      if (local.synced === 1 && local.pending_op === null && !remoteIds.has(id)) {
+        await tx.sql(`DELETE FROM ${spec.table} WHERE id = ?`, id);
         changed = true;
       }
     }

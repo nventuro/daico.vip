@@ -5,7 +5,7 @@ import type { SpendingCategory } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { useEntry } from '../../hooks/useEntry';
 import { capitalize } from '../../utils/textUtils';
-import { dueWord, formatDateCompact, isPast, todayIso } from '../../utils/dateUtils';
+import { dueWord, formatDateCompact, isPast } from '../../utils/dateUtils';
 import CheckRow from '../../components/CheckRow';
 import DeleteDialog from '../../components/DeleteDialog';
 import EntryPage from '../../components/EntryPage';
@@ -43,6 +43,7 @@ import Breakdown from './Breakdown';
 import BreakdownSkeleton from './BreakdownSkeleton';
 import Delta from './Delta';
 import MovementList from './MovementList';
+import { useToday } from '../../hooks/useToday';
 
 export default function StatementPage() {
   const { items, loading, error, replace, setPaid, remove } = useStatements();
@@ -51,7 +52,7 @@ export default function StatementPage() {
   const masterKey = useMasterKey();
   const { select, dialog } = useRuleDialog(rulesStore);
   const leave = useLeave();
-  const today = todayIso();
+  const today = useToday();
   const [deleting, setDeleting] = useState(false);
 
   const statement = useEntry(items);

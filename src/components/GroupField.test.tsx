@@ -13,7 +13,7 @@ describe('the group chip', () => {
     const html = render(['casa', 'películas'], 'casa');
     expect(html).toContain('aria-label="Grupo"');
     expect(html).toContain(
-      '<option value="0" selected="">casa</option><option value="1">películas</option><option value="new">Nuevo grupo…</option>',
+      '<option value="0" selected="">casa</option><option value="1">películas</option><option value="new">Nuevo grupo...</option>',
     );
     expect(html).not.toContain('Sin grupo');
     expect(html).not.toContain('Nombre del grupo');
@@ -28,7 +28,7 @@ describe('the group chip', () => {
   it('offers no group first for an entry that may have none, chosen while it has none', () => {
     const html = render(['casa'], '', true);
     expect(html).toContain(
-      '<option value="none" selected="">Sin grupo</option><option value="0">casa</option><option value="new">Nuevo grupo…</option>',
+      '<option value="none" selected="">Sin grupo</option><option value="0">casa</option><option value="new">Nuevo grupo...</option>',
     );
     expect(html).not.toContain('Nombre del grupo');
   });
@@ -36,7 +36,7 @@ describe('the group chip', () => {
   it('still offers a new group while there is none at all', () => {
     const html = render([], '', true);
     expect(html).toContain(
-      '<option value="none" selected="">Sin grupo</option><option value="new">Nuevo grupo…</option>',
+      '<option value="none" selected="">Sin grupo</option><option value="new">Nuevo grupo...</option>',
     );
   });
 });

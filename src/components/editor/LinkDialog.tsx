@@ -13,27 +13,38 @@ interface LinkDialogProps {
   onClose: () => void;
 }
 
-/** An address typed without a scheme is a web address; a path is the app's own. */
-function withScheme(address: string): string {
-  return /^[a-z][a-z0-9+.-]*:/i.test(address) || address.startsWith('/')
-    ? address
-    : `https://${address}`;
+/** Where a link may go: to the web, to a mailbox, or into the app. Anything
+ *  else the browser could be made to run is not a place. */
+const LINK_SCHEME = /^(https?:|mailto:)/i;
+const ANY_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/** Whether `address` is somewhere a link may go. */
+function isLinkable(address: string): boolean {
+  return address.startsWith('/') || LINK_SCHEME.test(address);
+}
+
+/** An address typed without a scheme is a web address; a path is the app's
+ *  own; one under another scheme is nowhere, null. */
+function withScheme(address: string): string | null {
+  if (isLinkable(address)) return address;
+  if (ANY_SCHEME.test(address)) return null;
+  return `https://${address}`;
 }
 
 /** Where a link's address is typed, changed, opened or taken off. */
 export default function LinkDialog({ href, onSave, onRemove, onClose }: LinkDialogProps) {
   const [address, setAddress] = useState(href);
-  const typed = address.trim();
+  const target = withScheme(address.trim());
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!typed) return;
-    onSave(withScheme(typed));
+    if (!target) return;
+    onSave(target);
     onClose();
   }
 
   return (
-    <ModalDialog onClose={onClose} layout="sheet">
+    <ModalDialog onClose={onClose} layout="sheet" label="Enlace">
       <form onSubmit={submit} className="flex flex-col gap-4 p-4">
         <span className="font-medium">Enlace</span>
 
@@ -54,12 +65,14 @@ export default function LinkDialog({ href, onSave, onRemove, onClose }: LinkDial
 
         {href && (
           <div className="flex items-center justify-between">
-            <Button
-              variant="link"
-              onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
-            >
-              Abrir
-            </Button>
+            {isLinkable(href) && (
+              <Button
+                variant="link"
+                onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
+              >
+                Abrir
+              </Button>
+            )}
             <Button
               variant="dangerOutline"
               size="sm"
@@ -73,7 +86,7 @@ export default function LinkDialog({ href, onSave, onRemove, onClose }: LinkDial
           </div>
         )}
 
-        <DialogFooter onCancel={onClose} confirmLabel="Guardar" submit confirmDisabled={!typed} />
+        <DialogFooter onCancel={onClose} confirmLabel="Guardar" submit confirmDisabled={!target} />
       </form>
     </ModalDialog>
   );

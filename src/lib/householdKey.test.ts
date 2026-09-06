@@ -9,20 +9,41 @@ import {
   fromBase64,
   generatePhrase,
   isPhraseWord,
+  openInboxFile,
   openInboxKey,
   parsePhrase,
-  rewrapInboxFileKey,
+  rowBinding,
   toBase64,
   unwrapMasterKey,
 } from './householdKey';
 // The worker's copy of the file format: what it seals, this file opens.
-import { importInboxPublicKey, sealPdf } from '../../worker/src/seal';
+import { importInboxPublicKey, inboxFileBinding, sealPdf } from '../../worker/src/seal';
 
 const PHRASE = PHRASE_WORDS.slice(0, HOUSEHOLD_PHRASE_WORDS);
 const OTHER_PHRASE = PHRASE_WORDS.slice(HOUSEHOLD_PHRASE_WORDS, 2 * HOUSEHOLD_PHRASE_WORDS);
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 const text = (data: Uint8Array) => new TextDecoder().decode(data);
+
+/** The row a file under test is sealed for. */
+const ROW = rowBinding('attachments', 'a1');
+
+/** A file sealed the way the app did before rows were bound in: version 1,
+ *  no associated data. */
+async function sealedUnbound(masterKey: CryptoKey, plain: Uint8Array<ArrayBuffer>) {
+  const fileKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+    'encrypt',
+  ]);
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, fileKey, plain),
+  );
+  const data = new Uint8Array([1, ...nonce, ...cipher]);
+  const wrappedFileKey = toBase64(
+    new Uint8Array(await crypto.subtle.wrapKey('raw', fileKey, masterKey, 'AES-KW')),
+  );
+  return { data, wrappedFileKey };
+}
 
 describe('the word list', () => {
   it('has 2048 distinct words, none of which is another with accents stripped', () => {
@@ -72,8 +93,10 @@ describe('the master key', () => {
     const unwrapped = await unwrapMasterKey(PHRASE, wrapped);
     expect(unwrapped).not.toBeNull();
     // Proof the two are one key: what one seals, the other opens.
-    const sealed = await encryptFile(key, bytes('hola'));
-    expect(text(await decryptFile(unwrapped!, sealed.wrappedFileKey, sealed.data))).toBe('hola');
+    const sealed = await encryptFile(key, bytes('hola'), ROW);
+    expect(text(await decryptFile(unwrapped!, sealed.wrappedFileKey, sealed.data, ROW))).toBe(
+      'hola',
+    );
 
     expect(await unwrapMasterKey(OTHER_PHRASE, wrapped)).toBeNull();
   });
@@ -117,16 +140,16 @@ describe('a file', () => {
   it('comes back as it went in', async () => {
     const { key } = await createMasterKey(PHRASE);
     const plain = crypto.getRandomValues(new Uint8Array(60_000));
-    const sealed = await encryptFile(key, plain);
+    const sealed = await encryptFile(key, plain, ROW);
     expect(sealed.data.length).toBe(plain.length + 1 + 12 + 16);
     expect(sealed.data.subarray(29)).not.toEqual(plain);
-    expect(await decryptFile(key, sealed.wrappedFileKey, sealed.data)).toEqual(plain);
+    expect(await decryptFile(key, sealed.wrappedFileKey, sealed.data, ROW)).toEqual(plain);
   });
 
   it('gets a key of its own each time', async () => {
     const { key } = await createMasterKey(PHRASE);
-    const a = await encryptFile(key, bytes('x'));
-    const b = await encryptFile(key, bytes('x'));
+    const a = await encryptFile(key, bytes('x'), ROW);
+    const b = await encryptFile(key, bytes('x'), ROW);
     expect(a.wrappedFileKey).not.toBe(b.wrappedFileKey);
     expect(a.data).not.toEqual(b.data);
   });
@@ -134,34 +157,55 @@ describe('a file', () => {
   it('refuses altered data and another household key', async () => {
     const { key } = await createMasterKey(PHRASE);
     const other = (await createMasterKey(OTHER_PHRASE)).key;
-    const sealed = await encryptFile(key, bytes('hola'));
+    const sealed = await encryptFile(key, bytes('hola'), ROW);
     const altered = sealed.data.slice();
     altered[altered.length - 1] ^= 1;
-    await expect(decryptFile(key, sealed.wrappedFileKey, altered)).rejects.toThrow();
-    await expect(decryptFile(other, sealed.wrappedFileKey, sealed.data)).rejects.toThrow();
+    await expect(decryptFile(key, sealed.wrappedFileKey, altered, ROW)).rejects.toThrow();
+    await expect(decryptFile(other, sealed.wrappedFileKey, sealed.data, ROW)).rejects.toThrow();
+  });
+
+  it('opens only under the row it was sealed for', async () => {
+    // Whoever can write rows — the server can — could move a blob and its key
+    // to another row; bound to its own, it opens nowhere else.
+    const { key } = await createMasterKey(PHRASE);
+    const sealed = await encryptFile(key, bytes('de un documento'), ROW);
+    await expect(
+      decryptFile(key, sealed.wrappedFileKey, sealed.data, rowBinding('attachments', 'a2')),
+    ).rejects.toThrow();
+    await expect(
+      decryptFile(key, sealed.wrappedFileKey, sealed.data, rowBinding('notes', 'a1')),
+    ).rejects.toThrow();
+  });
+
+  it('still opens a file sealed before rows were bound in, under any row', async () => {
+    const { key } = await createMasterKey(PHRASE);
+    const sealed = await sealedUnbound(key, bytes('de antes'));
+    expect(text(await decryptFile(key, sealed.wrappedFileKey, sealed.data, ROW))).toBe('de antes');
+    // And seals anew under the current version.
+    expect((await encryptFile(key, bytes('x'), ROW)).data[0]).toBe(2);
   });
 
   it('refuses a change to any part of it: the nonce, the body, or its wrapped key', async () => {
     const { key } = await createMasterKey(PHRASE);
-    const sealed = await encryptFile(key, bytes('un documento'));
+    const sealed = await encryptFile(key, bytes('un documento'), ROW);
     // The nonce sits after the format byte, the body after the nonce.
     for (const at of [1, 12, 13, sealed.data.length - 17]) {
       const altered = sealed.data.slice();
       altered[at] ^= 1;
-      await expect(decryptFile(key, sealed.wrappedFileKey, altered)).rejects.toThrow();
+      await expect(decryptFile(key, sealed.wrappedFileKey, altered, ROW)).rejects.toThrow();
     }
     const wrappedKey = fromBase64(sealed.wrappedFileKey);
     wrappedKey[0] ^= 1;
-    await expect(decryptFile(key, toBase64(wrappedKey), sealed.data)).rejects.toThrow();
+    await expect(decryptFile(key, toBase64(wrappedKey), sealed.data, ROW)).rejects.toThrow();
   });
 
   it('refuses a format it does not know, saying which', async () => {
     const { key } = await createMasterKey(PHRASE);
-    const sealed = await encryptFile(key, bytes('hola'));
-    for (const version of [0, 2, 255]) {
+    const sealed = await encryptFile(key, bytes('hola'), ROW);
+    for (const version of [0, 3, 255]) {
       const other = sealed.data.slice();
       other[0] = version;
-      await expect(decryptFile(key, sealed.wrappedFileKey, other)).rejects.toThrow(
+      await expect(decryptFile(key, sealed.wrappedFileKey, other, ROW)).rejects.toThrow(
         `Unknown attachment file format ${version}`,
       );
     }
@@ -170,7 +214,7 @@ describe('a file', () => {
   it('never seals two files under the same nonce', async () => {
     const { key } = await createMasterKey(PHRASE);
     const sealed = await Promise.all(
-      Array.from({ length: 50 }, () => encryptFile(key, bytes('x'))),
+      Array.from({ length: 50 }, () => encryptFile(key, bytes('x'), ROW)),
     );
     const nonces = sealed.map((file) => toBase64(file.data.subarray(1, 13)));
     expect(new Set(nonces).size).toBe(nonces.length);
@@ -191,14 +235,22 @@ describe('base64', () => {
 });
 
 describe('the inbox key', () => {
-  it('opens under its master key, and a PDF the worker sealed to it becomes an ordinary attachment', async () => {
+  const STAGED = inboxFileBinding('f1');
+
+  it('opens under its master key, and opens a PDF the worker sealed to it under the row it was staged as', async () => {
     const { key: masterKey } = await createMasterKey(PHRASE);
     const pair = await createInboxKey(masterKey);
-    const sealed = await sealPdf(await importInboxPublicKey(pair.public_key), bytes('%PDF hola'));
+    const publicKey = await importInboxPublicKey(pair.public_key);
+    const sealed = await sealPdf(publicKey, bytes('%PDF hola'), STAGED);
     const privateKey = await openInboxKey(masterKey, pair);
-    const wrapped = await rewrapInboxFileKey(privateKey, masterKey, sealed.wrappedKey);
-    // The bytes are the worker's, untouched; only the key changed hands.
-    expect(text(await decryptFile(masterKey, wrapped, sealed.data))).toBe('%PDF hola');
+    expect(text(await openInboxFile(privateKey, sealed.wrappedKey, sealed.data, STAGED))).toBe(
+      '%PDF hola',
+    );
+    // The worker names the row the way the app does; the two copies agree.
+    expect(STAGED).toBe(rowBinding('trip_inbox_files', 'f1'));
+    await expect(
+      openInboxFile(privateKey, sealed.wrappedKey, sealed.data, inboxFileBinding('f2')),
+    ).rejects.toThrow();
   });
 
   it("does not open under another household's master key", async () => {
@@ -208,13 +260,27 @@ describe('the inbox key', () => {
     await expect(openInboxKey(other, pair)).rejects.toThrow();
   });
 
+  it("refuses a public half that is not this private half's", async () => {
+    // Whoever replaced the published half would have every PDF from then on
+    // sealed to a key of their own; the pair is asked to work before it is used.
+    const { key: masterKey } = await createMasterKey(PHRASE);
+    const pair = await createInboxKey(masterKey);
+    const otherPair = await createInboxKey(masterKey);
+    await expect(
+      openInboxKey(masterKey, { ...pair, public_key: otherPair.public_key }),
+    ).rejects.toThrow('no es la de este par');
+  });
+
   it('refuses a file key wrapped for another pair', async () => {
     const { key: masterKey } = await createMasterKey(PHRASE);
     const pair = await createInboxKey(masterKey);
     const otherPair = await createInboxKey(masterKey);
-    const sealed = await sealPdf(await importInboxPublicKey(otherPair.public_key), bytes('x'));
+    const publicKey = await importInboxPublicKey(otherPair.public_key);
+    const sealed = await sealPdf(publicKey, bytes('x'), STAGED);
     const privateKey = await openInboxKey(masterKey, pair);
-    await expect(rewrapInboxFileKey(privateKey, masterKey, sealed.wrappedKey)).rejects.toThrow();
+    await expect(
+      openInboxFile(privateKey, sealed.wrappedKey, sealed.data, STAGED),
+    ).rejects.toThrow();
   });
 
   it('keeps the private half sealed and the public half in the clear', async () => {
@@ -222,7 +288,7 @@ describe('the inbox key', () => {
     const pair = await createInboxKey(masterKey);
     // SPKI, importable as it is; the other two are opaque without the key.
     await expect(importInboxPublicKey(pair.public_key)).resolves.toBeTruthy();
-    expect(fromBase64(pair.private_key)[0]).toBe(1);
+    expect(fromBase64(pair.private_key)[0]).toBe(2);
     expect(pair.wrapped_key).not.toBe('');
   });
 });

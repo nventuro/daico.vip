@@ -26,15 +26,21 @@ let waiting: ServiceWorker | null = null;
 // Set for good once a takeover is under way: the page is being replaced, and a
 // second attempt would only race the first.
 let takingOver = false;
+// Set for good once another tab's takeover has put a newer build in charge of
+// this page too: what it runs is the old build under the new one's worker,
+// which stops serving the old build's pieces, so this page has to reload.
+let replaced = false;
 // How many things are under way that a reload would cut short. On Android the
 // page is hidden while the device's picker or share sheet is up over it, so
 // that moment looks exactly like the app being put down, and is not.
 let holds = 0;
 const listeners = new Set<() => void>();
 
-/** Whether a version newer than the running one is downloaded and waiting. */
+/** Whether a version newer than the running one is downloaded and waiting —
+ *  or already in charge, put there by another tab, and waiting for this page
+ *  to reload into it. */
 export function isUpdateWaiting(): boolean {
-  return waiting !== null;
+  return waiting !== null || replaced;
 }
 
 /** Run `listener` when that changes; returns the unsubscribe. */
@@ -83,7 +89,17 @@ async function takeOver(worker: ServiceWorker): Promise<boolean> {
 
 /** Go in with the waiting version now, for the member who asks. */
 export function applyUpdate(): void {
-  if (waiting) void takeOver(waiting);
+  if (replaced) window.location.reload();
+  else if (waiting) void takeOver(waiting);
+}
+
+/** A takeover this page did not start: another tab's. Reload out of the way
+ *  at once if nobody is looking, else when the app is next put down. */
+function onForeignTakeover(): void {
+  if (takingOver) return;
+  replaced = true;
+  listeners.forEach((listener) => listener());
+  if (document.visibilityState === 'hidden' && holds === 0) window.location.reload();
 }
 
 /**
@@ -126,8 +142,11 @@ function installUpdateTriggers(registration: ServiceWorkerRegistration): void {
   window.addEventListener('online', ask);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') ask();
-    else if (waiting && holds === 0) void takeOver(waiting);
+    else if (holds > 0) return;
+    else if (replaced) window.location.reload();
+    else if (waiting) void takeOver(waiting);
   });
+  navigator.serviceWorker.addEventListener('controllerchange', onForeignTakeover);
 }
 
 /**
@@ -155,6 +174,11 @@ export async function installAppUpdates(): Promise<boolean> {
     });
     watchForUpdates(registration);
     installUpdateTriggers(registration);
+    // One already waiting when this page started, which did not take control
+    // above: it is announced like one arriving, since it never installs again.
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      setWaiting(registration.waiting);
+    }
   } catch (err) {
     console.warn('[update] the service worker could not be registered:', err);
   }

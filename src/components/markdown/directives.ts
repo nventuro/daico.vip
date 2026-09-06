@@ -49,7 +49,7 @@ export function directivesToElements() {
         node.type !== 'textDirective' &&
         node.type !== 'containerDirective'
       ) {
-        return;
+        return undefined;
       }
       const { key, ...rest } = node.attributes ?? {};
       node.data = {
@@ -57,6 +57,7 @@ export function directivesToElements() {
         hName: node.name,
         hProperties: key === undefined ? rest : { ...rest, imageKey: key },
       };
+      return undefined;
     });
   };
 }

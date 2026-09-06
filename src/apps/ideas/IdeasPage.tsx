@@ -25,7 +25,7 @@ export default function IdeasPage() {
    *  written on, and opened to be written on. */
   async function addIdea(title: string) {
     const id = await add({ title, group_name: lastEditedGroup(items), body: '' });
-    if (id) navigate(entryPath('ideas', id));
+    if (id) void navigate(entryPath('ideas', id));
   }
 
   return (

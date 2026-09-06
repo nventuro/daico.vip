@@ -23,7 +23,9 @@ function versionOf(note: Note): string {
  * is open — reading a note is decrypting it — and again for a note whose body
  * has not been opened yet, so a screen never shows one note's body under
  * another's title. A note already open stays open while a newer version of
- * it is read, so a screen writing on it never sees it blink out.
+ * it is read, so a screen writing on it never sees it blink out. A version
+ * that comes in from another device while the note is being written on here
+ * is overwritten by the next keystroke: the later write wins, as everywhere.
  */
 export function useNoteText(note: Note | undefined): NoteText {
   const masterKey = useMasterKey();
@@ -39,7 +41,7 @@ export function useNoteText(note: Note | undefined): NoteText {
       return;
     if (masterKey.status !== 'unlocked') return;
     let active = true;
-    openBody(masterKey.key, { body, wrapped_key: wrappedKey }).then(
+    openBody(masterKey.key, { id, body, wrapped_key: wrappedKey }).then(
       (text) => {
         if (active) setOpened({ id, version, text, error: null });
       },

@@ -33,7 +33,9 @@ export interface CheckupGroups {
 }
 
 /** Checkups split into the two groups the list draws, each keeping the order
- *  it came in. */
+ *  it came in. Nothing is set aside as «Más adelante», as a chore is: a member
+ *  has a handful of checkups, months or years apart, and the whole list reads
+ *  at a glance — one due next year under one due next week is the point. */
 export function groupCheckups(checkups: Checkup[]): CheckupGroups {
   return {
     pending: checkups.filter((checkup) => !isDone(checkup)),

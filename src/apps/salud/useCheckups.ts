@@ -6,6 +6,7 @@ import { useSession } from '../../hooks/useSession';
 import { todayIso } from '../../utils/dateUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import { dueAfterMarking } from './recurrence';
+import * as engine from '../../lib/offline/engine';
 
 /** Everything the user decides about a checkup; the row's own columns minus
  *  the engine-managed ones, the mark, and whose it is. */
@@ -27,7 +28,7 @@ function withRepeat<T extends Partial<CheckupInput>>(patch: T, every: number | n
 /** Local-first checkups — the signed-in member's, since the server hands out
  *  no others: add / edit / mark / delete, syncing in the background. */
 export function useCheckups() {
-  const { items, loading, error, insert, update, remove } = useOfflineTable(CHECKUPS_SPEC);
+  const { items, loading, error, insert, update, remove, mutate } = useOfflineTable(CHECKUPS_SPEC);
   const owner = useSession()?.user.id ?? null;
 
   /** Creates a checkup of the signed-in member's from everything decided about
@@ -56,14 +57,21 @@ export function useCheckups() {
   /** Marks a checkup done today: the day it was marked and, when it repeats,
    *  the day the next one falls on. One write, whatever kind of checkup. */
   const mark = useCallback(
-    (checkup: Checkup) => {
-      const today = todayIso();
-      return update(checkup.id, {
-        last_done_on: today,
-        due_on: dueAfterMarking(checkup, today),
-      });
-    },
-    [update],
+    (checkup: Checkup) =>
+      mutate(async () => {
+        // The checkup as it is stored, not as it was drawn: an interval typed
+        // and saved on leaving the field is what the next date is counted
+        // by, whichever came first.
+        const stored =
+          (await engine.listVisible<Checkup>(CHECKUPS_SPEC)).find((c) => c.id === checkup.id) ??
+          checkup;
+        const today = todayIso();
+        await engine.update(CHECKUPS_SPEC, checkup.id, {
+          last_done_on: today,
+          due_on: dueAfterMarking(stored, today),
+        });
+      }),
+    [mutate],
   );
 
   /** Takes a finished checkup's mark off. Its date never moved, so there is

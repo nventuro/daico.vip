@@ -58,7 +58,9 @@ export function offerUndo(next: UndoOffer): void {
 export function takeUndo(offer: UndoOffer): void {
   if (state.offer !== offer) return;
   set({ offer: null, shownAt: null });
-  void offer.undo();
+  Promise.resolve(offer.undo()).catch((err: unknown) => {
+    console.warn('[undo] could not be undone:', err);
+  });
   offer.onEnd?.(true);
 }
 

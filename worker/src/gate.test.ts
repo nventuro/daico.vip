@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RECEIVING_SERVER, isAllowedSender, senderRejection, type Sender } from './gate';
+import { RECEIVING_SERVER, senderRejection, type Sender } from './gate';
 
 const MEMBERS = ['Member@Example.com', 'other@example.com'];
 const PASSING = `${RECEIVING_SERVER}; dkim=pass header.d=example.com; spf=pass; dmarc=pass header.from=example.com`;
@@ -16,7 +16,7 @@ function sender(overrides: Partial<Sender> = {}): Sender {
 describe('senderRejection', () => {
   it('lets a member through whose mail passed DMARC', () => {
     expect(senderRejection(sender(), MEMBERS)).toBeNull();
-    expect(isAllowedSender(sender(), MEMBERS)).toBe(true);
+    expect(senderRejection(sender(), MEMBERS)).toBeNull();
   });
 
   it('reads addresses case-insensitively, on both sides', () => {

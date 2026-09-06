@@ -7,7 +7,7 @@ type Handler = () => void;
 function events() {
   const handlers = new Map<string, Set<Handler>>();
   return {
-    addEventListener(type: string, handler: Handler, options?: { once?: boolean }) {
+    addEventListener: (type: string, handler: Handler, options?: { once?: boolean }) => {
       const set = handlers.get(type) ?? new Set<Handler>();
       handlers.set(type, set);
       if (!options?.once) return void set.add(handler);
@@ -17,7 +17,7 @@ function events() {
       };
       set.add(once);
     },
-    fire(type: string) {
+    fire: (type: string) => {
       for (const handler of [...(handlers.get(type) ?? [])]) handler();
     },
   };
@@ -99,10 +99,10 @@ function fakeBrowser({
       get controller() {
         return controller;
       },
-      getRegistration: async () => registration,
-      register: async (url: string, options: unknown) => {
+      getRegistration: () => Promise.resolve(registration),
+      register: (url: string, options: unknown) => {
         registered.push({ url, options });
-        return registration;
+        return Promise.resolve(registration);
       },
       addEventListener: container.addEventListener,
     },
@@ -143,6 +143,8 @@ function fakeBrowser({
       doc.fire('visibilitychange');
     },
     reconnect: () => win.fire('online'),
+    /** Another tab told a newer build to take control, of this page too. */
+    takenOverElsewhere: () => container.fire('controllerchange'),
   };
 }
 
@@ -329,6 +331,63 @@ describe('something under way that a reload would cut short', () => {
     applyUpdate();
     await vi.advanceTimersByTimeAsync(0);
     expect(browser.reloads()).toBe(1);
+  });
+});
+
+describe('a takeover another tab started', () => {
+  it('reloads this page out of the way once it is put down', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, isUpdateWaiting } = await load();
+    await installAppUpdates();
+    // The other tab's build takes charge of this page too; what it runs is
+    // the old build under a worker that no longer serves its pieces.
+    browser.takenOverElsewhere();
+    expect(isUpdateWaiting()).toBe(true);
+    expect(browser.reloads()).toBe(0);
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(browser.reloads()).toBe(1);
+  });
+
+  it('reloads at once when nobody is looking', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates } = await load();
+    await installAppUpdates();
+    browser.hide();
+    browser.takenOverElsewhere();
+    expect(browser.reloads()).toBe(1);
+  });
+
+  it('is what the member who asks outright reloads into', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, applyUpdate } = await load();
+    await installAppUpdates();
+    browser.takenOverElsewhere();
+    applyUpdate();
+    expect(browser.reloads()).toBe(1);
+  });
+
+  it('is not what this page starting its own looks like', async () => {
+    const browser = fakeBrowser();
+    const { installAppUpdates, isUpdateWaiting } = await load();
+    await installAppUpdates();
+    browser.arrive();
+    browser.hide();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(browser.reloads()).toBe(1);
+    expect(isUpdateWaiting()).toBe(true);
+  });
+});
+
+describe('a build waiting when the page started that never took control', () => {
+  it('is announced all the same, and goes in the next time the app is put down', async () => {
+    const browser = fakeBrowser({ waiting: true, takesOver: false });
+    const { installAppUpdates, isUpdateWaiting } = await load();
+    const answer = installAppUpdates();
+    await vi.advanceTimersByTimeAsync(TAKEOVER_TIMEOUT_MS);
+    expect(await answer).toBe(false);
+    expect(browser.reloads()).toBe(0);
+    expect(isUpdateWaiting()).toBe(true);
   });
 });
 

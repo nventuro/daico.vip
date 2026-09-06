@@ -67,7 +67,7 @@ export default function RuleDialog({
   }
 
   return (
-    <ModalDialog onClose={onClose} layout="sheet">
+    <ModalDialog onClose={onClose} layout="sheet" label={line.charge ? 'Percepción' : 'Categoría'}>
       <form onSubmit={handleSubmit} className="flex min-h-full flex-col gap-4 p-4">
         <span className="font-medium">{line.charge ? 'Percepción' : 'Categoría'}</span>
         <ul className="border-y border-border">

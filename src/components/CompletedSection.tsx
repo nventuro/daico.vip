@@ -21,6 +21,7 @@ export default function CompletedSection({ label, count, children }: CompletedSe
   return (
     <div className="mt-6">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex w-full items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:text-muted-strong"

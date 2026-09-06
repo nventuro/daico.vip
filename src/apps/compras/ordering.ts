@@ -44,10 +44,13 @@ export function keyForAppend(items: Positioned[]): string {
 
 /**
  * The new key for item `fromId` after it's dropped onto `toId`'s slot, given the
- * list in its current visible order. Returns null when the move is a no-op
- * (dropped on itself, or either id is missing) or when a valid key can't be
- * minted — duplicate (equal) or corrupt neighbour keys make the generator throw,
- * so we bail and leave the order untouched rather than crash mid-drag.
+ * list in its current visible order. Two devices appending offline mint the
+ * same key, and no key fits between two equal ones: dropped between such
+ * rows, the item lands past the run of them, one slot from where it was let
+ * go. Returns null when the move is a no-op (dropped on itself, or either id
+ * is missing) or when a key still can't be minted — corrupt neighbour keys
+ * make the generator throw, so we bail and leave the order untouched rather
+ * than crash mid-drag.
  */
 export function keyForMove(items: Positioned[], fromId: string, toId: string): string | null {
   if (fromId === toId) return null;
@@ -57,7 +60,11 @@ export function keyForMove(items: Positioned[], fromId: string, toId: string): s
 
   const reordered = arrayMove(items, from, to);
   const before = to > 0 ? reordered[to - 1].position : null;
-  const after = to < reordered.length - 1 ? reordered[to + 1].position : null;
+  let end = to + 1;
+  if (before !== null) {
+    while (end < reordered.length && reordered[end].position === before) end += 1;
+  }
+  const after = end < reordered.length ? reordered[end].position : null;
   try {
     return positionBetween(before, after);
   } catch {

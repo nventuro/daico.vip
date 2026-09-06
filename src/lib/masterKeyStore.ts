@@ -8,6 +8,7 @@
 // everywhere.
 // =============================================================================
 /** IndexedDB database and store holding this device's unwrapped master key. */
+import { forgetOpened } from './opened';
 const MASTER_KEY_DB = 'daico-keys';
 const MASTER_KEY_STORE = 'keys';
 
@@ -16,7 +17,7 @@ const MASTER_KEY_ID = 'master';
 function done<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
   });
 }
 
@@ -41,7 +42,7 @@ async function withStore<T>(
 /** The master key kept on this device, or null when it has none. */
 async function loadMasterKey(): Promise<CryptoKey | null> {
   try {
-    const key = await withStore('readonly', (store) => store.get(MASTER_KEY_ID));
+    const key = await withStore<unknown>('readonly', (store) => store.get(MASTER_KEY_ID));
     return key instanceof CryptoKey ? key : null;
   } catch {
     // No IndexedDB (a private window that blocks it): the device simply holds no key.
@@ -50,7 +51,13 @@ async function loadMasterKey(): Promise<CryptoKey | null> {
 }
 
 async function saveMasterKey(key: CryptoKey): Promise<void> {
-  await withStore('readwrite', (store) => store.put(key, MASTER_KEY_ID));
+  try {
+    await withStore('readwrite', (store) => store.put(key, MASTER_KEY_ID));
+  } catch (err) {
+    // No IndexedDB to keep it in: the key serves this session and the phrase
+    // is asked again next time, which beats a device that never unlocks.
+    console.warn('[key] the master key could not be kept on this device:', err);
+  }
 }
 
 async function deleteMasterKey(): Promise<void> {
@@ -101,8 +108,10 @@ export async function setMasterKey(key: CryptoKey): Promise<void> {
   set({ status: 'unlocked', key });
 }
 
-/** Forget the key: the device is locked until the phrase is typed again. */
+/** Forget the key, and everything opened under it: the device is locked
+ *  until the phrase is typed again. */
 export async function clearMasterKey(): Promise<void> {
+  forgetOpened();
   await deleteMasterKey();
   set({ status: 'locked' });
 }

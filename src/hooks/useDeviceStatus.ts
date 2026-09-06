@@ -22,7 +22,7 @@ export interface DeviceStatus {
 export function useDeviceStatus() {
   const [status, setStatus] = useState<DeviceStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { syncing } = useSyncStatus();
+  const syncing = useSyncStatus((status) => status.syncing);
 
   const read = useCallback(async (): Promise<DeviceStatus> => {
     const [counts, refusals, files, storage] = await Promise.all([

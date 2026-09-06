@@ -17,9 +17,15 @@ export function groupRuns<T>(
   return runs;
 }
 
-/** How group names are ordered: in the household's language, so an accented
- *  name sits where a person would look for it rather than after the z. */
-const nameCollator = new Intl.Collator('es');
+/** How titles and group names are ordered: in the household's language, so an
+ *  accented name sits where a person would look for it rather than after the
+ *  z, and a capital beside its lower case. */
+const nameCollator = new Intl.Collator('es', { sensitivity: 'base' });
+
+/** Two titles in the order a person would look for them. */
+export function compareTitles(a: string, b: string): number {
+  return nameCollator.compare(a, b);
+}
 
 /**
  * The items filed under each name, every name once, in the order a person

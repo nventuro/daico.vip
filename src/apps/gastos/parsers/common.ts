@@ -113,9 +113,9 @@ export function headerDates(
     const dates = text(line).split(/\s+/).map(isoFromNamedDate);
     if (dates.length === 6 && dates.every((d) => d !== null)) {
       return {
-        previous_closed_on: dates[0] as string,
-        closed_on: dates[2] as string,
-        due_on: dates[3] as string,
+        previous_closed_on: dates[0],
+        closed_on: dates[2],
+        due_on: dates[3],
       };
     }
   }
@@ -147,16 +147,24 @@ export function minimumPayment(lines: PageLine[]): number | null {
 
 /**
  * Pesos per dollar the bank valued the dollar spend at, told from the 30%
- * withholding it charges on that spend: the charge is 30% of the spend in
- * pesos. Null when there is no such charge or no dollar spend.
+ * withholding it charges on that spend — the purchases in dollars, not the
+ * month's dollar total, which a payment or a refund pulls down. A layout that
+ * prints the peso value the charge was taken on beside it is read from that;
+ * otherwise the charge is 30% of it. Null when there is no such charge or no
+ * dollar spend.
  */
 export function usdRate(
   charges: { description: string; ars_cents: number }[],
-  totalUsdCents: number,
+  lines: { usd_cents: number; charge: boolean }[],
 ): number | null {
   const withholding = charges.find((c) => /\b30%/.test(c.description));
-  if (!withholding || totalUsdCents <= 0) return null;
-  return withholding.ars_cents / 0.3 / totalUsdCents;
+  const spend = lines
+    .filter((line) => !line.charge && line.usd_cents > 0)
+    .reduce((sum, line) => sum + line.usd_cents, 0);
+  if (!withholding || spend <= 0) return null;
+  const printed = /30%[^(]*\(\s*([\d.]+,\d\d)\s*\)/.exec(withholding.description);
+  const base = (printed && cents(printed[1])) ?? withholding.ars_cents / 0.3;
+  return base / spend;
 }
 
 /** Fails the read when what the lines add up to is not what the bank printed. */

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { GUIDES_SPEC, GUIDE_CHAPTERS_SPEC, type GuideChapter } from '../../lib/offline/specs';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
+import { errorMessage } from '../../utils/textUtils';
 
 /** What the household decides about a guide from its editor: its title and
  *  the group it is shelved under. Whether it is archived is flipped on its
@@ -23,19 +24,22 @@ export interface GuideInput {
  */
 export function useGuides() {
   const { items: guides, loading, error, update } = useOfflineTable(GUIDES_SPEC);
-  const [chapters, setChapters] = useState<GuideChapter[]>([]);
+  // Undefined until read: a chapter page that sees an empty list would say
+  // the chapter is not there for the render before it is.
+  const [chapters, setChapters] = useState<GuideChapter[] | undefined>(undefined);
+  const [chaptersError, setChaptersError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const read = () =>
-      engine
-        .listVisible(GUIDE_CHAPTERS_SPEC)
-        .then((rows) => {
+      engine.listVisible(GUIDE_CHAPTERS_SPEC).then(
+        (rows) => {
           if (active) setChapters(rows);
-        })
-        .catch(() => {
-          // The guides table shares the store; its error already surfaces.
-        });
+        },
+        (e: unknown) => {
+          if (active) setChaptersError(errorMessage(e));
+        },
+      );
     void read();
     const stop = engine.subscribe(GUIDE_CHAPTERS_SPEC.table, () => void read());
     return () => {
@@ -44,5 +48,11 @@ export function useGuides() {
     };
   }, []);
 
-  return { guides, chapters, loading, error, save: update };
+  return {
+    guides,
+    chapters: chapters ?? [],
+    loading: loading || chapters === undefined,
+    error: error ?? chaptersError,
+    save: update,
+  };
 }

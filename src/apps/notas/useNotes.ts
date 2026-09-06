@@ -24,7 +24,9 @@ export function useNotes() {
     async (title: string, text: string, masterKey: CryptoKey): Promise<string | undefined> => {
       const value = lowercaseTrimmed(title);
       if (!value) return undefined;
-      return insert({ title: value, ...(await sealBody(masterKey, text)) });
+      // The id first: the body is sealed for the row it will be in.
+      const id = crypto.randomUUID();
+      return insert({ title: value, ...(await sealBody(masterKey, text, id)) }, id);
     },
     [insert],
   );
@@ -36,7 +38,7 @@ export function useNotes() {
     async (id: string, { title, text }: Partial<NoteInput>, masterKey: CryptoKey) => {
       const patch: Partial<RowInput<Note>> = {};
       if (title !== undefined) patch.title = title;
-      if (text !== undefined) Object.assign(patch, await sealBody(masterKey, text));
+      if (text !== undefined) Object.assign(patch, await sealBody(masterKey, text, id));
       return update(id, patch);
     },
     [update],

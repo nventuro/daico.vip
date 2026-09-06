@@ -1,4 +1,5 @@
-import { CONTROL_CLASS } from '../components/controlClasses';
+import TextInput from '../components/TextInput';
+import { CONTROL_CLASS, INSET_CONTROL_CLASS } from '../components/controlClasses';
 
 interface PhraseWordsProps {
   /** One entry per word of the phrase. */
@@ -32,7 +33,7 @@ export default function PhraseWords({ words, onChange }: PhraseWordsProps) {
         >
           <span className="w-3.5 shrink-0 text-right text-xs text-muted">{index + 1}</span>
           {onChange ? (
-            <input
+            <TextInput
               type="text"
               value={word}
               onChange={(e) => change(index, e.target.value)}
@@ -41,7 +42,7 @@ export default function PhraseWords({ words, onChange }: PhraseWordsProps) {
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent outline-none"
+              className={INSET_CONTROL_CLASS}
             />
           ) : (
             <span>{word}</span>

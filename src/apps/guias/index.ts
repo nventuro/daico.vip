@@ -17,9 +17,9 @@ const guias: AppModule = {
   routes: [
     { index: true, Component: GuidesPage },
     { path: ':guideId', Component: GuidePage },
-    // A guide is shelved from its own page; the address it used to be edited
-    // at still leads to it. Static segments outrank dynamic ones, which is
-    // what keeps `editar` from being read as a chapter.
+    // A guide is shelved from its own page; `editar` leads there. Static
+    // segments outrank dynamic ones, which is what keeps `editar` from being
+    // read as a chapter.
     { path: ':guideId/editar', Component: EditRedirect },
     { path: ':guideId/:chapterId', Component: GuideChapterPage },
   ],

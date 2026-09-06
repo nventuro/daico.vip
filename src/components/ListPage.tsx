@@ -23,7 +23,7 @@ export default function ListPage({ loading, error, skeleton, bar, children }: Li
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1">
-        <OfflineBanner />
+        <OfflineBanner className="mb-4" />
         <ErrorLine error={error} className="mb-4" />
         {loading ? (skeleton ?? <SkeletonRows />) : children}
       </div>

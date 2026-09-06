@@ -46,7 +46,6 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
   const lines = pages.flat();
   if (!lines.some((line) => SIGNATURE.test(text(line)))) throw new UnknownLayout();
 
-  let cards = 0;
   const purchases: StatementLine[] = [];
   const charges: StatementLine[] = [];
   let block: StatementLine[] = [];
@@ -72,7 +71,6 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
         'US$',
       );
       purchases.push(...block);
-      cards++;
       block = [];
       continue;
     }
@@ -118,7 +116,7 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     else charges.push(movement);
   }
 
-  if (cards === 0 || total === null) {
+  if (total === null) {
     throw new StatementError('No se encontraron los totales del resumen; no se guardó nada.');
   }
   const dates = headerDates(lines);
@@ -140,7 +138,7 @@ export function parseGaliciaVisa(pages: PageLine[][]): StatementContents {
     minimum_ars_cents: minimumPayment(lines),
     total_ars_cents: total.ars,
     total_usd_cents: total.usd,
-    usd_rate: usdRate(charges, total.usd),
+    usd_rate: usdRate(charges, all),
     lines: all,
   };
 }

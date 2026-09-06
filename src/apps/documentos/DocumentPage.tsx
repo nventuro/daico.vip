@@ -13,7 +13,7 @@ import { appPath, entryPath } from '../types';
 import { useDocuments } from './useDocuments';
 
 /** A document, read and written on the same page: the title on blur, each
- *  control as it changes, and its pictures — which are what it says. */
+ *  control as it changes, and its files — which are what it says. */
 export default function DocumentPage() {
   const { items, loading, error, save, remove } = useDocuments();
   const entry = useEntry(items);

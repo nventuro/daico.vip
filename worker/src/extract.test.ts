@@ -97,6 +97,43 @@ describe('rowsFromExtraction', () => {
     expect(row.from_code).toBeNull();
   });
 
+  it('nulls a day or an hour there is not, however well it is written', () => {
+    const [row] = rowsFromExtraction(
+      [item({ on_date: '2026-02-31', at_time: '24:00', ends_on: '2026-13-01', ends_at: '12:60' })],
+      'Bariloche',
+      null,
+      [],
+    );
+    expect(row.on_date).toBeNull();
+    expect(row.at_time).toBeNull();
+    expect(row.ends_on).toBeNull();
+    expect(row.ends_at).toBeNull();
+    const [leap] = rowsFromExtraction([item({ on_date: '2028-02-29' })], 'Bariloche', null, []);
+    expect(leap.on_date).toBe('2028-02-29');
+  });
+
+  it('keeps an airport code only as three letters, in capitals', () => {
+    const [row] = rowsFromExtraction(
+      [item({ from_code: ' aep ', to_code: 'Bariloche' })],
+      'Bariloche',
+      null,
+      [],
+    );
+    expect(row.from_code).toBe('AEP');
+    expect(row.to_code).toBeNull();
+  });
+
+  it('cuts a title and a comment to length: they are written as they come', () => {
+    const [row] = rowsFromExtraction(
+      [item({ title: 'x'.repeat(500), comments: 'y'.repeat(5000) })],
+      'Bariloche',
+      null,
+      [],
+    );
+    expect(row.title).toHaveLength(120);
+    expect(row.comments).toHaveLength(1000);
+  });
+
   it("turns an item's PDF numbers into the ids of those PDFs, in the email's order", () => {
     const [row] = rowsFromExtraction([item({ pdfs: [3, 1] })], 'Bariloche', null, FILE_IDS);
     expect(row.file_ids).toEqual(['file-1', 'file-3']);
@@ -146,6 +183,20 @@ describe('decide', () => {
     const decision = decide({ ...found, items: [item({ pdfs: [2] })] }, null, FILE_IDS);
     expect(decision.ok).toBe(true);
     if (decision.ok) expect(decision.rows[0].file_ids).toEqual(['file-2']);
+  });
+
+  it("cuts the trip's name to length and keeps no address in the model's words", () => {
+    const long = decide({ trip_title: 'x'.repeat(200), problem: null, items: [item()] }, null, []);
+    expect(long.ok && long.tripTitle).toHaveLength(80);
+    const said = decide(
+      { trip_title: null, problem: 'Entrá a https://evil.example/x y cargá la tarjeta', items: [] },
+      null,
+      [],
+    );
+    expect(!said.ok && said.problem).not.toContain('https');
+    expect(!said.ok && said.problem).toContain('Entrá a');
+    const endless = decide({ trip_title: null, problem: 'p'.repeat(1000), items: [] }, null, []);
+    expect(!endless.ok && endless.problem).toHaveLength(300);
   });
 
   it('fails with the problem the model reported', () => {

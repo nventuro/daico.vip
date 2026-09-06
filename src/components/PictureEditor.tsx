@@ -26,6 +26,12 @@ const ATTACHMENT_JPEG_QUALITY = 0.9;
  *  place a crop, small enough for a phone to redraw at once on each turn. */
 const ATTACHMENT_PREVIEW_MAX_PX = 1600;
 
+/** Longest side, in pixels, of a picture as it is saved once it has been
+ *  cropped or rotated: enough to read a document's every line, and within the
+ *  canvas a phone will draw — a photo at its full size wants one it will not,
+ *  and comes out as nothing. */
+const ATTACHMENT_PICTURE_MAX_PX = 3000;
+
 const PREVIEW = {
   type: 'image/jpeg',
   quality: ATTACHMENT_JPEG_QUALITY,
@@ -134,6 +140,7 @@ export default function PictureEditor({
         const blob = await renderImage(image, rotation, cut, {
           type,
           quality: ATTACHMENT_JPEG_QUALITY,
+          maxSize: ATTACHMENT_PICTURE_MAX_PX,
         });
         picture = new File([blob], file.name, { type });
       }
@@ -151,7 +158,7 @@ export default function PictureEditor({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
       {/* Padded so the selection's handles, which sit astride the picture's
           edges, have room when the picture fills the stage. */}
       <div className="flex h-[50dvh] items-center justify-center overflow-hidden bg-surface-inverse p-3">
@@ -182,7 +189,7 @@ export default function PictureEditor({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => rotate(-1)}
+            onClick={() => void rotate(-1)}
             disabled={!image || busy}
             aria-label="Girar a la izquierda"
             title="Girar a la izquierda"
@@ -192,7 +199,7 @@ export default function PictureEditor({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => rotate(1)}
+            onClick={() => void rotate(1)}
             disabled={!image || busy}
             aria-label="Girar a la derecha"
             title="Girar a la derecha"

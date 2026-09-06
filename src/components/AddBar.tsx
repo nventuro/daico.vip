@@ -11,7 +11,7 @@ interface AddBarProps {
   placeholder: string;
   /** Accessible label for the text input. */
   inputLabel: string;
-  /** Optional secondary controls (e.g. a date picker) shown under the input row. */
+  /** What belongs under the input row. */
   children?: ReactNode;
   /** What belongs above the input row: a list-level action. */
   notice?: ReactNode;

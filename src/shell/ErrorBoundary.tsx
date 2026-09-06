@@ -13,8 +13,8 @@ interface ErrorBoundaryState {
  * still starting: without this the failure is a splash that never ends, and
  * whatever went wrong is only in the console.
  *
- * The one class component in the app — catching a render is the one thing
- * React has no hook for.
+ * A class component: catching a render is the one thing React has no hook
+ * for.
  */
 export default class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
   state: ErrorBoundaryState = { message: null };

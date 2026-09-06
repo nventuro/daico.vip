@@ -16,10 +16,9 @@ export default function RecipeEditPage() {
         <RecipeForm
           key={recipe.id}
           recipe={recipe}
-          onSave={async (input: RecipeInput) => {
-            await save(recipe.id, input);
-            leave(entryPath('recetas', recipe.id));
-          }}
+          onSave={(input: RecipeInput) =>
+            void save(recipe.id, input).then(() => leave(entryPath('recetas', recipe.id)))
+          }
         />
       )}
     </EntryPage>

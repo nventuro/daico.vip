@@ -13,7 +13,7 @@ export default function EntryMarks({ marks }: { marks: EntryMark[] | undefined }
     <span className="flex shrink-0 items-center gap-1 text-muted">
       {marks.map((mark) => {
         const { Icon, label } = ICONS[mark];
-        return <Icon key={mark} size={16} stroke={1.5} aria-label={label} />;
+        return <Icon key={mark} size={16} stroke={1.5} role="img" aria-label={label} />;
       })}
     </span>
   );

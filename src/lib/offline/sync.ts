@@ -8,13 +8,17 @@
 //
 // Push-before-pull means our own changes are on the server before we pull, so
 // the pull's "deleted elsewhere" detection never removes a row we just created.
-// The tables are tiny, so a full pull every sync is simpler than tracking a
-// server-side watermark and is plenty fast.
+// A table is pulled whole rather than from a watermark, so a row deleted
+// elsewhere is simply one the pull does not bring. That is a lot to bring down
+// for one write, so a write pushes at once and pulls only when the last pull
+// is not recent; what asks for a run outright — the connection back, the app
+// in front again — pulls.
 // =============================================================================
 import { supabase } from '../supabase';
 import { isPermanentRowError } from '../refusals';
 import { ALL_SPECS, type TableSpec } from './specs';
 import { PENDING_DELETES, SYNC_PROBLEMS } from './localTables';
+import { MultiTabError } from './singleTab';
 import * as engine from './engine';
 
 /** How recently (ms) a sync run must have ended for a screen that opens not
@@ -153,18 +157,24 @@ export function reportFiles(done: number, total: number): void {
 export function resetSyncStatus(): void {
   generation += 1;
   writeCompletedAt(null);
-  lastRunAt = null;
+  lastPullAt = null;
   setStatus({ tables: {}, files: null, completedAt: null });
 }
 
 // ─── Runs ────────────────────────────────────────────────────────────────────
 
-// Serialize syncs; if one is requested while another runs, run exactly one more
-// afterwards so the latest local changes always get a chance to push.
-let syncing = false;
-let rerun = false;
-// When the last run ended, whatever came of it; null until one has.
-let lastRunAt: number | null = null;
+/** What a run is asked for: to bring the server's state down, or only to get
+ *  what is queued here onto it — then the tables come down only when the last
+ *  pull is not recent. */
+type RunMode = 'pull' | 'push';
+
+// One run at a time. A request while one is on is honoured by one more pass
+// afterwards, so the latest local changes always get a chance to push; a pull
+// asked for meanwhile is never demoted to a push.
+let current: Promise<void> | null = null;
+let rerun: RunMode | null = null;
+// When the tables last came down, whatever came of the rest; null until they have.
+let lastPullAt: number | null = null;
 // Which data a run belongs to: the device's as it was when the run started.
 // A reset while a run is on means that data is gone — the session ended and
 // the store was wiped — and what the run still brings down belongs to nobody:
@@ -187,71 +197,115 @@ export function afterSync(listener: AfterSyncListener): () => void {
   };
 }
 
-/** Best-effort sync of all tables. Never throws — pending changes simply stay
- *  queued for a later attempt. */
-export async function syncAll(): Promise<void> {
-  if (!navigator.onLine) return;
-  if (syncing) {
-    rerun = true;
-    return;
+/** Best-effort sync of all tables, the server's state brought down whole.
+ *  Never throws — pending changes simply stay queued for a later attempt.
+ *  Asked for while a run is on, it resolves once that run and the pass it
+ *  asks for are through. */
+export function syncAll(): Promise<void> {
+  return run('pull');
+}
+
+/** After a local write: gets what is queued here onto the server at once, and
+ *  brings the server's state down only when this device has not in a while —
+ *  a pause in typing must not pull every table. Never throws. */
+export function syncAfterWrite(): Promise<void> {
+  return run('push');
+}
+
+function run(mode: RunMode): Promise<void> {
+  if (!navigator.onLine) return Promise.resolve();
+  if (current) {
+    if (rerun !== 'pull') rerun = mode;
+    return current;
   }
-  syncing = true;
+  current = runPasses(mode).finally(() => {
+    current = null;
+  });
+  return current;
+}
+
+function pullIsStale(): boolean {
+  return lastPullAt === null || Date.now() - lastPullAt >= SYNC_FRESH_MS;
+}
+
+async function runPasses(first: RunMode): Promise<void> {
   const run = generation;
   const superseded = () => generation !== run;
-  setStatus({
-    syncing: true,
-    tables: Object.fromEntries(ALL_SPECS.map((spec) => [spec.table, 'pending'])),
-    files: null,
-  });
-  // The run counts as whole only if its last pass over the tables and every
-  // listener went through: then this device holds everything there is.
-  let whole = true;
-  // The tables the last pass brought down, for the work that follows them.
-  let synced = new Set<string>();
+  setStatus({ syncing: true });
   try {
-    do {
-      rerun = false;
-      whole = true;
-      synced = new Set<string>();
-      for (const spec of ALL_SPECS) {
-        setTable(spec.table, 'pulling');
-        try {
-          await syncTable(spec, superseded);
-        } catch (err) {
-          // Network blip, expired token, a column the server doesn't have yet…
-          // Queued changes stay put; we retry on the next trigger (online
-          // event, app focus, or the next user action). Caught per table so
-          // one table that keeps failing doesn't block the rest.
-          whole = false;
-          setTable(spec.table, 'pending');
-          console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
-          continue;
-        }
-        // The data this run was for is gone: nothing more is brought down,
-        // nothing follows, and the run is nobody's to stamp.
-        if (superseded()) return;
-        synced.add(spec.table);
-        setTable(spec.table, 'done');
-      }
-    } while (rerun && navigator.onLine);
-    for (const listener of afterSyncListeners) {
-      try {
-        await listener(synced);
-      } catch (err) {
-        // Same contract as a table: whatever it left undone waits for the next run.
-        whole = false;
-        console.warn('[offline] after-sync work failed, will retry later:', err);
-      }
-    }
-    if (whole) {
-      const completedAt = new Date().toISOString();
-      writeCompletedAt(completedAt);
-      setStatus({ completedAt });
+    let next: RunMode | null = first;
+    while (next !== null && navigator.onLine) {
+      rerun = null;
+      await pass(next, superseded);
+      // The data this run was for is gone: the run is nobody's to go on with.
+      if (superseded()) return;
+      next = rerun;
     }
   } finally {
-    if (!superseded()) lastRunAt = Date.now();
-    syncing = false;
     setStatus({ syncing: false });
+  }
+}
+
+/** One pass: every table's queued changes pushed, the tables brought down
+ *  when asked or stale, then the work that follows them. Whatever fails waits
+ *  for the next pass. */
+async function pass(mode: RunMode, superseded: () => boolean): Promise<void> {
+  const pull = mode === 'pull' || pullIsStale();
+  if (pull) {
+    setStatus({
+      tables: Object.fromEntries(ALL_SPECS.map((spec) => [spec.table, 'pending'])),
+      files: null,
+    });
+  }
+  // The pass counts as whole only if every table came down and every listener
+  // went through: then this device holds everything there is.
+  let whole = pull;
+  // The tables brought down, for the work that follows them.
+  const synced = new Set<string>();
+  for (const spec of ALL_SPECS) {
+    if (pull) setTable(spec.table, 'pulling');
+    try {
+      await syncTable(spec, pull, superseded);
+    } catch (err) {
+      // A tab that does not own the store cannot sync at all: it stops at the
+      // first table rather than fail every one.
+      if (err instanceof MultiTabError) {
+        console.warn('[offline] another tab holds the store; not syncing here');
+        return;
+      }
+      // Network blip, expired token, a column the server doesn't have yet…
+      // Queued changes stay put; we retry on the next trigger (online
+      // event, app focus, or the next user action). Caught per table so
+      // one table that keeps failing doesn't block the rest.
+      whole = false;
+      if (pull) setTable(spec.table, 'pending');
+      console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
+      continue;
+    }
+    // Nothing more is brought down for data that is gone, and nothing follows.
+    if (superseded()) return;
+    if (pull) {
+      synced.add(spec.table);
+      setTable(spec.table, 'done');
+    }
+  }
+  // Stamped once a table came down and not otherwise: after a pass that failed
+  // on every table, the next screen to open asks again.
+  if (synced.size > 0) lastPullAt = Date.now();
+  for (const listener of afterSyncListeners) {
+    try {
+      await listener(synced);
+    } catch (err) {
+      // Same contract as a table: whatever it left undone waits for the next run.
+      whole = false;
+      console.warn('[offline] after-sync work failed, will retry later:', describe(err));
+    }
+  }
+  if (superseded()) return;
+  if (whole) {
+    const completedAt = new Date().toISOString();
+    writeCompletedAt(completedAt);
+    setStatus({ completedAt });
   }
 }
 
@@ -275,12 +329,12 @@ export function installSyncTriggers(): () => void {
   };
 }
 
-/** Sync unless a run is going on or one ended within SYNC_FRESH_MS. For a
- *  screen that opens: it wants what is on the server, but moving around the
- *  app must not sync at every tap. Reconnecting, coming back to the app and
- *  a local change ask for a run outright. */
+/** Sync unless a run is going on or the tables came down within
+ *  SYNC_FRESH_MS. For a screen that opens: it wants what is on the server,
+ *  but moving around the app must not sync at every tap. Reconnecting and
+ *  coming back to the app ask for a run outright. */
 export async function syncIfStale(): Promise<void> {
-  if (syncing || (lastRunAt !== null && Date.now() - lastRunAt < SYNC_FRESH_MS)) return;
+  if (current || !pullIsStale()) return;
   await syncAll();
 }
 
@@ -291,7 +345,7 @@ function describe(err: unknown): string {
     const { code, message } = err as { code?: string; message?: string };
     return code ? `${code}: ${message}` : `${message}`;
   }
-  return `${err}`;
+  return String(err);
 }
 
 /**
@@ -314,30 +368,34 @@ async function refusedForGood(
 
 /** The whole table from the server, a page at a time: PostgREST answers a
  *  plain select with its first page only and says nothing about the rest, and
- *  a short read would look exactly like rows deleted elsewhere. Ordered by id
- *  so the pages stay a partition while other devices write. */
-async function pull(spec: TableSpec): Promise<Record<string, unknown>[]> {
+ *  a short read would look exactly like rows deleted elsewhere. Each page is
+ *  the rows past the last id of the one before, so the pages stay a partition
+ *  while other devices write: a row deleted from an earlier page shifts
+ *  nothing. */
+async function pullTable(spec: TableSpec): Promise<Record<string, unknown>[]> {
   // Every column, rather than the ones this build's spec names: a build older
   // than the database would ask for a column that is not there yet and lose
   // the whole table over it. `reconcile` reads only what its spec declares, so
   // the extra ones cost a few bytes and are ignored.
   const rows: Record<string, unknown>[] = [];
-  for (let from = 0; ; from += SYNC_PULL_PAGE) {
-    const { data, error } = await supabase
-      .from(spec.table)
-      .select('*')
-      .order('id')
-      .range(from, from + SYNC_PULL_PAGE - 1);
+  let after: string | null = null;
+  for (;;) {
+    let query = supabase.from(spec.table).select('*').order('id').limit(SYNC_PULL_PAGE);
+    if (after !== null) query = query.gt('id', after);
+    const { data, error } = await query;
     if (error) throw error;
     const page = (data ?? []) as unknown as Record<string, unknown>[];
     rows.push(...page);
     if (page.length < SYNC_PULL_PAGE) return rows;
+    after = page[page.length - 1].id as string;
   }
 }
 
-/** One table's turn in a run; `superseded` says whether the data the run is
- *  for has been wiped meanwhile, in which case nothing more is written. */
-async function syncTable(spec: TableSpec, superseded: () => boolean): Promise<void> {
+/** One table's turn in a pass: what is queued here pushed, and, when `pull`,
+ *  the server's rows brought down. `superseded` says whether the data the
+ *  run is for has been wiped meanwhile, in which case nothing more is
+ *  written. */
+async function syncTable(spec: TableSpec, pull: boolean, superseded: () => boolean): Promise<void> {
   // 1. Queued creates/updates — the objects are already in server shape.
   for (const row of await engine.getPendingUpserts(spec)) {
     const { error } = await supabase.from(spec.table).upsert(row);
@@ -348,7 +406,9 @@ async function syncTable(spec: TableSpec, superseded: () => boolean): Promise<vo
     await engine.markUpserted(spec, row.id, row.updated_at);
   }
 
-  // 2. Queued deletes (unconditional — "delete wins" under last-write-wins).
+  // 2. Queued deletes. A delete wins over any edit of the row, whenever that
+  // edit is pushed: the server keeps a record of the deletion and takes no
+  // row of that id again, so the next pull takes the copy here with it.
   for (const id of await engine.getPendingDeletes(spec)) {
     const { error } = await supabase.from(spec.table).delete().eq('id', id);
     if (error) {
@@ -359,9 +419,11 @@ async function syncTable(spec: TableSpec, superseded: () => boolean): Promise<vo
   }
 
   // 3. Full pull + reconcile.
-  const remote = await pull(spec);
-  if (superseded()) return;
-  await engine.reconcile(spec, remote);
+  if (pull) {
+    const remote = await pullTable(spec);
+    if (superseded()) return;
+    await engine.reconcile(spec, remote);
+  }
 
   await forgetSettledRefusals(spec);
 }

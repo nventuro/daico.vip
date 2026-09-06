@@ -5,7 +5,7 @@ interface CommentsProps {
   /** What is written about the entry, as stored. */
   value: string;
   /** Every change, as markdown; saving it is the page's. */
-  onChange: (markdown: string) => void;
+  onChange: (markdown: () => string) => void;
 }
 
 /** What is written about an entry, headed like the sections around it: the

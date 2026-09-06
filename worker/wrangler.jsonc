@@ -17,5 +17,8 @@
   // the one `wrangler hyperdrive create` prints (see
   // scripts/trip-inbox-writer-password.mjs at the repo root).
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "bb0526149afd439dae8633252b621be1" }],
+  // Nothing the worker logs is kept: a persisted log is a place a line about
+  // an email could end up. `worker:tail` still shows them live.
+  "observability": { "enabled": false },
   // Secrets, never here: ANTHROPIC_API_KEY (`npx wrangler secret put`).
 }

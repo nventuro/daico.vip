@@ -5,6 +5,7 @@ import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { todayIso } from '../../utils/dateUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import { dueAfterMarking } from './recurrence';
+import * as engine from '../../lib/offline/engine';
 
 /** Everything the user decides about a chore; the row's own columns minus the
  *  engine-managed ones and the mark. */
@@ -29,7 +30,7 @@ function withRepeat<T extends Partial<ChoreInput>>(patch: T, every: number | nul
 /** Local-first chores: add / edit / mark / delete, syncing in the background.
  *  Every action is instant and works offline. */
 export function useChores() {
-  const { items, loading, error, insert, update, remove } = useOfflineTable(CHORES_SPEC);
+  const { items, loading, error, insert, update, remove, mutate } = useOfflineTable(CHORES_SPEC);
 
   /** Creates a chore from everything decided about it, resolving the new id
    *  so the caller can open it; undefined for a blank title or a failed write. */
@@ -56,11 +57,20 @@ export function useChores() {
   /** Marks a chore done today: the day it was marked and, when it repeats, the
    *  day the next one falls on. One write, whatever kind of chore it is. */
   const mark = useCallback(
-    (chore: Chore) => {
-      const today = todayIso();
-      return update(chore.id, { last_done_on: today, due_on: dueAfterMarking(chore, today) });
-    },
-    [update],
+    (chore: Chore) =>
+      mutate(async () => {
+        // The chore as it is stored, not as it was drawn: an interval typed
+        // and saved on leaving the field is what the next date is counted
+        // by, whichever came first.
+        const stored =
+          (await engine.listVisible<Chore>(CHORES_SPEC)).find((c) => c.id === chore.id) ?? chore;
+        const today = todayIso();
+        await engine.update(CHORES_SPEC, chore.id, {
+          last_done_on: today,
+          due_on: dueAfterMarking(stored, today),
+        });
+      }),
+    [mutate],
   );
 
   /** Takes a finished chore's mark off. Its date never moved, so there is

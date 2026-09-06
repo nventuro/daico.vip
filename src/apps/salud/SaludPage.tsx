@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Checkup } from '../../lib/offline/specs';
 import { offerUndo } from '../../lib/undo';
-import { formatDateShort, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { formatDateShort, isPast, relativeDay } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import ChecklistItem from '../../components/ChecklistItem';
 import CompletedSection from '../../components/CompletedSection';
@@ -19,13 +19,14 @@ import { checkupMarks } from './marks';
 import { groupCheckups, isDone, markMessage } from './recurrence';
 import { useCheckups } from './useCheckups';
 import { useHealthRecords } from './useHealthRecords';
+import { useToday } from '../../hooks/useToday';
+
+/** The two kinds an entry can be born as. */
+const KIND_OPTIONS = SALUD_KINDS.map((kind) => ({ kind, label: SALUD_KIND_LABELS[kind].one }));
 
 /** The signed-in member's health, in two fixed sections: the checkups still
  *  to have done, then the studies kept, newest first. An empty section is not
  *  drawn; a checkup done for good folds into «Hechos» at the end. */
-/** The two kinds an entry can be born as. */
-const KIND_OPTIONS = SALUD_KINDS.map((kind) => ({ kind, label: SALUD_KIND_LABELS[kind].one }));
-
 export default function SaludPage() {
   const checkups = useCheckups();
   const records = useHealthRecords();
@@ -33,7 +34,7 @@ export default function SaludPage() {
   // The title typed into the bar, while its kind is being asked.
   const [naming, setNaming] = useState<string | null>(null);
 
-  const today = todayIso();
+  const today = useToday();
   const { pending, done } = useMemo(() => groupCheckups(checkups.items), [checkups.items]);
 
   function toggle(checkup: Checkup) {
@@ -82,7 +83,7 @@ export default function SaludPage() {
             repeat_unit: null,
           })
         : await records.add({ title, on_date: today });
-    if (id) navigate(entryPath('salud', id));
+    if (id) void navigate(entryPath('salud', id));
   }
 
   return (

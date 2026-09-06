@@ -76,8 +76,8 @@ export async function askToPersist(): Promise<boolean | null> {
 
 /**
  * Let go of everything that can be fetched again — the guide images, and the
- * attachment files the bucket already has that are not documents'. What is
- * only here stays here.
+ * attachment files the bucket already has that every device is not meant to
+ * keep. What is only here stays here.
  */
 export async function freeSpace(): Promise<void> {
   await dropCachedFiles();

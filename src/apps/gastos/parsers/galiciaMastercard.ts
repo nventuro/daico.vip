@@ -42,7 +42,6 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
   const lines = pages.flat();
   if (!lines.some((line) => SIGNATURE.test(text(line)))) throw new UnknownLayout();
 
-  let cards = 0;
   const purchases: StatementLine[] = [];
   const charges: StatementLine[] = [];
   let block: StatementLine[] = [];
@@ -94,8 +93,6 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
       const card = additional ? 'un adicional' : 'el titular';
       reconcile(`Los consumos de ${card}`, sum(block, 'ars_cents'), ars ?? 0, '$');
       reconcile(`Los consumos en dólares de ${card}`, sum(block, 'usd_cents'), usd ?? 0, 'US$');
-      // A card with nothing on it is still printed; it has nothing to show.
-      if (block.length > 0) cards++;
       purchases.push(...block);
       block = [];
       inInstallments = false;
@@ -128,7 +125,7 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
     });
   }
 
-  if (cards === 0 || total === null || consumption === null) {
+  if (total === null || consumption === null) {
     throw new StatementError('No se encontraron los totales del resumen; no se guardó nada.');
   }
   const dates = headerDates(lines);
@@ -153,7 +150,7 @@ export function parseGaliciaMastercard(pages: PageLine[][]): StatementContents {
     minimum_ars_cents: minimumPayment(lines),
     total_ars_cents: total.ars,
     total_usd_cents: total.usd,
-    usd_rate: usdRate(charges, total.usd),
+    usd_rate: usdRate(charges, purchases),
     lines: all,
   };
 }

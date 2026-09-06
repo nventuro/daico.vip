@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { IconGripVertical } from '@tabler/icons-react';
 import type { ShoppingItem } from '../../lib/offline/specs';
 import ChecklistItem from '../../components/ChecklistItem';
+import IconButton from '../../components/IconButton';
 
 interface SortableShoppingItemProps {
   item: ShoppingItem;
@@ -27,16 +28,14 @@ export default function SortableShoppingItem({ item, onToggle }: SortableShoppin
       style={{ transform: CSS.Transform.toString(transform), transition }}
       dragging={isDragging}
       dragHandle={
-        <button
-          type="button"
+        <IconButton
           {...attributes}
           {...listeners}
-          aria-label="Reordenar"
-          title="Reordenar"
-          className="flex shrink-0 cursor-grab touch-none items-center pr-1 text-muted transition-colors hover:text-muted-strong"
-        >
-          <IconGripVertical size={18} stroke={1.5} />
-        </button>
+          label="Reordenar"
+          icon={IconGripVertical}
+          size={18}
+          className="cursor-grab touch-none pr-1"
+        />
       }
     />
   );

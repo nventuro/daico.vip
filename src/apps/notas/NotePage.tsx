@@ -31,7 +31,7 @@ export default function NotePage() {
 
   const textSave = useTextSave(async (written) => {
     if (note && key) await save(note.id, { text: written }, key);
-  });
+  }, note?.id);
 
   async function removeNote(id: string) {
     // The note's pictures go with it; nothing else would ever list them.

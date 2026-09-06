@@ -57,7 +57,7 @@ export default function PdfPreview({
   const unreadable = refused ?? (view.status === 'failed' ? 'No se pudo leer el PDF.' : null);
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
       <div className="flex h-[50dvh] items-center justify-center overflow-hidden bg-surface-inverse p-3">
         {view.status === 'ready' ? (
           <PdfPage pdf={view.pdf} number={1} alt="Primera página" className="h-full" inverse />

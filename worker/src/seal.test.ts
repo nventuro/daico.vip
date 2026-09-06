@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { fromBase64, toBase64 } from './base64';
-import { importInboxPublicKey, sealPdf } from './seal';
+import { importInboxPublicKey, inboxFileBinding, sealPdf } from './seal';
 
-const VERSION_BYTE = 1;
+const VERSION_BYTE = 2;
 const NONCE_BYTES = 12;
 const GCM_TAG_BYTES = 16;
 
@@ -25,12 +25,13 @@ async function inboxPair(): Promise<{ spki: string; privateKey: CryptoKey }> {
   return { spki: toBase64(new Uint8Array(exported)), privateKey: pair.privateKey };
 }
 
-/** What the app does with a sealed file, minus the re-wrap: the file key
- *  unwrapped with the private half, the bytes opened with it. */
+/** What the app does with a sealed file: the file key unwrapped with the
+ *  private half, the bytes opened with it under the row they were sealed for. */
 async function open(
   privateKey: CryptoKey,
   data: Uint8Array,
   wrappedKey: string,
+  boundTo: string,
 ): Promise<Uint8Array> {
   const fileKey = await crypto.subtle.unwrapKey(
     'raw',
@@ -44,26 +45,37 @@ async function open(
   const nonce = data.subarray(1, 1 + NONCE_BYTES);
   const cipher = data.subarray(1 + NONCE_BYTES);
   return new Uint8Array(
-    await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, fileKey, cipher),
+    await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: new TextEncoder().encode(boundTo) },
+      fileKey,
+      cipher,
+    ),
   );
 }
 
 const pdf = new TextEncoder().encode('%PDF-1.4 not really a PDF, but bytes all the same');
+const ROW = inboxFileBinding('f1');
 
 describe('sealPdf', () => {
   it('writes the version byte, a nonce and the ciphertext, and opens under the private half', async () => {
     const { spki, privateKey } = await inboxPair();
-    const { data, wrappedKey } = await sealPdf(await importInboxPublicKey(spki), pdf);
+    const { data, wrappedKey } = await sealPdf(await importInboxPublicKey(spki), pdf, ROW);
     expect(data[0]).toBe(VERSION_BYTE);
     expect(data.length).toBe(1 + NONCE_BYTES + pdf.length + GCM_TAG_BYTES);
-    expect(await open(privateKey, data, wrappedKey)).toEqual(pdf);
+    expect(await open(privateKey, data, wrappedKey, ROW)).toEqual(pdf);
+  });
+
+  it('opens only under the row it was sealed for', async () => {
+    const { spki, privateKey } = await inboxPair();
+    const { data, wrappedKey } = await sealPdf(await importInboxPublicKey(spki), pdf, ROW);
+    await expect(open(privateKey, data, wrappedKey, inboxFileBinding('f2'))).rejects.toThrow();
   });
 
   it('seals afresh every time: two seals of one PDF share neither key nor nonce', async () => {
     const { spki } = await inboxPair();
     const publicKey = await importInboxPublicKey(spki);
-    const first = await sealPdf(publicKey, pdf);
-    const second = await sealPdf(publicKey, pdf);
+    const first = await sealPdf(publicKey, pdf, ROW);
+    const second = await sealPdf(publicKey, pdf, ROW);
     expect(first.wrappedKey).not.toBe(second.wrappedKey);
     expect(first.data.subarray(1, 1 + NONCE_BYTES)).not.toEqual(
       second.data.subarray(1, 1 + NONCE_BYTES),
@@ -73,7 +85,7 @@ describe('sealPdf', () => {
   it('cannot be opened with another household’s private half', async () => {
     const { spki } = await inboxPair();
     const other = await inboxPair();
-    const { data, wrappedKey } = await sealPdf(await importInboxPublicKey(spki), pdf);
-    await expect(open(other.privateKey, data, wrappedKey)).rejects.toThrow();
+    const { data, wrappedKey } = await sealPdf(await importInboxPublicKey(spki), pdf, ROW);
+    await expect(open(other.privateKey, data, wrappedKey, ROW)).rejects.toThrow();
   });
 });

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Chore } from '../../lib/offline/specs';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useChores } from './useChores';
-import { isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { isPast, relativeDay } from '../../utils/dateUtils';
 import { offerUndo } from '../../lib/undo';
 import ChecklistItem from '../../components/ChecklistItem';
 import EntryMarks from '../../components/EntryMarks';
@@ -16,6 +16,7 @@ import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import { choreMarks } from './marks';
 import { groupChores, isDone, markMessage } from './recurrence';
+import { useToday } from '../../hooks/useToday';
 
 export default function ChoresPage() {
   const { items: chores, loading, error, add, mark, unmark, restore } = useChores();
@@ -23,7 +24,7 @@ export default function ChoresPage() {
   const attached = useMemo(() => ownersWithAttachments(attachments, 'chore'), [attachments]);
   const navigate = useNavigate();
 
-  const today = todayIso();
+  const today = useToday();
   const { soon, later, done } = useMemo(() => groupChores(chores, today), [chores, today]);
 
   function toggle(chore: Chore) {
@@ -48,7 +49,7 @@ export default function ChoresPage() {
       repeat_unit: null,
       repeat_from: null,
     });
-    if (id) navigate(entryPath('tareas', id));
+    if (id) void navigate(entryPath('tareas', id));
   }
 
   function renderChore(chore: Chore) {

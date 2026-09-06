@@ -151,10 +151,12 @@ export function monthCoverage(month: string, cards: CardCoverage[]): MonthCovera
       short.push({ format: card.format, kind: 'none' });
       continue;
     }
+    // Short at either end, or at both: a card whose record starts and ends
+    // inside the month is said to twice.
+    if (inside[0].from > from)
+      short.push({ format: card.format, kind: 'since', day: inside[0].from });
     if (inside[inside.length - 1].to < to)
       short.push({ format: card.format, kind: 'until', day: inside[inside.length - 1].to });
-    else if (inside[0].from > from)
-      short.push({ format: card.format, kind: 'since', day: inside[0].from });
   }
   return { whole: short.length === 0, short };
 }

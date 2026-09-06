@@ -4,7 +4,7 @@ import { errorMessage, normalize } from '../../utils/textUtils';
 import * as engine from '../../lib/offline/engine';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { openOnce } from './openOnce';
+import { openRowOnce } from '../../lib/opened';
 import { openPattern, sealPattern } from './payload';
 import type { Rule } from './rules';
 
@@ -34,7 +34,9 @@ export function useMerchantRules() {
       items.map(async (row) => ({
         id: row.id,
         category: row.category,
-        pattern: await openOnce(row, () => openPattern(masterKey.key, row)),
+        pattern: await openRowOnce(MERCHANT_RULES_SPEC.table, row, () =>
+          openPattern(masterKey.key, row),
+        ),
       })),
     ).then(
       (unsealed) => {
@@ -54,9 +56,14 @@ export function useMerchantRules() {
 
   const add = useCallback(
     (text: string, category: SpendingCategory, key: CryptoKey) =>
-      mutate(async () =>
-        engine.insert(MERCHANT_RULES_SPEC, { ...(await sealPattern(key, text)), category }),
-      ),
+      mutate(async () => {
+        const id = crypto.randomUUID();
+        return engine.insert(
+          MERCHANT_RULES_SPEC,
+          { ...(await sealPattern(key, text, id)), category },
+          id,
+        );
+      }),
     [mutate],
   );
 
@@ -65,7 +72,7 @@ export function useMerchantRules() {
       mutate(async () =>
         engine.update(MERCHANT_RULES_SPEC, id, {
           ...(patch.category ? { category: patch.category } : {}),
-          ...(patch.pattern === undefined ? {} : await sealPattern(key, patch.pattern)),
+          ...(patch.pattern === undefined ? {} : await sealPattern(key, patch.pattern, id)),
         }),
       ),
     [mutate],
@@ -80,10 +87,12 @@ export function useMerchantRules() {
         for (const { pattern, category } of entries) {
           const found = existing.get(normalize(pattern));
           if (!found) {
-            await engine.insert(MERCHANT_RULES_SPEC, {
-              ...(await sealPattern(key, pattern)),
-              category,
-            });
+            const id = crypto.randomUUID();
+            await engine.insert(
+              MERCHANT_RULES_SPEC,
+              { ...(await sealPattern(key, pattern, id)), category },
+              id,
+            );
           } else if (found.category !== category) {
             await engine.update(MERCHANT_RULES_SPEC, found.id, { category });
           }

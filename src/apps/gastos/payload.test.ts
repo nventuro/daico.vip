@@ -19,17 +19,22 @@ const contents = statement({
   ),
 });
 
+/** The sealed columns as the row `id` carries them. */
+const rowOf = (id: string, sealed: { payload: string; wrapped_key: string }) => ({ id, ...sealed });
+
 describe('a statement payload', () => {
   it('comes back whole, and a ninety-line statement stays a few KB', async () => {
     const key = await masterKey();
-    const sealed = await sealContents(key, contents);
-    expect(await openContents(key, sealed)).toEqual(contents);
+    const sealed = await sealContents(key, contents, 's1');
+    expect(await openContents(key, rowOf('s1', sealed))).toEqual(contents);
     expect(sealed.payload.length).toBeLessThan(4_000);
   });
 
-  it('does not open under another key', async () => {
-    const sealed = await sealContents(await masterKey(), contents);
-    await expect(openContents(await masterKey(), sealed)).rejects.toThrow();
+  it('does not open under another key, nor as another statement', async () => {
+    const key = await masterKey();
+    const sealed = await sealContents(key, contents, 's1');
+    await expect(openContents(await masterKey(), rowOf('s1', sealed))).rejects.toThrow();
+    await expect(openContents(key, rowOf('s2', sealed))).rejects.toThrow();
   });
 
   it('opens one sealed under schema 1 in the current shape, the names it carried left out', async () => {
@@ -44,7 +49,7 @@ describe('a statement payload', () => {
     const key = await masterKey();
     const opened = await openContents(
       key,
-      await sealContents(key, old as unknown as StatementContents),
+      rowOf('s1', await sealContents(key, old as unknown as StatementContents, 's1')),
     );
     expect(opened).toEqual({ ...contents, previous_closed_on: null });
     expect(JSON.stringify(opened)).not.toMatch(/TITULAR/);
@@ -58,17 +63,20 @@ describe('a statement payload', () => {
       expect(() => upgradeContents({ ...contents, schema })).toThrow(/más nueva/);
     }
     const key = await masterKey();
-    const sealed = await sealContents(key, {
-      ...contents,
-      schema: STATEMENT_CONTENTS_SCHEMA + 1,
-    });
-    await expect(openContents(key, sealed)).rejects.toThrow(/más nueva/);
+    const sealed = await sealContents(
+      key,
+      { ...contents, schema: STATEMENT_CONTENTS_SCHEMA + 1 },
+      's1',
+    );
+    await expect(openContents(key, rowOf('s1', sealed))).rejects.toThrow(/más nueva/);
   });
 });
 
 describe('a rule pattern', () => {
-  it('comes back as typed', async () => {
+  it('comes back as typed, under its own rule only', async () => {
     const key = await masterKey();
-    expect(await openPattern(key, await sealPattern(key, 'Café Órbita'))).toBe('Café Órbita');
+    const sealed = await sealPattern(key, 'Café Órbita', 'r1');
+    expect(await openPattern(key, { id: 'r1', ...sealed })).toBe('Café Órbita');
+    await expect(openPattern(key, { id: 'r2', ...sealed })).rejects.toThrow();
   });
 });

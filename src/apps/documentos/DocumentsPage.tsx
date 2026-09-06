@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { isPast, todayIso } from '../../utils/dateUtils';
+import { isPast } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
 import LinkRow from '../../components/LinkRow';
@@ -8,17 +8,18 @@ import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import { useDocuments } from './useDocuments';
 import { expiryLabel } from './expiry';
+import { useToday } from '../../hooks/useToday';
 
 export default function DocumentsPage() {
   const { items, loading, error, add } = useDocuments();
   const navigate = useNavigate();
-  const today = todayIso();
+  const today = useToday();
 
   /** A document is born from its title alone, never expiring, and opened to
    *  have its files added. */
   async function addDocument(title: string) {
     const id = await add({ title, expires_on: null });
-    if (id) navigate(entryPath('documentos', id));
+    if (id) void navigate(entryPath('documentos', id));
   }
 
   return (

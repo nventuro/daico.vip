@@ -10,6 +10,7 @@
 // =============================================================================
 import type { AttachmentOwnerKind, SyncedRow } from '../../types';
 import type { RepeatUnit } from '../../utils/recurrence';
+import { compareTitles } from '../../utils/listUtils';
 
 /** How a column is declared in SQLite, and how its values cross to the app. */
 export interface ColumnSpec {
@@ -33,6 +34,22 @@ export interface TableSpec<Row extends SyncedRow = SyncedRow> {
   columns: ColumnSpecs<Row>;
   /** ORDER BY clause (SQL) for the visible list. */
   orderBy: string;
+  /** The order the visible list is finally put in, where SQL's is not the
+   *  household's: SQLite folds only ASCII, and puts «árbol» after «zorro». */
+  compare?(a: Row, b: Row): number;
+}
+
+/** Rows by title, in the order a person would look for them. */
+function byTitle<Row extends SyncedRow & { title: string }>(a: Row, b: Row): number {
+  return compareTitles(a.title, b.title);
+}
+
+/** Two days in order, one that is not set after every one that is. */
+function byDay(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a < b ? -1 : 1;
 }
 
 /** What a row is made of, minus what the engine fills in: the values a caller
@@ -41,12 +58,12 @@ export type RowInput<Row extends SyncedRow> = Omit<Row, keyof SyncedRow>;
 
 /** A spec's own columns as name/spec pairs, in DDL order. */
 export function columnsOf(spec: TableSpec): [string, ColumnSpec][] {
-  return Object.entries(spec.columns as Record<string, ColumnSpec>);
+  return Object.entries(spec.columns);
 }
 
 /** A spec's own column names, in DDL order. */
 export function columnNames(spec: TableSpec): string[] {
-  return Object.keys(spec.columns as Record<string, ColumnSpec>);
+  return Object.keys(spec.columns);
 }
 
 // ─── The shell's tables, and the ones several apps share ─────────────────────
@@ -79,7 +96,7 @@ export const HOUSEHOLD_KEY_SPEC: TableSpec<HouseholdKey> = {
 /**
  * The pair the email worker seals a PDF to: the public half in the clear, the
  * private half sealed under the master key in the attachment file format,
- * with the key that sealed it wrapped the way a note's body key is. One row
+ * with the key that sealed it wrapped under the master key. One row
  * per household, written once; synced so a device opens a staged file
  * offline.
  */
@@ -153,8 +170,7 @@ export interface Chore extends SyncedRow {
    *  one falls on. Null for a chore with no date, which never repeats. */
   due_on: string | null;
   /** The day it was last marked (yyyy-mm-dd), null if it never was. A chore
-   *  that does not repeat and carries one is done: that pair is what `done`
-   *  used to be, plus when. */
+   *  that does not repeat and carries one is done. */
   last_done_on: string | null;
   /** How many `repeat_unit`s go by between one and the next; null when the
    *  chore does not repeat. */
@@ -233,6 +249,7 @@ export const GUIDES_SPEC: TableSpec<Guide> = {
     archived: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
   },
   orderBy: 'title COLLATE NOCASE ASC',
+  compare: byTitle,
 };
 
 /**
@@ -294,6 +311,7 @@ export const DATES_SPEC: TableSpec<DateEntry> = {
     comments: { ddl: 'TEXT' },
   },
   orderBy: 'occurs_on ASC, title COLLATE NOCASE ASC',
+  compare: (a, b) => byDay(a.occurs_on, b.occurs_on) || byTitle(a, b),
 };
 
 // ─── Recetas ─────────────────────────────────────────────────────────────────
@@ -320,13 +338,14 @@ export const RECIPES_SPEC: TableSpec<Recipe> = {
     servings: { ddl: 'INTEGER' },
   },
   orderBy: 'title COLLATE NOCASE ASC',
+  compare: byTitle,
 };
 
 // ─── Documentos ──────────────────────────────────────────────────────────────
 
 /**
  * A document — a passport, an ID, a policy — whose content is its attachments:
- * the pictures of it. The row holds only what lists it and says when it
+ * the files of it. The row holds only what lists it and says when it
  * expires; anything sensitive (a number, a date of birth) stays inside the
  * encrypted files.
  */
@@ -344,6 +363,7 @@ export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
     expires_on: { ddl: 'TEXT' },
   },
   orderBy: 'title COLLATE NOCASE ASC',
+  compare: byTitle,
 };
 
 // ─── Gastos ──────────────────────────────────────────────────────────────────
@@ -480,7 +500,7 @@ export const CHECKUPS_SPEC: TableSpec<Checkup> = {
 
 /**
  * A study kept — a blood test, an X-ray, a vaccination certificate. Like a
- * document, its content is its pictures: the row holds the title and the day
+ * document, its content is its files: the row holds the title and the day
  * it was done, which list it, and nothing that says what the study found.
  * One member's, like a checkup.
  */
@@ -590,6 +610,7 @@ export const TRIPS_SPEC: TableSpec<Trip> = {
     ends_on: { ddl: 'TEXT' },
   },
   orderBy: 'starts_on ASC NULLS LAST, title COLLATE NOCASE ASC',
+  compare: (a, b) => byDay(a.starts_on, b.starts_on) || byTitle(a, b),
 };
 
 /**

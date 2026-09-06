@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { todayIso } from '../../utils/dateUtils';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
 import EntryMarks from '../../components/EntryMarks';
@@ -14,6 +13,7 @@ import { entryPath } from '../types';
 import { groupNotes } from './grouping';
 import { noteMarks } from './marks';
 import { useNotes } from './useNotes';
+import { useToday } from '../../hooks/useToday';
 
 export default function NotesPage() {
   const { items, loading, error, add } = useNotes();
@@ -27,10 +27,11 @@ export default function NotesPage() {
   async function addNote(title: string) {
     if (masterKey.status !== 'unlocked') return;
     const id = await add(title, '', masterKey.key);
-    if (id) navigate(entryPath('notas', id));
+    if (id) void navigate(entryPath('notas', id));
   }
 
-  const groups = useMemo(() => groupNotes(items, todayIso()), [items]);
+  const today = useToday();
+  const groups = useMemo(() => groupNotes(items, today), [items, today]);
 
   return (
     <ListPage

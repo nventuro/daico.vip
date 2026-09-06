@@ -68,14 +68,14 @@ export function categoryOf(
 ): { category: SpendingCategory | null; rule: Rule | null } {
   if (line.charge) return { category: 'impuestos', rule: null };
   const key = normalize(merchantKey(line.description));
-  let best: Rule | null = null;
+  let best: { rule: Rule; length: number } | null = null;
   for (const rule of rules) {
     const pattern = normalize(rule.pattern.trim());
-    if (pattern && key.includes(pattern) && (!best || pattern.length > best.pattern.length)) {
-      best = rule;
+    if (pattern && key.includes(pattern) && (!best || pattern.length > best.length)) {
+      best = { rule, length: pattern.length };
     }
   }
-  return best ? { category: best.category, rule: best } : { category: null, rule: null };
+  return best ? { category: best.rule.category, rule: best.rule } : { category: null, rule: null };
 }
 
 /** Rules as pasted in bulk: the ones read, and the lines that are not one. */

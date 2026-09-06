@@ -9,9 +9,9 @@ interface OfflineBannerProps {
   className?: string;
 }
 
-/** Shown while the device has no connection: on the offline-first pages, to
- *  explain that edits are saved locally and synced when it comes back; on the
- *  home screen, to say how old what it shows is. */
+/** Shown while the device has no connection: on a list, to say that edits
+ *  are kept here and sent once it is back; on the home screen, to say how old
+ *  what it shows is. */
 export default function OfflineBanner({ children, className }: OfflineBannerProps) {
   const online = useOnline();
 

@@ -5,8 +5,9 @@ const DAYS_PER_WEEK = 7;
 
 /**
  * How a repetition is counted. Every repeating thing in the app — a chore that
- * comes back, a date that comes round — is "every N of these", so both tables
- * carry the same pair of columns and share the arithmetic below.
+ * comes back, a date that comes round, a checkup — is "every N of these", so
+ * every table that repeats carries the same pair of columns and shares the
+ * arithmetic below.
  */
 export const REPEAT_UNITS = ['day', 'week', 'month', 'year'] as const;
 export type RepeatUnit = (typeof REPEAT_UNITS)[number];

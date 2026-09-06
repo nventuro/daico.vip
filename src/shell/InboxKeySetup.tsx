@@ -21,7 +21,7 @@ export default function InboxKeySetup() {
   const masterKey = useMasterKey();
   const { items, loading } = useOfflineTable(INBOX_KEY_SPEC);
   const online = useOnline();
-  const { completedAt } = useSyncStatus();
+  const completedAt = useSyncStatus((status) => status.completedAt);
   const attempted = useRef(false);
 
   useEffect(() => {

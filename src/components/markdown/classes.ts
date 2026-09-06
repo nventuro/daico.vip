@@ -5,14 +5,16 @@
 // =============================================================================
 
 export const MARKDOWN_CLASS = {
+  // Every space is kept, as the editor keeps it while a body is written.
+  body: 'whitespace-break-spaces',
   h1: 'mt-8 mb-3 font-display text-2xl font-black',
   h2: 'mt-6 mb-2 font-display text-xl font-black',
   h3: 'mt-5 mb-2 text-lg font-semibold',
   p: 'my-3 leading-relaxed',
   ul: 'my-3 list-disc pl-5',
   ol: 'my-3 list-decimal pl-5',
-  // The editor keeps an item's text in a paragraph of its own; the margins
-  // around it are the item's, so that paragraph has none of its own.
+  // An item's text is a paragraph of its own; the margins around it are the
+  // item's, so that paragraph has none.
   li: 'my-1 leading-relaxed [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
   // A ticked list is a list without bullets, each row a box and its text.
   taskList: 'my-3 list-none pl-0',

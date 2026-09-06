@@ -26,7 +26,7 @@ export default function RecipesPage() {
   // own, so a new one is just a title that goes straight to writing.
   async function addRecipe(title: string) {
     const id = await add(title);
-    if (id) navigate(entryPath('recetas', id, 'editar'));
+    if (id) void navigate(entryPath('recetas', id, 'editar'));
   }
 
   return (

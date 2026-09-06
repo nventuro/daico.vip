@@ -46,7 +46,7 @@ export default function AttachmentAddDialog({ files, onSave, onClose }: Attachme
   };
 
   return (
-    <ModalDialog onClose={onClose} layout="sheet">
+    <ModalDialog onClose={onClose} layout="sheet" label={pdf ? 'Nuevo PDF' : 'Nueva foto'}>
       <div className="flex flex-col gap-4 p-4">
         <span className="font-medium">
           {files.length === 1

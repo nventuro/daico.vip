@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { countsOf, failureBody, replyMime, serviceFailureBody, successBody } from './reply';
+import {
+  alreadyStagedBody,
+  countsOf,
+  failureBody,
+  replyMime,
+  serviceFailureBody,
+  successBody,
+} from './reply';
 
 describe('successBody', () => {
   it('says one item in the singular, with its class', () => {
@@ -35,6 +42,24 @@ describe('successBody', () => {
       ': un pasaje y un alojamiento, con 2 PDF.',
     );
     expect(successBody('Bariloche', countsOf(['ticket']), 0)).not.toContain('PDF');
+  });
+
+  it('says how many attachments were left out, when any were', () => {
+    expect(successBody('Bariloche', countsOf(['ticket']), 1, 1)).toContain(
+      '\nDejé afuera un adjunto que no era un PDF o era demasiado grande.',
+    );
+    expect(successBody('Bariloche', countsOf(['ticket']), 1, 3)).toContain(
+      'Dejé afuera 3 adjuntos',
+    );
+    expect(successBody('Bariloche', countsOf(['ticket']), 1)).not.toContain('Dejé afuera');
+  });
+});
+
+describe('alreadyStagedBody', () => {
+  it('says nothing was staged again, and where the first time went', () => {
+    expect(alreadyStagedBody()).toBe(
+      'Este correo ya lo había recibido, así que no guardé nada de nuevo.\nLas sugerencias de la primera vez están en Viajes: https://daico.vip/viajes',
+    );
   });
 });
 
@@ -83,6 +108,30 @@ describe('replyMime', () => {
     );
     expect(raw).toContain('In-Reply-To: <abc@mail.example>');
     expect(raw).toContain('References: <abc@mail.example>');
+    // Marked as a machine's, so a responder on the other side lets it be.
+    expect(raw).toContain('Auto-Submitted: auto-replied');
+  });
+
+  it('keeps every header it copies from the original to one line, and the subject to length', () => {
+    const raw = replyMime(
+      {
+        from: 'trips@example.com',
+        to: 'member@example.com',
+        subject: `Fwd: Tu vuelo\r\nBcc: everyone@example.com\r\n${'x'.repeat(300)}`,
+        inReplyTo: '<id@x>\r\nX-Injected: yes',
+        references: '<a@x>\r\n<b@x>',
+      },
+      'Hola',
+    );
+    // What was written as a header of its own is now words on the line above.
+    expect(raw).not.toMatch(/^Bcc:/m);
+    expect(raw).not.toMatch(/^X-Injected:/m);
+    expect(raw).toContain('In-Reply-To: <id@x> X-Injected: yes');
+    expect(raw).toContain('References: <a@x> <b@x> <id@x> X-Injected: yes');
+    const subject = /Subject: =\?utf-8\?B\?([^?]+)\?=/.exec(raw)?.[1] ?? '';
+    const decoded = Buffer.from(subject, 'base64').toString();
+    expect(decoded).not.toContain('\n');
+    expect(decoded).toHaveLength('Re: '.length + 200);
   });
 
   it('carries the original References on, ending in its Message-ID', () => {

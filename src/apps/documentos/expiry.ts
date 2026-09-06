@@ -1,5 +1,5 @@
 import type { DocumentEntry } from '../../lib/offline/specs';
-import { daysUntil, dueWord, formatDateShort } from '../../utils/dateUtils';
+import { dueWord, formatDateShort, withinNotice } from '../../utils/dateUtils';
 
 /** How many days ahead of its expiry a document shows on the home screen: six
  *  months, the margin a passport is often required to have left, and time
@@ -12,7 +12,7 @@ const DOCUMENT_NOTICE_DAYS = 180;
  * expiry is updated, since that is exactly when it needs attention.
  */
 export function isExpiring(entry: DocumentEntry, today: string): boolean {
-  return entry.expires_on !== null && daysUntil(today, entry.expires_on) <= DOCUMENT_NOTICE_DAYS;
+  return entry.expires_on !== null && withinNotice(today, entry.expires_on, DOCUMENT_NOTICE_DAYS);
 }
 
 /** "vence dd/mm/yyyy", or "venció" once the day has gone by. */

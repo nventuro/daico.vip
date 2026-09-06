@@ -20,7 +20,7 @@ interface RecordPageProps {
 }
 
 /** A study, read and written on the same page: the title on blur, the day as
- *  it changes, and its pictures — which are what it says. */
+ *  it changes, and its files — which are what it says. */
 export default function RecordPage({ record, save, remove }: RecordPageProps) {
   const attachments = useAttachments({ kind: 'health_record', id: record.id });
   const leave = useLeave();
@@ -28,7 +28,7 @@ export default function RecordPage({ record, save, remove }: RecordPageProps) {
   const labels = SALUD_KIND_LABELS.record;
 
   async function removeRecord() {
-    // The study's pictures go with it; nothing else would ever list them.
+    // The study's files go with it; nothing else would ever list them.
     await attachments.removeAll();
     await remove(record.id);
     leave(appPath('salud'));

@@ -11,10 +11,13 @@ export interface Sender {
   authenticationResults: string | null;
 }
 
+/** What the receiving server's verdict rules out, before anyone asks who the
+ *  sender is. */
+export type VerdictRejection = 'no-verdict' | 'foreign-verdict' | 'dmarc-failed';
+
 /** Why a sender is turned away; only ever logged, never told to the sender,
- *  who gets no reply at all. */
-export type SenderRejection =
-  'no-verdict' | 'foreign-verdict' | 'dmarc-failed' | 'envelope-not-member' | 'from-not-member';
+ *  whose mail is refused at the door — a bounce from their own server at most. */
+export type SenderRejection = VerdictRejection | 'envelope-not-member' | 'from-not-member';
 
 /**
  * The receiving mail server, as it names itself at the head of every verdict
@@ -40,14 +43,26 @@ function normalized(email: string): string {
 }
 
 /**
- * Whether an email may go on to be read, and if not, why. Both addresses have
- * to be a member's: the From header is what the DMARC verdict vouches for,
- * and the envelope sender is where the reply goes.
+ * What the verdict alone rules out, or null when the mail is authentic: the
+ * receiving server must have stamped it, under its own name, as a DMARC
+ * pass. Asked first, before anything is opened for the mail.
  */
-export function senderRejection(sender: Sender, memberEmails: string[]): SenderRejection | null {
-  if (sender.authenticationResults === null) return 'no-verdict';
-  if (!OWN_VERDICT.test(sender.authenticationResults)) return 'foreign-verdict';
-  if (!DMARC_PASS.test(sender.authenticationResults)) return 'dmarc-failed';
+export function verdictRejection(authenticationResults: string | null): VerdictRejection | null {
+  if (authenticationResults === null) return 'no-verdict';
+  if (!OWN_VERDICT.test(authenticationResults)) return 'foreign-verdict';
+  if (!DMARC_PASS.test(authenticationResults)) return 'dmarc-failed';
+  return null;
+}
+
+/**
+ * Why an authentic mail's sender is turned away, or null when they are let
+ * in. Both addresses have to be a member's: the From header is what the
+ * DMARC verdict vouches for, and the envelope sender is where the reply goes.
+ */
+export function memberRejection(
+  sender: Pick<Sender, 'envelopeFrom' | 'headerFrom'>,
+  memberEmails: string[],
+): SenderRejection | null {
   const members = new Set(memberEmails.map(normalized));
   if (!members.has(normalized(sender.envelopeFrom))) return 'envelope-not-member';
   if (sender.headerFrom === null || !members.has(normalized(sender.headerFrom))) {
@@ -56,6 +71,8 @@ export function senderRejection(sender: Sender, memberEmails: string[]): SenderR
   return null;
 }
 
-export function isAllowedSender(sender: Sender, memberEmails: string[]): boolean {
-  return senderRejection(sender, memberEmails) === null;
+/** Whether an email may go on to be read, and if not, why: the verdict
+ *  first, then who the sender is. */
+export function senderRejection(sender: Sender, memberEmails: string[]): SenderRejection | null {
+  return verdictRejection(sender.authenticationResults) ?? memberRejection(sender, memberEmails);
 }

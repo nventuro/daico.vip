@@ -75,7 +75,7 @@ vi.mock('../../hooks/useOfflineTable', () => ({
   }),
 }));
 vi.mock('../../hooks/useAttachments', () => ({
-  useAttachments: () => ({ items: [], loading: false, error: null, addSealed: vi.fn() }),
+  useAttachments: () => ({ items: [], loading: false, error: null, addOpened: vi.fn() }),
 }));
 vi.mock('../../hooks/useMasterKey', () => ({
   useMasterKey: () => ({ status: 'unlocked', key: {} }),

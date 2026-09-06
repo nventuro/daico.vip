@@ -5,7 +5,7 @@ import SectionLabel from './SectionLabel';
 
 /** One answer to the question: what it is called, and the icon it is drawn
  *  with in its list, if it has one. */
-export interface KindOption<Kind extends string> {
+interface KindOption<Kind extends string> {
   kind: Kind;
   label: string;
   icon?: TablerIcon;
@@ -33,7 +33,7 @@ export default function KindPickDialog<Kind extends string>({
   onClose,
 }: KindPickDialogProps<Kind>) {
   return (
-    <ModalDialog onClose={onClose} layout="confirm">
+    <ModalDialog onClose={onClose} layout="confirm" label="¿Qué es?">
       <div className="flex flex-col gap-2">
         {/* What is being asked about, in the weight of the text around it: it
             says what is being talked about, not what is being asked. */}

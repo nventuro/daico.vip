@@ -21,7 +21,7 @@ export default function DatePage() {
 
   const commentsSave = useTextSave(async (text) => {
     if (entry) await save(entry.id, { comments: text || null });
-  });
+  }, entry?.id);
 
   async function removeDate(id: string) {
     await remove(id);
@@ -47,7 +47,6 @@ export default function DatePage() {
                 repeat_unit: entry.repeat_unit,
               }}
               onChange={(patch) => void save(entry.id, patch)}
-              layout="form"
             />
           </div>
 

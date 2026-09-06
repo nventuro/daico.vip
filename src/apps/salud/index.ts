@@ -15,7 +15,7 @@ const salud: AppModule = {
   specs: [CHECKUPS_SPEC, HEALTH_RECORDS_SPEC],
   routes: [
     { index: true, Component: SaludPage },
-    // The optional segment is one of a study's pictures, open in the lightbox.
+    // The optional segment is one of a study's files, open in the lightbox.
     { path: ':id/:attachmentId?', Component: SaludEntryPage },
   ],
   useUpcoming: useSaludUpcoming,

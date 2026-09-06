@@ -29,6 +29,10 @@ describe('isPermanentRowError', () => {
     }
   });
 
+  it('is true for a column the table does not have, which PostgREST turns away itself', () => {
+    expect(isPermanentRowError({ code: 'PGRST204' })).toBe(true);
+  });
+
   it('is false for anything that may pass later, and for no code at all', () => {
     for (const code of ['08006', '53300', '57014', 'PGRST301']) {
       expect(isPermanentRowError({ code })).toBe(false);

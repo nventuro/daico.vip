@@ -7,7 +7,7 @@ import { useLeave } from '../../hooks/useLeave';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { useOnline } from '../../hooks/useOnline';
-import { relativeDayTime, todayIso } from '../../utils/dateUtils';
+import { relativeDayTime } from '../../utils/dateUtils';
 import { errorMessage } from '../../utils/textUtils';
 import DeleteDialog from '../../components/DeleteDialog';
 import EntryPage from '../../components/EntryPage';
@@ -27,7 +27,7 @@ import {
   suggestedTripChoice,
   type InboxGroup,
 } from './grouping';
-import { confirmInbox, discardInbox, groupFileIds, sealedFilesOf } from './inboxConfirm';
+import { confirmInbox, discardInbox, groupFileIds, openedFilesOf } from './inboxConfirm';
 import { deleteInboxFiles } from './inboxFiles';
 import { inboxUndoState } from './inboxUndo';
 import { useMissingInboxFiles } from './useMissingInboxFiles';
@@ -40,6 +40,7 @@ import {
 } from './labels';
 import { useTripInbox } from './useTripInbox';
 import { useTrips } from './useTrips';
+import { useToday } from '../../hooks/useToday';
 
 /**
  * One email's suggestions, reviewed whole: what arrived, the trip to put it
@@ -54,8 +55,8 @@ export default function InboxReviewPage() {
   // The rows go in as they came, capitals and all — not through the trip
   // rows' own `add`, which lower-cases what is typed into an add bar.
   const { insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
-  const { addSealed } = useAttachments();
-  const { items: inboxKeys } = useOfflineTable(INBOX_KEY_SPEC);
+  const { addOpened } = useAttachments();
+  const { items: inboxKeys, loading: keysLoading } = useOfflineTable(INBOX_KEY_SPEC);
   const masterKey = useMasterKey();
   const online = useOnline();
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export default function InboxReviewPage() {
   const [discarding, setDiscarding] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const today = todayIso();
+  const today = useToday();
   const group = groups.find((candidate) => candidate.importId === importId);
   const choices = useMemo(() => inboxTripChoices(trips, today), [trips, today]);
   // Nothing chosen yet means the suggestion, which is only known once the
@@ -80,10 +81,11 @@ export default function InboxReviewPage() {
 
   async function confirm(group: InboxGroup) {
     if (masterKey.status !== 'unlocked') return;
+    const { key } = masterKey;
     setProblem(null);
     let files;
     try {
-      files = await sealedFilesOf(group, masterKey.key, inboxKeys[0]);
+      files = await openedFilesOf(group, key, inboxKeys[0]);
     } catch (e) {
       setProblem(errorMessage(e));
       return;
@@ -94,13 +96,20 @@ export default function InboxReviewPage() {
       {
         addTrip,
         addItem,
-        addAttachment: addSealed,
+        addAttachment: (owner, file) => addOpened(owner, file, key),
         removeStaged: remove,
         removeFiles: deleteInboxFiles,
       },
       files,
     );
-    if (undo) navigate(entryPath('viajes', undo.tripId), { state: inboxUndoState(undo) });
+    // In place of this page, which has nothing left to show: going back from
+    // the trip is going back to the inbox.
+    if (undo) {
+      void navigate(entryPath('viajes', undo.tripId), {
+        replace: true,
+        state: inboxUndoState(undo),
+      });
+    }
   }
 
   async function discard(group: InboxGroup) {
@@ -111,7 +120,7 @@ export default function InboxReviewPage() {
   return (
     <EntryPage
       entry={group}
-      loading={loading || tripsLoading}
+      loading={loading || tripsLoading || keysLoading}
       error={error ?? tripsError ?? problem}
       missing="No se encontró en el inbox."
     >
@@ -124,7 +133,7 @@ export default function InboxReviewPage() {
           className="flex flex-col gap-4"
         >
           {lacking && !online && (
-            <OfflineBanner>
+            <OfflineBanner className="mb-4">
               Los PDF de este correo todavía no llegaron a este dispositivo: para agregarlo hace
               falta conexión.
             </OfflineBanner>

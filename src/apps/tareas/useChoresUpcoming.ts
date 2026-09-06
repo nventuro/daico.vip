@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import { daysUntil, todayIso } from '../../utils/dateUtils';
+import { withinNotice } from '../../utils/dateUtils';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { entryPath, upcomingFrom, type Upcoming } from '../types';
 import { useChores } from './useChores';
 import { choreMarks } from './marks';
 import { isDone } from './recurrence';
+import { useToday } from '../../hooks/useToday';
 
 /** How many days ahead a pending chore shows on the home screen's upcoming list. */
 const CHORE_NOTICE_DAYS = 3;
@@ -14,11 +15,11 @@ const CHORE_NOTICE_DAYS = 3;
 export function useChoresUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useChores();
   const { items: attachments } = useAttachments();
-  const today = todayIso();
+  const today = useToday();
   return useMemo(() => {
     const attached = ownersWithAttachments(attachments, 'chore');
     return upcomingFrom({ items, loading }, (chore) =>
-      !isDone(chore) && chore.due_on != null && daysUntil(today, chore.due_on) <= CHORE_NOTICE_DAYS
+      !isDone(chore) && chore.due_on != null && withinNotice(today, chore.due_on, CHORE_NOTICE_DAYS)
         ? {
             title: chore.title,
             on: chore.due_on,

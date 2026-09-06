@@ -5,18 +5,29 @@
 // merchant rule's pattern, the same way without the compression.
 // =============================================================================
 import { STATEMENT_CONTENTS_SCHEMA, type StatementContents, type StatementLine } from './statement';
-import type { MerchantRule, Statement } from '../../lib/offline/specs';
-import { decryptFile, encryptFile, fromBase64, toBase64 } from '../../lib/householdKey';
+import {
+  MERCHANT_RULES_SPEC,
+  STATEMENTS_SPEC,
+  type MerchantRule,
+  type Statement,
+} from '../../lib/offline/specs';
+import { decryptFile, encryptFile, fromBase64, rowBinding, toBase64 } from '../../lib/householdKey';
 import { gunzip, gzip } from '../../lib/compress';
 
-/** The payload and wrapped key that carry `contents`, sealed under `masterKey`. */
+/** The payload and wrapped key that carry `contents`, sealed under `masterKey`
+ *  for the statement `id`. */
 export async function sealContents(
   masterKey: CryptoKey,
   contents: StatementContents,
+  id: string,
 ): Promise<Pick<Statement, 'payload' | 'wrapped_key'>> {
   const plain = new TextEncoder().encode(JSON.stringify(contents));
   const packed = await gzip(plain);
-  const { data, wrappedFileKey } = await encryptFile(masterKey, packed);
+  const { data, wrappedFileKey } = await encryptFile(
+    masterKey,
+    packed,
+    rowBinding(STATEMENTS_SPEC.table, id),
+  );
   return { payload: toBase64(data), wrapped_key: wrappedFileKey };
 }
 
@@ -57,27 +68,42 @@ export function upgradeContents(contents: Record<string, unknown>): StatementCon
  *  household's or the payload was altered. */
 export async function openContents(
   masterKey: CryptoKey,
-  statement: Pick<Statement, 'payload' | 'wrapped_key'>,
+  statement: Pick<Statement, 'id' | 'payload' | 'wrapped_key'>,
 ): Promise<StatementContents> {
-  const packed = await decryptFile(masterKey, statement.wrapped_key, fromBase64(statement.payload));
+  const packed = await decryptFile(
+    masterKey,
+    statement.wrapped_key,
+    fromBase64(statement.payload),
+    rowBinding(STATEMENTS_SPEC.table, statement.id),
+  );
   const plain = await gunzip(packed);
   return upgradeContents(JSON.parse(new TextDecoder().decode(plain)) as Record<string, unknown>);
 }
 
-/** The encrypted pattern and wrapped key that carry `pattern`. */
+/** The encrypted pattern and wrapped key that carry `pattern`, for the rule `id`. */
 export async function sealPattern(
   masterKey: CryptoKey,
   pattern: string,
+  id: string,
 ): Promise<Pick<MerchantRule, 'pattern' | 'wrapped_key'>> {
-  const { data, wrappedFileKey } = await encryptFile(masterKey, new TextEncoder().encode(pattern));
+  const { data, wrappedFileKey } = await encryptFile(
+    masterKey,
+    new TextEncoder().encode(pattern),
+    rowBinding(MERCHANT_RULES_SPEC.table, id),
+  );
   return { pattern: toBase64(data), wrapped_key: wrappedFileKey };
 }
 
 /** The pattern a rule's row seals. */
 export async function openPattern(
   masterKey: CryptoKey,
-  rule: Pick<MerchantRule, 'pattern' | 'wrapped_key'>,
+  rule: Pick<MerchantRule, 'id' | 'pattern' | 'wrapped_key'>,
 ): Promise<string> {
-  const plain = await decryptFile(masterKey, rule.wrapped_key, fromBase64(rule.pattern));
+  const plain = await decryptFile(
+    masterKey,
+    rule.wrapped_key,
+    fromBase64(rule.pattern),
+    rowBinding(MERCHANT_RULES_SPEC.table, rule.id),
+  );
   return new TextDecoder().decode(plain);
 }

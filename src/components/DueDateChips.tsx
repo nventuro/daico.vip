@@ -41,7 +41,15 @@ export default function DueDateChips({
           Sin fecha
         </Chip>
       )}
-      <NativeDatePicker value={value} onChange={onChange} label="Fecha">
+      <NativeDatePicker
+        value={value}
+        // The native dialog has a clear of its own; a date that is required
+        // is changed through it and never dropped.
+        onChange={(picked) => {
+          if (picked !== null || !required) onChange(picked);
+        }}
+        label="Fecha"
+      >
         {(open) => (
           <Chip selected={other} onClick={open} aria-label="Elegir fecha" title="Elegir fecha">
             <IconCalendarEvent size={16} stroke={1.5} />

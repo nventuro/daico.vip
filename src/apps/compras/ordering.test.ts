@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { keyForAppend, keyForMove, keyForSlot, positionBetween, type Positioned } from './ordering';
 
 /** A list of n items in sort-key order, keyed by a fresh fractional sequence
- *  ('a0','a1',...) — i.e. the state right after the migration backfill. */
+ *  ('a0','a1',...), as a list is when every key was minted in order. */
 function makeList(n: number): Positioned[] {
   const items: Positioned[] = [];
   let prev: string | null = null;
@@ -81,17 +81,21 @@ describe('keyForMove', () => {
     expect([...keys].sort()).toEqual(keys); // already ascending
   });
 
-  it('returns null instead of throwing on duplicate neighbour keys', () => {
-    // Two items share a key (shouldn't happen, but corrupt sync data could do
-    // it): a move landing between them must bail rather than let the key
-    // generator throw on equal bounds mid-drag.
-    const corrupt: Positioned[] = [
+  it('lands past a run of equal keys rather than dropping the move', () => {
+    // Two devices appending offline mint the same key, and no key fits
+    // between two equal ones: the row goes after the run of them.
+    const twins: Positioned[] = [
       { id: 'p', position: 'a2' },
       { id: 'q', position: 'a2' },
       { id: 'r', position: 'a5' },
     ];
-    expect(() => keyForMove(corrupt, 'r', 'q')).not.toThrow();
-    expect(keyForMove(corrupt, 'r', 'q')).toBeNull();
+    const key = keyForMove(twins, 'r', 'q');
+    expect(key).not.toBeNull();
+    expect(key! > 'a2' && key! < 'a5').toBe(true);
+    // Dropped ahead of the run, it goes before both.
+    const ahead = keyForMove(twins, 'r', 'p');
+    expect(ahead).not.toBeNull();
+    expect(ahead! < 'a2').toBe(true);
   });
 });
 

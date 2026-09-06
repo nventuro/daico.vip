@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-react';
 import type { Statement, StatementFormat } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
-import { dueWord, formatDateCompact, isPast, relativeDay, todayIso } from '../../utils/dateUtils';
+import { dueWord, formatDateCompact, isPast, relativeDay } from '../../utils/dateUtils';
 import { tooLargeMessage } from '../../utils/textUtils';
 import DialogFooter from '../../components/DialogFooter';
 import EmptyState from '../../components/EmptyState';
@@ -26,6 +26,7 @@ import { coverageByCard, type Period } from './coverage';
 import { statementPath } from './paths';
 import { FORMAT_LABELS, formatArs, lateLabel, periodLabel, statementTitle } from './labels';
 import CardMark from './CardMark';
+import { useToday } from '../../hooks/useToday';
 
 /** Largest PDF taken as a statement, in bytes (input guard). */
 const STATEMENT_PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -71,18 +72,18 @@ export default function StatementsPage() {
   const [reading, setReading] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
-  const today = todayIso();
+  const today = useToday();
 
   async function keep(contents: StatementContents, existing?: Statement) {
     if (masterKey.status !== 'unlocked') return;
     if (existing) {
       const previous = await openStatement(existing, masterKey.key);
       await replace(existing.id, withOneOffsFrom(contents, previous), masterKey.key);
-      navigate(statementPath(existing.id));
+      void navigate(statementPath(existing.id));
       return;
     }
     const id = await add(contents, masterKey.key);
-    if (id) navigate(statementPath(id));
+    if (id) void navigate(statementPath(id));
   }
 
   async function importFile(file: File) {
@@ -251,7 +252,7 @@ export default function StatementsPage() {
         )}
       </ListPage>
       {duplicate && (
-        <ModalDialog onClose={() => setDuplicate(null)} layout="confirm">
+        <ModalDialog onClose={() => setDuplicate(null)} layout="confirm" label="Resumen repetido">
           <div className="flex flex-col gap-2">
             <p className="font-medium text-on-surface">
               Ya está el resumen {FORMAT_LABELS[duplicate.contents.format]}{' '}

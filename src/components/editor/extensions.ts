@@ -177,7 +177,7 @@ const MarkdownInline = Node.create({
     return [
       {
         tag: 'code[data-markdown-inline]',
-        getAttrs: (element) => ({ text: (element as HTMLElement).textContent ?? '' }),
+        getAttrs: (element) => ({ text: element.textContent ?? '' }),
       },
     ];
   },

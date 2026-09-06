@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import EntryPage from '../../components/EntryPage';
@@ -17,10 +16,6 @@ export default function GuideChapterPage() {
   const previous = index > 0 ? guideChapters[index - 1] : undefined;
   const next =
     index !== -1 && index < guideChapters.length - 1 ? guideChapters[index + 1] : undefined;
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [chapterId]);
 
   const navLink = 'inline-flex max-w-[48%] items-center gap-1 text-sm text-(--app) hover:underline';
 

@@ -14,8 +14,8 @@ export function useLeave(): (to: string) => void {
   return useCallback(
     (to: string) => {
       const steps = stepsBackTo(to);
-      if (steps === null) navigate(to, { replace: true });
-      else navigate(steps);
+      if (steps === null) void navigate(to, { replace: true });
+      else void navigate(steps);
     },
     [navigate],
   );

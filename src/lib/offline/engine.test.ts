@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ALL_SPECS,
   CHORES_SPEC,
+  DOCUMENTS_SPEC,
   SHOPPING_SPEC,
   columnNames,
   type Chore,
+  type DocumentEntry,
   type ShoppingItem,
 } from './specs';
 import { GUIDE_IMAGE_CACHE, LOCAL_SPECS } from './localTables';
@@ -47,6 +49,16 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('listVisible', () => {
+  it("puts titles in the household's order, whatever SQLite made of the accents", async () => {
+    for (const title of ['zorro', 'Ñandú', 'árbol', 'Bote']) {
+      await engine.insert(DOCUMENTS_SPEC, { title, expires_on: null });
+    }
+    const titles = (await engine.listVisible<DocumentEntry>(DOCUMENTS_SPEC)).map((d) => d.title);
+    expect(titles).toEqual(['árbol', 'Bote', 'Ñandú', 'zorro']);
+  });
 });
 
 describe('local schema', () => {
@@ -443,19 +455,46 @@ describe('reconcile', () => {
     expect(await bookkeeping('chores', 'a')).toEqual({ pending_op: null, synced: 1 });
   });
 
-  it('keeps the local row when the server version is older or the same', async () => {
+  it('keeps the local row when the server version is older', async () => {
     await pulled(serverChore('a', T1));
     await pulled(serverChore('a', T0, { title: 'stale' }));
-    await pulled(serverChore('a', T1, { title: 'same instant' }));
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T1)]);
+  });
+
+  it("takes the server's version at the same instant when it reads differently", async () => {
+    // Two devices wrote in the one millisecond: the server holds one version
+    // and this device the other, and the server's is what every other device
+    // has. A clean row is a copy of the server's, so it becomes one again.
+    await pulled(serverChore('a', T1));
+    const watcher = watch('chores');
+    await pulled(serverChore('a', T1, { title: 'the other write' }));
+    expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([
+      serverChore('a', T1, { title: 'the other write' }),
+    ]);
+    expect(watcher.calls).toBe(1);
+    // The same row again is no change at all.
+    await pulled(serverChore('a', T1, { title: 'the other write' }));
+    expect(watcher.calls).toBe(1);
+    watcher.stop();
   });
 
   it('compares timestamps by instant, whatever their format', async () => {
     await pulled(serverChore('a', T0));
-    await pulled(serverChore('a', '2026-08-27T10:00:00.000+00:00', { title: 'same instant' }));
-    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].title).toBe('Chore a');
+    const watcher = watch('chores');
+    // The same row, its stamps spelled another way: nothing to change.
+    await pulled(
+      serverChore('a', '2026-08-27T10:00:00.000+00:00', {
+        created_at: '2026-08-27T10:00:00+00:00',
+      }),
+    );
+    expect(watcher.calls).toBe(0);
     await pulled(serverChore('a', '2026-08-27T07:00:01.000-03:00', { title: 'one second later' }));
     expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].title).toBe('one second later');
+    // PostgREST writes the fraction to the microsecond; a stamp that did not
+    // parse would read as neither older nor newer, and be taken.
+    await pulled(serverChore('a', '2026-08-27T10:00:00.999999+00:00', { title: 'stale' }));
+    expect((await engine.listVisible<Chore>(CHORES_SPEC))[0].title).toBe('one second later');
+    watcher.stop();
   });
 
   it('leaves a row with a queued upsert alone even when the server is newer', async () => {

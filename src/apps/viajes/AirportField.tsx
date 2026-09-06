@@ -16,10 +16,11 @@ interface AirportFieldProps {
 /**
  * The airport a pasaje leaves from or lands at. What it holds is a code, but
  * what it takes is free text: a city is how an airport is remembered, and the
- * only way to search the list is to type part of what an option says. Every
- * keystroke is resolved to a code — so the field is right even if the form is
- * submitted without leaving it — and three letters are always taken as one, so
- * an airport the list has never heard of still goes in.
+ * only way to search the list is to type part of what an option says. What is
+ * typed is resolved to a code once the field is left, or picked from the list
+ * — half a city resolves to the wrong airport, and every keystroke would be a
+ * row written — and three letters are always taken as one, so an airport the
+ * list has never heard of still goes in.
  */
 export default function AirportField({
   value,
@@ -32,12 +33,18 @@ export default function AirportField({
   // and showing it back mid-word would eat the city being typed.
   const [typing, setTyping] = useState<string | null>(null);
 
+  function commit(text: string) {
+    const code = resolveAirportCode(text);
+    setTyping(null);
+    if (code !== value) onChange(code);
+  }
+
   function change(text: string) {
     const code = resolveAirportCode(text);
-    // Picking from the list drops its whole value in: snap to the code rather
-    // than leave a city sitting in a field that holds one.
-    setTyping(code !== null && text.startsWith(`${code} `) ? null : text);
-    onChange(code);
+    // Picking from the list drops its whole value in: that is the airport,
+    // and it goes in at once rather than leave a city sitting in the field.
+    if (code !== null && text.startsWith(`${code} `)) commit(text);
+    else setTyping(text);
   }
 
   return (
@@ -45,7 +52,15 @@ export default function AirportField({
       type="text"
       value={typing ?? value ?? ''}
       onChange={(e) => change(e.target.value)}
-      onBlur={() => setTyping(null)}
+      onBlur={() => {
+        if (typing !== null) commit(typing);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
       placeholder="AEP"
       aria-label={label}
       list={list}

@@ -11,7 +11,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 // into text to dateUtils.
 const NATIVE_DATE_INPUT_TYPES = /^(date|datetime-local|month|week|time)$/;
 const nativeDateInput = {
-  selector: `JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type']:matches([value.value=${NATIVE_DATE_INPUT_TYPES}], [value.expression.value=${NATIVE_DATE_INPUT_TYPES}])`,
+  selector: `JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type']:matches([value.value=${NATIVE_DATE_INPUT_TYPES}], [value.expression.value=${NATIVE_DATE_INPUT_TYPES}], [value.expression.quasis.0.value.cooked=${NATIVE_DATE_INPUT_TYPES}])`,
   message:
     "A native date or time input follows the browser's language (month first, and a 12-hour clock, in English). Use DatePicker / TimePicker, or NativeDatePicker / NativeTimePicker behind a control of your own.",
 };
@@ -66,13 +66,17 @@ export default defineConfig([
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
-      tseslint.configs.recommended,
+      tseslint.configs.recommendedTypeChecked,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+      // The type-aware rules read the program the tsconfigs describe: a
+      // promise left floating or a value read as `any` is only visible with
+      // the types in hand.
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
       'no-restricted-syntax': ['error', nativeDateInput, ...dateToText, browserLocale],

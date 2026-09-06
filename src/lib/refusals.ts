@@ -21,13 +21,20 @@ export function isPermanentStatus(status: number | undefined): boolean {
 
 // SQLSTATE classes describing what was asked rather than the moment: 22 a value
 // the column cannot hold, 23 a constraint it breaks, 42 something this session
-// may not do or a column that is not there.
+// may not do.
 const PERMANENT_SQLSTATE_CLASSES = ['22', '23', '42'];
+// A row naming a column the table does not have is turned away by PostgREST
+// itself, under a code of its own, before any SQL runs.
+const PERMANENT_POSTGREST_CODES = ['PGRST204'];
 
 /** Whether the server refused this row for good, by the code PostgREST
  *  reports. Anything else — a lost connection, an expired token, the server
  *  down — is the moment's. */
 export function isPermanentRowError(error: { code?: string } | null): boolean {
   const code = error?.code;
-  return code !== undefined && PERMANENT_SQLSTATE_CLASSES.includes(code.slice(0, 2));
+  if (code === undefined) return false;
+  return (
+    PERMANENT_SQLSTATE_CLASSES.includes(code.slice(0, 2)) ||
+    PERMANENT_POSTGREST_CODES.includes(code)
+  );
 }

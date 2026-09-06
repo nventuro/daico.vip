@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { Statement } from '../../lib/offline/specs';
+import { STATEMENTS_SPEC, type Statement } from '../../lib/offline/specs';
 import { useMasterKey } from '../../hooks/useMasterKey';
 import { errorMessage } from '../../utils/textUtils';
-import { openOnce } from './openOnce';
+import { openRowOnce } from '../../lib/opened';
 import { openContents } from './payload';
 import type { StatementContents } from './statement';
 
@@ -11,7 +11,7 @@ export function openStatement(
   statement: Statement,
   masterKey: CryptoKey,
 ): Promise<StatementContents> {
-  return openOnce(statement, () => openContents(masterKey, statement));
+  return openRowOnce(STATEMENTS_SPEC.table, statement, () => openContents(masterKey, statement));
 }
 
 /** The contents of every statement given, by statement id; undefined until

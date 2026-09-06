@@ -1,6 +1,6 @@
 import { useState } from 'react';
-// The only place an app reaches into another. Recetas is still a sketch;
-// where pushing to the shopping list belongs is settled when it is built out.
+// The one place an app reaches into another; where pushing to the shopping
+// list belongs is settled when Recetas is built out.
 import { useShoppingList } from '../compras/useShoppingList';
 import Button from '../../components/Button';
 import IngredientRow from './IngredientRow';
@@ -44,12 +44,12 @@ export default function Ingredients({ items }: IngredientsProps) {
   }
 
   return (
-    <section className="my-4 border border-border bg-surface-raised">
-      <header className="flex items-baseline justify-between gap-2 px-3 pt-3 pb-1">
+    <section className="my-4">
+      <header className="flex items-baseline justify-between gap-2 px-3 pb-1">
         <p className="font-semibold">Ingredientes</p>
         <p className="text-xs text-muted">marcá lo que ya tenés</p>
       </header>
-      <ul className="divide-y divide-border">
+      <ul className="divide-y divide-border border-y border-border">
         {names.map((name, index) => (
           <IngredientRow
             key={index}

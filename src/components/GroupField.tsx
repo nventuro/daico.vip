@@ -87,7 +87,7 @@ export default function GroupField({ groups, value, onChange, optional = false }
           {group}
         </option>
       ))}
-      <option value={NEW}>Nuevo grupo…</option>
+      <option value={NEW}>Nuevo grupo...</option>
     </ChipSelect>
   );
 }

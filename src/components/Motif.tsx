@@ -36,8 +36,8 @@ interface MotifShapes {
   accent: string[];
 }
 
-/** Each app's own centre. Tareas keeps the original drawing, which is also
- *  the base the shell's own surfaces use. */
+/** Each app's own centre; Tareas' is also the base the shell's own surfaces
+ *  use. */
 const MOTIFS: Record<AppHue, MotifShapes> = {
   'app-tareas': {
     center: [diamond(50, 50, 24)],

@@ -14,13 +14,13 @@ describe('the Galicia MASTERCARD layout', () => {
   it('reads the consolidated block: totals, previous balance, nothing pending', () => {
     const contents = parseGaliciaMastercard(pages());
     expect(contents.format).toBe('galicia-mastercard');
-    expect(contents.number).toBe('027');
+    expect(contents.number).toBe('001');
     expect(contents.previous_closed_on).toBe('2026-07-23');
     expect(contents.closed_on).toBe('2026-08-20');
-    expect(contents.previous_ars_cents).toBe(126_627_626);
-    expect(contents.previous_usd_cents).toBe(4_750);
+    expect(contents.previous_ars_cents).toBe(100_000_000);
+    expect(contents.previous_usd_cents).toBe(5_000);
     expect(contents.pending_ars_cents).toBe(0);
-    expect(contents.total_ars_cents).toBe(144_751);
+    expect(contents.total_ars_cents).toBe(145_000);
     expect(contents.total_usd_cents).toBe(249);
   });
 
@@ -65,9 +65,10 @@ describe('the Galicia MASTERCARD layout', () => {
     const charges = contents.lines.filter((line) => line.charge);
     expect(charges.map((line) => [line.description, line.ars_cents, line.on])).toEqual([
       ['PERCEPCION IVA DTO 354/18', 1_000, '2026-08-20'],
-      ['PERCEP.AFIP RG 4815 30%', 111_751, '2026-08-20'],
+      ['PERCEP.AFIP RG 4815 30%', 112_000, '2026-08-20'],
     ]);
-    expect(contents.usd_rate).toBeCloseTo(1496.0, 0);
+    // 1.120 pesos withheld is 30% of the peso value of 2,49 dollars.
+    expect(contents.usd_rate).toBeCloseTo(1499.33, 1);
   });
 
   it('refuses a statement whose purchases do not add up to its consumption', () => {

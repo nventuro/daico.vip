@@ -10,10 +10,14 @@ export interface BodyHandle {
 
 export interface BodyProps {
   /** The text as stored, in the app's markdown. Read once, when the editor is
-   *  made: a body never chases the row it came from. */
+   *  made: a body never chases the row it came from, so a version another
+   *  device writes while this one is open is overwritten by the next
+   *  keystroke here — the later write wins, as everywhere. */
   value: string;
-  /** Every change, as markdown. Saving it, and when, is the caller's. */
-  onChange: (markdown: string) => void;
+  /** Every change, as the way to get the markdown: serialising the whole
+   *  body is work worth doing when it is saved, not on every keystroke.
+   *  Saving it, and when, is the caller's. */
+  onChange: (markdown: () => string) => void;
   /** The text's own name, shown while it is empty. */
   placeholder: string;
   autoFocus?: boolean;
@@ -60,7 +64,7 @@ export default function BodyEditor({
         'aria-label': ariaLabel,
       },
     },
-    onUpdate: ({ editor }) => onChangeRef.current(editor.getMarkdown()),
+    onUpdate: ({ editor }) => onChangeRef.current(() => editor.getMarkdown()),
   });
 
   useImperativeHandle(ref, () => ({ focus: () => editor.commands.focus('start') }), [editor]);

@@ -2,13 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { InboxGroup } from './grouping';
 import { CREATE_TRIP_CHOICE } from './grouping';
-import type { SealedAttachment } from '../../hooks/useAttachments';
+import type { AttachmentSource } from '../../hooks/useAttachments';
+import type { AttachmentOwner } from '../../types';
 import {
   confirmInbox,
   discardInbox,
   groupFileIds,
   tripItemFrom,
   type InboxWrites,
+  type TripItemWrite,
 } from './inboxConfirm';
 
 function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxItem {
@@ -45,15 +47,9 @@ const GROUP: InboxGroup = {
   ],
 };
 
-/** A staged file as the confirm gets it, already re-keyed. */
-function sealed(name: string): SealedAttachment {
-  return {
-    name,
-    mime: 'application/pdf',
-    size: 3,
-    data: new Uint8Array([1, 2, 3]),
-    wrappedFileKey: 'k',
-  };
+/** A staged file as the confirm gets it, opened. */
+function opened(name: string): AttachmentSource {
+  return { name, mime: 'application/pdf', size: 3, plain: new Uint8Array([1, 2, 3]) };
 }
 
 /** Writes that remember what they were asked and hand out ids in order. */
@@ -72,20 +68,22 @@ function writes(): InboxWrites & {
     attached,
     removed,
     files,
-    addTrip: vi.fn(async () => 'v-new'),
-    addItem: vi.fn(async (input) => {
+    addTrip: vi.fn(() => Promise.resolve('v-new')),
+    addItem: vi.fn((input: TripItemWrite) => {
       added.push(input.title);
-      return `i${added.length}`;
+      return Promise.resolve(`i${added.length}`);
     }),
-    addAttachment: vi.fn(async (owner, file) => {
+    addAttachment: vi.fn((owner: AttachmentOwner, file: AttachmentSource) => {
       attached.push([owner.id, file.name]);
-      return `a${attached.length}`;
+      return Promise.resolve(`a${attached.length}`);
     }),
-    removeStaged: vi.fn(async (id: string) => {
+    removeStaged: vi.fn((id: string) => {
       removed.push(id);
+      return Promise.resolve();
     }),
-    removeFiles: vi.fn(async (ids: string[]) => {
+    removeFiles: vi.fn((ids: string[]) => {
       files.push(ids);
+      return Promise.resolve();
     }),
   };
 }
@@ -113,13 +111,30 @@ describe('tripItemFrom', () => {
 });
 
 describe('confirmInbox', () => {
-  it('writes the rows into the chosen trip in the group order, then clears the staged ones', async () => {
+  it('writes the rows into the chosen trip in the group order, each staged row cleared once its own is in', async () => {
     const w = writes();
+    const order: string[] = [];
+    vi.mocked(w.addItem).mockImplementation((input) => {
+      w.added.push(input.title);
+      order.push(`add ${input.title}`);
+      return Promise.resolve(`i${w.added.length}`);
+    });
+    vi.mocked(w.removeStaged).mockImplementation((id) => {
+      order.push(`remove ${id}`);
+      w.removed.push(id);
+      return Promise.resolve();
+    });
     const undo = await confirmInbox(GROUP, 'v1', w);
     expect(w.addTrip).not.toHaveBeenCalled();
-    expect(w.added).toEqual(['AR 1420', 'Hotel Cormorán', 'Autos Pampa · alquiler de auto']);
+    expect(order).toEqual([
+      'add AR 1420',
+      'remove s1',
+      'add Hotel Cormorán',
+      'remove s2',
+      'add Autos Pampa · alquiler de auto',
+      'remove s3',
+    ]);
     expect(vi.mocked(w.addItem).mock.calls.every(([input]) => input.trip_id === 'v1')).toBe(true);
-    expect(w.removed).toEqual(['s1', 's2', 's3']);
     expect(undo).toEqual({
       label: 'Se agregaron 3 ítems',
       tripCreated: false,
@@ -143,8 +158,8 @@ describe('confirmInbox', () => {
     expect(groupFileIds(group)).toEqual(['f1', 'f2']);
     const w = writes();
     const files = new Map([
-      ['f1', sealed('pasajes')],
-      ['f2', sealed('hotel')],
+      ['f1', opened('pasajes')],
+      ['f2', opened('hotel')],
     ]);
     const undo = await confirmInbox(group, 'v1', w, files);
     expect(w.attached).toEqual([
@@ -174,6 +189,36 @@ describe('confirmInbox', () => {
     );
     expect(undo?.tripCreated).toBe(true);
     expect(undo?.tripId).toBe('v-new');
+  });
+
+  it('stops at a row it could not write, leaving it and the rest staged', async () => {
+    const w = writes();
+    vi.mocked(w.addItem).mockImplementationOnce((input) => {
+      w.added.push(input.title);
+      return Promise.resolve('i1');
+    });
+    vi.mocked(w.addItem).mockResolvedValueOnce(undefined);
+    const undo = await confirmInbox(GROUP, 'v1', w);
+    // The first row is in the trip and its staged row gone; the second could
+    // not be written, so it and the third are left to be confirmed again.
+    expect(w.removed).toEqual(['s1']);
+    expect(w.addItem).toHaveBeenCalledTimes(2);
+    expect(undo).toMatchObject({ itemIds: ['i1'], staged: [GROUP.items[0]] });
+  });
+
+  it('stops before clearing a row whose file could not be attached', async () => {
+    const group: InboxGroup = {
+      ...GROUP,
+      items: [staged('s1', { file_ids: '["f1"]' }), staged('s2')],
+    };
+    const w = writes();
+    vi.mocked(w.addAttachment).mockResolvedValueOnce(undefined);
+    const undo = await confirmInbox(group, 'v1', w, new Map([['f1', opened('pasajes')]]));
+    // The row is in the trip without its PDF, and stays staged with it, to
+    // be confirmed again rather than lose the PDF.
+    expect(w.removed).toEqual([]);
+    expect(w.addItem).toHaveBeenCalledTimes(1);
+    expect(undo).toMatchObject({ itemIds: ['i1'], attachmentIds: [], staged: [] });
   });
 
   it('writes nothing when the trip could not be created', async () => {

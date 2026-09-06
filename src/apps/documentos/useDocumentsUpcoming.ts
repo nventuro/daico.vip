@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
-import { todayIso } from '../../utils/dateUtils';
 import { entryPath, upcomingFrom, type Upcoming } from '../types';
 import { useDocuments } from './useDocuments';
 import { isExpiring } from './expiry';
+import { useToday } from '../../hooks/useToday';
 
 /** The documents expiring within six months, or already expired, for the
  *  home screen. */
 export function useDocumentsUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useDocuments();
-  const today = todayIso();
+  const today = useToday();
   return useMemo(
     () =>
       upcomingFrom({ items, loading }, (entry) => {

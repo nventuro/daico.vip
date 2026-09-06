@@ -8,11 +8,12 @@
 // sender — success or failure — so a forward never vanishes without a word.
 //
 // What the worker holds: an Anthropic key, and a Hyperdrive binding to the
-// database as `trip_inbox_writer`, a role that can insert into `trip_inbox`
-// and its files, and read `members` and the household's inbox public key,
-// and nothing else. Never the service key, and never a key that opens a
-// file: a compromised worker can stage junk and learn the member emails it
-// already handles mail for, but read or change nothing else.
+// database as `trip_inbox_writer`, a role that can insert into `trip_inbox`,
+// its files and the record of which emails were staged, and read `members`,
+// that record and the household's inbox public key, and nothing else. Never
+// the service key, and never a key that opens a file: a compromised worker
+// can stage junk and learn the member emails it already handles mail for,
+// but read or change nothing else.
 //
 // Setting it up and deploying it is step 5 of the README's first-time setup;
 // Cloudflare does not watch the repository, so every change is a deploy.
@@ -22,7 +23,8 @@
 // =============================================================================
 import PostalMime, { type Email } from 'postal-mime';
 import { EmailMessage } from 'cloudflare:email';
-import { senderRejection, type SenderRejection } from './gate';
+import type pg from 'pg';
+import { memberRejection, verdictRejection, type SenderRejection } from './gate';
 import {
   decide,
   extractBookings,
@@ -30,9 +32,24 @@ import {
   type EmailPdf,
   type InboxRow,
 } from './extract';
-import { countsOf, failureBody, replyMime, serviceFailureBody, successBody } from './reply';
-import { inboxPublicKey, insertRows, memberEmails, openDb, type InboxFile } from './db';
-import { importInboxPublicKey, sealPdf } from './seal';
+import {
+  alreadyStagedBody,
+  countsOf,
+  failureBody,
+  replyMime,
+  serviceFailureBody,
+  successBody,
+} from './reply';
+import {
+  AlreadyStagedError,
+  alreadyStaged,
+  inboxPublicKey,
+  insertRows,
+  memberEmails,
+  openDb,
+  type InboxFile,
+} from './db';
+import { importInboxPublicKey, inboxFileBinding, sealPdf } from './seal';
 import { toBase64 } from './base64';
 
 export interface Env {
@@ -41,17 +58,45 @@ export interface Env {
 }
 
 const PDF_TYPE = 'application/pdf';
+/** What a PDF's bytes open with, whatever the attachment says it is. */
+const PDF_MAGIC = '%PDF-';
 
 /** Attachments over this are left out: the text usually carries the
  *  itinerary, and a scan this size is not a confirmation. It is also the
  *  largest file the app attaches, so a PDF kept here is one the app takes. */
 const PDF_MAX_BYTES = 10 * 1024 * 1024;
+/** How many PDFs, and how many bytes of them together, one email may send
+ *  the model: what the model takes in one request has a ceiling, and every
+ *  byte of it is billed. */
+const PDF_MAX_COUNT = 4;
+const PDFS_MAX_BYTES = 16 * 1024 * 1024;
+/** How much of an email's text the model reads. */
+const TEXT_MAX_CHARS = 60_000;
+/** The longest Message-ID kept: a header line's worth. */
+const MESSAGE_ID_MAX_CHARS = 998;
 
 /** What the sending server is told; deliberately says nothing more. */
 const REJECT_REASON = 'address not accepted';
 
 function firstHeader(email: Email, key: string): string | null {
   return email.headers.find((header) => header.key === key)?.value ?? null;
+}
+
+/** Whether the mail was sent by a machine answering another mail — a
+ *  vacation responder, a bounce — which the reply would only set off again. */
+function isAutoSubmitted(email: Email): boolean {
+  const auto = firstHeader(email, 'auto-submitted')?.trim().toLowerCase();
+  if (auto !== undefined && auto !== 'no') return true;
+  if (firstHeader(email, 'x-auto-response-suppress') !== null) return true;
+  const precedence = firstHeader(email, 'precedence')?.trim().toLowerCase();
+  return precedence === 'bulk' || precedence === 'junk' || precedence === 'auto_reply';
+}
+
+/** The email's Message-ID as it is kept: one line, cut to length; null when
+ *  it has none. */
+function normalizedMessageId(messageId: string | null): string | null {
+  const value = (messageId ?? '').replace(/[\r\n]/g, '').trim();
+  return value === '' ? null : value.slice(0, MESSAGE_ID_MAX_CHARS);
 }
 
 /** The text the model reads: the plain part, or the HTML with its tags
@@ -73,22 +118,52 @@ function bytesOf(content: ArrayBuffer | Uint8Array | string): Uint8Array | null 
   return null;
 }
 
-/** The PDF attachments, in the email's order, small ones only. */
-function pdfs(email: Email): EmailPdf[] {
-  return email.attachments.flatMap((attachment) => {
-    if (attachment.mimeType !== PDF_TYPE) return [];
+function isPdf(bytes: Uint8Array): boolean {
+  return new TextDecoder().decode(bytes.subarray(0, PDF_MAGIC.length)) === PDF_MAGIC;
+}
+
+/** The PDF attachments, in the email's order, as many as the model takes:
+ *  what says it is a PDF or is named one, and opens as one. The rest of
+ *  those are counted, for the reply to say. */
+function pdfs(email: Email): { kept: EmailPdf[]; skipped: number } {
+  const kept: EmailPdf[] = [];
+  let skipped = 0;
+  let bytesKept = 0;
+  for (const attachment of email.attachments) {
+    const named = attachment.filename?.toLowerCase().endsWith('.pdf') ?? false;
+    if (attachment.mimeType !== PDF_TYPE && !named) continue;
     const bytes = bytesOf(attachment.content);
-    if (bytes === null || bytes.length === 0 || bytes.length > PDF_MAX_BYTES) return [];
-    return [{ name: attachmentName(attachment.filename), bytes }];
-  });
+    if (
+      bytes === null ||
+      bytes.length === 0 ||
+      bytes.length > PDF_MAX_BYTES ||
+      !isPdf(bytes) ||
+      kept.length === PDF_MAX_COUNT ||
+      bytesKept + bytes.length > PDFS_MAX_BYTES
+    ) {
+      skipped += 1;
+      continue;
+    }
+    kept.push({ name: attachmentName(attachment.filename), bytes });
+    bytesKept += bytes.length;
+  }
+  return { kept, skipped };
 }
 
-function contentOf(email: Email): EmailContent {
-  return { subject: email.subject ?? null, text: bodyText(email), pdfs: pdfs(email) };
+function contentOf(email: Email): { content: EmailContent; skipped: number } {
+  const { kept, skipped } = pdfs(email);
+  return {
+    content: {
+      subject: email.subject ?? null,
+      text: bodyText(email).slice(0, TEXT_MAX_CHARS),
+      pdfs: kept,
+    },
+    skipped,
+  };
 }
 
-/** The PDFs some row is printed in, sealed for the household; the rest of
- *  the email's PDFs are forgotten here. */
+/** The PDFs some row is printed in, sealed for the household, each bound to
+ *  the row it is staged as; the rest of the email's PDFs are forgotten here. */
 async function sealNamed(
   pdfs: EmailPdf[],
   fileIds: string[],
@@ -100,7 +175,7 @@ async function sealNamed(
   for (const [index, pdf] of pdfs.entries()) {
     const id = fileIds[index];
     if (!named.has(id)) continue;
-    const { data, wrappedKey } = await sealPdf(publicKey, pdf.bytes);
+    const { data, wrappedKey } = await sealPdf(publicKey, pdf.bytes, inboxFileBinding(id));
     files.push({
       id,
       name: pdf.name,
@@ -134,17 +209,27 @@ function rejectionLog(rejection: SenderRejection, email: Email): string {
 
 export default {
   async email(message, env) {
-    // Parsing is cheap and the gate needs the From header and the verdict;
-    // the spend — the model — comes only after it.
-    const email = await PostalMime.parse(message.raw, { attachmentEncoding: 'arraybuffer' });
-    const db = await openDb(env.HYPERDRIVE.connectionString);
+    let db: pg.Client | null = null;
     try {
-      const rejection = senderRejection(
-        {
-          envelopeFrom: message.from,
-          headerFrom: email.from?.address ?? null,
-          authenticationResults: firstHeader(email, 'authentication-results'),
-        },
+      // Parsing is cheap and the gate needs the From header and the verdict;
+      // the database comes after the verdict, and the spend — the model —
+      // only after the gate.
+      const email = await PostalMime.parse(message.raw, { attachmentEncoding: 'arraybuffer' });
+      if (isAutoSubmitted(email)) {
+        // A machine answering a machine: dropped without a word, or the two
+        // would answer each other until one gave up.
+        console.warn('dropped: auto-submitted');
+        return;
+      }
+      const verdict = verdictRejection(firstHeader(email, 'authentication-results'));
+      if (verdict !== null) {
+        console.warn(rejectionLog(verdict, email));
+        message.setReject(REJECT_REASON);
+        return;
+      }
+      db = await openDb(env.HYPERDRIVE.connectionString);
+      const rejection = memberRejection(
+        { envelopeFrom: message.from, headerFrom: email.from?.address ?? null },
         await memberEmails(db),
       );
       if (rejection !== null) {
@@ -175,7 +260,14 @@ export default {
         );
 
       try {
-        const content = contentOf(email);
+        // An email delivered again — the sending server never got the first
+        // delivery's answer — is answered again, and read and staged once.
+        const messageId = normalizedMessageId(email.messageId ?? null);
+        if (messageId !== null && (await alreadyStaged(db, messageId))) {
+          await reply(alreadyStagedBody());
+          return;
+        }
+        const { content, skipped } = contentOf(email);
         // Each PDF gets the id it would be staged under before the model
         // names any, so the rows are built with the ids in hand.
         const fileIds = content.pdfs.map(() => crypto.randomUUID());
@@ -201,9 +293,23 @@ export default {
                   await importInboxPublicKey(publicKey),
                 ),
               };
-        await insertRows(db, crypto.randomUUID(), rows, files);
+        try {
+          await insertRows(db, crypto.randomUUID(), rows, files, messageId);
+        } catch (error) {
+          // Two deliveries read at once: the other one staged it first.
+          if (error instanceof AlreadyStagedError) {
+            await reply(alreadyStagedBody());
+            return;
+          }
+          throw error;
+        }
         await reply(
-          successBody(decision.tripTitle, countsOf(rows.map((row) => row.kind)), files.length),
+          successBody(
+            decision.tripTitle,
+            countsOf(rows.map((row) => row.kind)),
+            files.length,
+            skipped,
+          ),
         );
       } catch (error) {
         console.error(`failed: ${errorMessage(error)}`);
@@ -213,8 +319,14 @@ export default {
           console.error(`failed to reply: ${errorMessage(replyError)}`);
         }
       }
+    } catch (error) {
+      // Before the gate — the mail could not be read, or the database not
+      // reached — there is no one to answer yet, and the sending server is
+      // told to try again later, in as many words.
+      console.error(`failed before the gate: ${errorMessage(error)}`);
+      throw new Error('temporary failure');
     } finally {
-      await db.end();
+      await db?.end().catch(() => undefined);
     }
   },
 } satisfies ExportedHandler<Env>;

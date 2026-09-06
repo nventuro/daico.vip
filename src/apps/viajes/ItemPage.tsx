@@ -34,7 +34,7 @@ export default function ItemPage() {
 
   const commentsSave = useTextSave(async (text) => {
     if (entry) await save(entry.id, { comments: text || null });
-  });
+  }, entry?.id);
 
   /** Ticks the pendiente as the trip's list does, or unticks it, and leaves
    *  the page: the trip — or wherever the page was opened from — is where the

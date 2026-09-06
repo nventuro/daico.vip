@@ -21,7 +21,7 @@ export default function DeleteDialog({
 }: DeleteDialogProps) {
   if (!open) return null;
   return (
-    <ModalDialog onClose={onCancel} layout="confirm">
+    <ModalDialog onClose={onCancel} layout="confirm" label={question}>
       <div className="flex flex-col gap-2">
         <p className="font-medium text-on-surface">{question}</p>
         <p className="text-sm text-muted">No se puede deshacer.</p>

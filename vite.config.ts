@@ -1,9 +1,13 @@
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { SUPABASE_URL, YOUTUBE_EMBED_URL } from './src/config';
+import { PDF_DECODERS, PDF_DECODERS_URL } from './src/lib/pdfDecoders';
 
 // The page's Content-Security-Policy, carried as a <meta> tag because the static
 // host can't set response headers. The point is `script-src`: no inline and no
@@ -23,6 +27,7 @@ const CONTENT_SECURITY_POLICY = [
   `frame-src ${new URL(YOUTUBE_EMBED_URL).origin}`,
   "object-src 'none'",
   "base-uri 'self'",
+  "form-action 'self'",
 ].join('; ');
 
 /**
@@ -42,6 +47,33 @@ function buildVersion(): string {
   } catch {
     return 'sin versión';
   }
+}
+
+/** The pdf.js decoders, copied from the package into the build under the
+ *  address the app fetches them from, and served from it in dev. */
+function pdfDecoders(): Plugin {
+  const require = createRequire(import.meta.url);
+  const dir = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'wasm');
+  return {
+    name: 'pdf-decoders',
+    generateBundle() {
+      for (const name of PDF_DECODERS) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `${PDF_DECODERS_URL.slice(1)}${name}`,
+          source: fs.readFileSync(path.join(dir, name)),
+        });
+      }
+    },
+    configureServer(server) {
+      server.middlewares.use(PDF_DECODERS_URL, (req, res, next) => {
+        const name = (req.url ?? '').slice(1);
+        if (!PDF_DECODERS.includes(name)) return next();
+        res.setHeader('Content-Type', 'application/wasm');
+        fs.createReadStream(path.join(dir, name)).pipe(res);
+      });
+    },
+  };
 }
 
 function contentSecurityPolicy(): Plugin {
@@ -96,7 +128,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache everything in the build, including the ~1.5 MB SQLite wasm.
+        // Precache everything in the build, the SQLite wasm and the pdf.js
+        // decoders included.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,woff,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: '/index.html',
@@ -118,6 +151,7 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
     contentSecurityPolicy(),
+    pdfDecoders(),
   ],
   // SQLocal and the SQLite wasm ship a worker + wasm that must not be pre-bundled
   // by Vite's dep optimizer, or the custom SAH-pool worker fails to resolve its
@@ -127,6 +161,9 @@ export default defineConfig({
   // bundle — emit ES module workers instead (supported on all modern browsers).
   worker: { format: 'es' },
   build: {
+    // pdf.js is the one chunk near Rollup's usual line, and it is loaded on
+    // demand: a minor of it must not turn the build red.
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         // The Supabase client is the one large dependency in the startup bundle;
@@ -144,7 +181,7 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    host: '0.0.0.0',
-  },
+  // On this machine only: the dev server carries no policy, and a phone on
+  // the same network is let in on purpose with `--host`.
+  server: { host: 'localhost' },
 });
