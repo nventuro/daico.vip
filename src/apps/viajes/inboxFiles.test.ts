@@ -50,6 +50,7 @@ function serverFile(id: string, importId: string, createdAt = T0) {
     data: toBase64(bytes(`pdf ${id}`)),
     wrapped_key: `wrapped ${id}`,
     created_at: createdAt,
+    mime: id === 'f2' ? 'image/png' : 'application/pdf',
   };
 }
 
@@ -84,9 +85,12 @@ describe('syncInboxFiles', () => {
     await staged('s2', 'e1', ['f1', 'f2']);
     await syncInboxFiles(pulled);
     expect(await heldInboxFiles(['f1', 'f2', 'f3'])).toEqual(new Set(['f1', 'f2']));
-    const [f1] = await readInboxFiles(['f1']);
+    const [f1, f2] = await readInboxFiles(['f1', 'f2']);
     expect(f1.data).toEqual(bytes('pdf f1'));
     expect(f1.wrapped_key).toBe('wrapped f1');
+    // What a file is travels with it, for the attachment it becomes.
+    expect(f1.mime).toBe('application/pdf');
+    expect(f2.mime).toBe('image/png');
     // Gone from the server, still here: nothing was fetched again or dropped.
     server.reset();
     await syncInboxFiles(pulled);

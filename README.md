@@ -171,9 +171,13 @@ before leaving, or a pasaje, an alojamiento, a reserva, a lugar. The app is for
 the weeks before a trip — what is booked and what is still missing — and,
 during it, for looking up a code or an address; it is not an agenda. A row's
 kind is asked by the + and never changed, only a pendiente is ever ticked, and
-deleting a trip takes its rows with it. A forwarded confirmation email becomes
-staged rows in `trip_inbox`, shown under Inbox to be added to a trip or
-discarded (Correo a Viajes below).
+deleting a trip takes its rows with it. A flight — a pasaje between two
+airports — keeps its boarding passes on a shelf of their own, apart from its
+other files, and from the day before it leaves the home screen asks for one
+until a file is on that shelf. A forwarded confirmation email becomes staged
+rows in `trip_inbox`, shown under Inbox to be added to a trip or discarded, and
+a forwarded boarding pass is matched to its pasaje there (Correo a Viajes
+below).
 
 **Guías** — `guides` / `guide_chapters`: imported reference documents — a guide,
 its sections, their chapters — in the same markdown dialect (Importing guides
@@ -236,8 +240,8 @@ leave it, so the server only ever stores ciphertext.
   drawn in the app, never handed to the system.
 - **Sync**: files follow every table sync — uploads go out once their rows are
   on the server, files of deleted rows are dropped, and the files every device
-  keeps — every document's, and a trip's until a week past its last day — are
-  fetched. Everything else is
+  keeps — every document's, and a trip's, boarding passes included, until a
+  week past its last day — are fetched. Everything else is
   fetched on demand, and «Liberar espacio» in Ajustes lets a past trip's go.
 
 ## Correo a Viajes
@@ -247,14 +251,24 @@ worker in `worker/` (its header says what it holds and why). It lets through onl
 from a member, has a model read the bookings out of it, and stages one row per
 booking in `trip_inbox`, always replying to the sender; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
-and answered both times. The PDFs the email carries are staged beside the rows
-in `trip_inbox_files`, sealed to the household's inbox key: a pair in
+and answered both times. The files the email carries — PDFs and pictures —
+are staged beside the rows in `trip_inbox_files`, sealed to the household's
+inbox key: a pair in
 `inbox_key` whose public half the worker seals to and whose private half is
 sealed under the master key like any file, so the worker never holds anything
 that opens one. Every device fetches the staged files after a sync, so a group
 is confirmed with no connection; confirming makes the rows a trip's and the
-PDFs their attachments — each opened with the inbox key and sealed again for
+files their attachments — each opened with the inbox key and sealed again for
 the attachment it becomes — and discarding drops both.
+
+A boarding pass email is the other thing the worker takes. The model stages
+one row of kind `boarding_pass` per flight leg, its files beside it, and the
+review asks for the pasaje rather than the trip: the flight of a trip ahead
+that matches by day and airports is preselected, the pasaje — or the trip too —
+can be made on the spot, and confirming seals each file for that pasaje's
+boarding-pass shelf. An email that is bookings and a boarding pass at once is
+refused with a reply, and a pass that came as a link rather than a file is
+answered with what to do instead.
 
 ## Backups
 

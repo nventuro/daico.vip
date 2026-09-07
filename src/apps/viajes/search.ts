@@ -1,4 +1,5 @@
 import { TRIPS_SPEC, TRIP_ITEMS_SPEC } from '../../lib/offline/specs';
+import { TRIP_ROW_FILE_KINDS } from '../../lib/attachmentFiles';
 import * as engine from '../../lib/offline/engine';
 import { searchTable } from '../../lib/search';
 import { todayIso } from '../../utils/dateUtils';
@@ -8,8 +9,8 @@ import { TRIP_KIND_LABELS, tripDatesLabel } from './labels';
 /**
  * Trips whose title mentions `query`, then the rows of any trip whose title or
  * comments do — a booking code and an address are written there, and they
- * travel in the clear, so both can be matched. Each row is shown under the
- * trip it belongs to.
+ * travel in the clear, so both can be matched — and their files by name, a
+ * boarding pass among them. Each row is shown under the trip it belongs to.
  */
 export async function searchTrips(query: string): Promise<SearchHit[]> {
   const today = todayIso();
@@ -27,7 +28,7 @@ export async function searchTrips(query: string): Promise<SearchHit[]> {
   });
   const items = await searchTable(TRIP_ITEMS_SPEC, query, {
     fields: ['title', 'comments'],
-    attachments: 'trip_item',
+    attachments: TRIP_ROW_FILE_KINDS,
     hit: (item) => ({
       title: item.title,
       subtitle: [TRIP_KIND_LABELS[item.kind], titles.get(item.trip_id)]

@@ -28,9 +28,11 @@ export interface SyncedRow {
  */
 export type EntryMark = 'comments' | 'repeat';
 
-/** The kinds of entry an attachment can belong to. */
+/** The kinds of entry an attachment can belong to. A `boarding_pass` is a
+ *  trip row's too — the pasaje's, by its id — but on a shelf of its own: the
+ *  pasaje's other files do not stand in for the one it boards with. */
 export type AttachmentOwnerKind =
-  'chore' | 'document' | 'note' | 'trip_item' | 'idea' | 'health_record';
+  'chore' | 'document' | 'note' | 'trip_item' | 'idea' | 'health_record' | 'boarding_pass';
 
 /** The entry an attachment belongs to. */
 export interface AttachmentOwner {

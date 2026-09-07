@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import type { Trip, TripInboxItem, TripItem, TripKind } from '../../lib/offline/specs';
 import {
   CREATE_TRIP_CHOICE,
+  boardingPassChoices,
   inboxGroups,
   inboxTripChoices,
   pendingCounts,
   splitTrips,
+  suggestedBoardingPassChoice,
   suggestedTripChoice,
   tripSections,
 } from './grouping';
@@ -177,6 +179,96 @@ describe('inboxGroups', () => {
 
   it('makes nothing of nothing', () => {
     expect(inboxGroups([])).toEqual([]);
+  });
+
+  it('names a group of bookings by its email, and makes each boarding pass a group of its own', () => {
+    const groups = inboxGroups([
+      staged('ida', { import_id: 'e1' }),
+      staged('hotel', { import_id: 'e1', kind: 'lodging' }),
+      staged('pase ida', {
+        import_id: 'e2',
+        kind: 'boarding_pass',
+        created_at: '2026-09-11T10:00:00Z',
+      }),
+      staged('pase vuelta', {
+        import_id: 'e2',
+        kind: 'boarding_pass',
+        created_at: '2026-09-11T10:00:00Z',
+      }),
+    ]);
+    expect(groups.map((group) => [group.key, group.boardingPass, group.items.length])).toEqual([
+      ['pase ida', true, 1],
+      ['pase vuelta', true, 1],
+      ['e1', false, 2],
+    ]);
+    expect(groups[0].importId).toBe('e2');
+  });
+});
+
+describe('boardingPassChoices', () => {
+  const trips = [
+    trip('pasado', '2026-08-01', '2026-08-10'),
+    trip('próximo', '2026-09-20', '2026-09-27'),
+    trip('lejano', '2026-12-01', '2026-12-15'),
+  ];
+  const flights = [
+    item('vuelo viejo', 'ticket', { trip_id: 'pasado', on_date: '2026-08-01' }),
+    item('ida', 'ticket', {
+      trip_id: 'próximo',
+      on_date: '2026-09-20',
+      from_code: 'AEP',
+      to_code: 'BRC',
+    }),
+    item('vuelta', 'ticket', {
+      trip_id: 'próximo',
+      on_date: '2026-09-27',
+      from_code: 'BRC',
+      to_code: 'AEP',
+    }),
+    item('hotel', 'lodging', { trip_id: 'próximo', on_date: '2026-09-20' }),
+    item('lejos', 'ticket', {
+      trip_id: 'lejano',
+      on_date: '2026-12-01',
+      from_code: 'EZE',
+      to_code: 'MAD',
+    }),
+  ];
+  const choices = boardingPassChoices(trips, flights, 'Bariloche', TODAY);
+
+  it('offers the pasajes of the trips ahead, trip by trip, then a new pasaje in each, then a new trip', () => {
+    expect(choices.map((choice) => choice.value)).toEqual([
+      'ida',
+      'vuelta',
+      'lejos',
+      'new:próximo',
+      'new:lejano',
+      CREATE_TRIP_CHOICE,
+    ]);
+    expect(choices[0].label).toBe('ida · dom 20 sept · próximo');
+    expect(choices[3].label).toBe('Crear el pasaje en «próximo»');
+    expect(choices[5].label).toBe('Crear viaje «Bariloche» con el pasaje');
+    expect(choices[5].target).toEqual({ kind: 'new-trip' });
+  });
+
+  it('suggests the pasaje leaving the same day between the same airports, over one on the day alone', () => {
+    const pass = staged('AR 1425', {
+      kind: 'boarding_pass',
+      on_date: '2026-09-27',
+      from_code: 'BRC',
+      to_code: 'AEP',
+    });
+    expect(suggestedBoardingPassChoice(pass, choices, flights)).toBe('vuelta');
+    const sameDay = staged('AR 1425', { kind: 'boarding_pass', on_date: '2026-09-27' });
+    expect(suggestedBoardingPassChoice(sameDay, choices, flights)).toBe('vuelta');
+  });
+
+  it('falls back to the flight number, then to a new pasaje in the next trip, then to a new trip', () => {
+    const byNumber = staged('IDA', { kind: 'boarding_pass', on_date: '2026-10-01' });
+    expect(suggestedBoardingPassChoice(byNumber, choices, flights)).toBe('ida');
+    const unknown = staged('LA 400', { kind: 'boarding_pass', on_date: '2026-10-01' });
+    expect(suggestedBoardingPassChoice(unknown, choices, flights)).toBe('new:próximo');
+    const none = boardingPassChoices([trips[0]], flights, 'Bariloche', TODAY);
+    expect(suggestedBoardingPassChoice(unknown, none, flights)).toBe(CREATE_TRIP_CHOICE);
   });
 });
 

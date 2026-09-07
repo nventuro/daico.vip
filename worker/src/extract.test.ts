@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { decide, rowsFromExtraction, type ExtractedItem, type Extraction } from './extract';
+import {
+  MIXED_EMAIL,
+  MIXED_EMAIL_ADVICE,
+  NO_BOARDING_PASS_FILE,
+  NO_BOARDING_PASS_FILE_ADVICE,
+  decide,
+  rowsFromExtraction,
+  type ExtractedItem,
+  type Extraction,
+} from './extract';
 
 function item(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   return {
@@ -12,12 +21,12 @@ function item(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
     from_code: 'AEP',
     to_code: 'BRC',
     comments: 'Código QK7T2M',
-    pdfs: [],
+    files: [],
     ...overrides,
   };
 }
 
-/** The ids the email's PDFs would be staged under, one per PDF, in order. */
+/** The ids the email's files would be staged under, one per file, in order. */
 const FILE_IDS = ['file-1', 'file-2', 'file-3'];
 
 describe('rowsFromExtraction', () => {
@@ -134,14 +143,14 @@ describe('rowsFromExtraction', () => {
     expect(row.comments).toHaveLength(1000);
   });
 
-  it("turns an item's PDF numbers into the ids of those PDFs, in the email's order", () => {
-    const [row] = rowsFromExtraction([item({ pdfs: [3, 1] })], 'Bariloche', null, FILE_IDS);
+  it("turns an item's file numbers into the ids of those files, in the email's order", () => {
+    const [row] = rowsFromExtraction([item({ files: [3, 1] })], 'Bariloche', null, FILE_IDS);
     expect(row.file_ids).toEqual(['file-1', 'file-3']);
   });
 
-  it('drops a number that names no PDF and counts one named twice once', () => {
+  it('drops a number that names no file and counts one named twice once', () => {
     const [row] = rowsFromExtraction(
-      [item({ pdfs: [0, 2, 4, 2, -1, 1.5] })],
+      [item({ files: [0, 2, 4, 2, -1, 1.5] })],
       'Bariloche',
       null,
       FILE_IDS,
@@ -150,15 +159,15 @@ describe('rowsFromExtraction', () => {
   });
 
   it('names no file when the model named none, or the email had none', () => {
-    const [none] = rowsFromExtraction([item({ pdfs: [] })], 'Bariloche', null, FILE_IDS);
+    const [none] = rowsFromExtraction([item({ files: [] })], 'Bariloche', null, FILE_IDS);
     expect(none.file_ids).toEqual([]);
-    const [noPdfs] = rowsFromExtraction([item({ pdfs: [1] })], 'Bariloche', null, []);
-    expect(noPdfs.file_ids).toEqual([]);
+    const [noFiles] = rowsFromExtraction([item({ files: [1] })], 'Bariloche', null, []);
+    expect(noFiles.file_ids).toEqual([]);
   });
 
-  it('lets one PDF belong to several rows', () => {
+  it('lets one file belong to several rows', () => {
     const rows = rowsFromExtraction(
-      [item({ pdfs: [1] }), item({ title: 'AR 1425', pdfs: [1] })],
+      [item({ files: [1] }), item({ title: 'AR 1425', files: [1] })],
       'Bariloche',
       null,
       FILE_IDS,
@@ -179,8 +188,8 @@ describe('decide', () => {
     }
   });
 
-  it('carries the PDF ids through to the rows', () => {
-    const decision = decide({ ...found, items: [item({ pdfs: [2] })] }, null, FILE_IDS);
+  it('carries the file ids through to the rows', () => {
+    const decision = decide({ ...found, items: [item({ files: [2] })] }, null, FILE_IDS);
     expect(decision.ok).toBe(true);
     if (decision.ok) expect(decision.rows[0].file_ids).toEqual(['file-2']);
   });
@@ -202,6 +211,46 @@ describe('decide', () => {
   it('fails with the problem the model reported', () => {
     const decision = decide({ ...found, problem: 'Es un recibo, no una confirmación.' }, null, []);
     expect(decision).toEqual({ ok: false, problem: 'Es un recibo, no una confirmación.' });
+  });
+
+  it('stages a boarding pass with its files, as its flight, and drops one that came with no file', () => {
+    const pass = item({ kind: 'boarding_pass', files: [1, 2], comments: 'Ana 14A · Bruno 14B' });
+    const decision = decide(
+      { ...found, items: [pass, item({ kind: 'boarding_pass', title: 'AR 1425' })] },
+      null,
+      FILE_IDS,
+    );
+    expect(decision.ok).toBe(true);
+    if (decision.ok) {
+      expect(decision.rows).toHaveLength(1);
+      expect(decision.rows[0]).toMatchObject({
+        kind: 'boarding_pass',
+        title: 'AR 1420',
+        on_date: '2026-09-12',
+        at_time: '08:40',
+        from_code: 'AEP',
+        to_code: 'BRC',
+        file_ids: ['file-1', 'file-2'],
+      });
+    }
+  });
+
+  it('refuses a boarding pass that came as no file at all, saying what to do instead', () => {
+    const decision = decide({ ...found, items: [item({ kind: 'boarding_pass' })] }, null, FILE_IDS);
+    expect(decision).toEqual({
+      ok: false,
+      problem: NO_BOARDING_PASS_FILE,
+      advice: NO_BOARDING_PASS_FILE_ADVICE,
+    });
+  });
+
+  it('refuses an email that is bookings and a boarding pass at once', () => {
+    const decision = decide(
+      { ...found, items: [item(), item({ kind: 'boarding_pass', files: [1] })] },
+      null,
+      FILE_IDS,
+    );
+    expect(decision).toEqual({ ok: false, problem: MIXED_EMAIL, advice: MIXED_EMAIL_ADVICE });
   });
 
   it('fails without a word when nothing was found, the trip is unnamed, or every item was blank', () => {

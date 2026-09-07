@@ -658,9 +658,10 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
   orderBy: 'on_date ASC NULLS LAST, created_at ASC',
 };
 
-/** What a confirmation email can contain: the booked classes, never a
- *  pendiente or a lugar. */
-export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'>;
+/** What a forwarded email can contain: the booked classes, never a pendiente
+ *  or a lugar — or a flight's boarding pass, which is no row of a trip but
+ *  the files one of its pasajes boards with. */
+export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'> | 'boarding_pass';
 
 /**
  * A booking the email pipeline staged for review: one row per item the model
@@ -668,8 +669,10 @@ export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'>;
  * `import_id` and reviewed as a group. It mirrors a row of a trip minus the
  * trip and the tick, which only exist once a member confirms it into a real
  * row; `trip_title` is the model's name for the trip, matched to a real one
- * or created at that point. Written by the worker, never by the app — which
- * only confirms or discards, and puts a row back after an undo.
+ * or created at that point. A boarding pass is staged in the same shape, its
+ * flight in the columns, and is put on a pasaje at confirm rather than made
+ * a row. Written by the worker, never by the app — which only confirms or
+ * discards, and puts a row back after an undo.
  */
 export interface TripInboxItem extends SyncedRow {
   import_id: string;

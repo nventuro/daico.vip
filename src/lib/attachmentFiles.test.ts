@@ -34,6 +34,7 @@ const row = {
 };
 const documentRow = { ...row, owner_kind: 'document' as const, owner_id: 'd1' };
 const tripRow = { ...row, owner_kind: 'trip_item' as const, owner_id: 't1' };
+const passRow = { ...row, owner_kind: 'boarding_pass' as const, owner_id: 't1' };
 const tripItem = {
   trip_id: '',
   kind: 'lodging' as const,
@@ -270,6 +271,23 @@ describe('syncAttachmentFiles', () => {
     expect(await localAttachmentFile('edge')).toEqual(bytes('edge'));
     expect(await localAttachmentFile('undated')).toEqual(bytes('undated'));
     expect(await localAttachmentFile('unknown')).toEqual(bytes('unknown'));
+  });
+
+  it("keeps a flight's boarding pass like the flight's other files: on every device until its trip is over", async () => {
+    server.seedFiles([
+      { name: 'pass', data: bytes('pass'), uploaded: T0 },
+      { name: 'old-pass', data: bytes('old'), uploaded: T0 },
+      { name: 'unknown-pass', data: bytes('unknown'), uploaded: T0 },
+    ]);
+    await tripWithFile('ahead', null, 'ticket');
+    await engine.insert(ATTACHMENTS_SPEC, { ...passRow, owner_id: 'ahead-row' }, 'pass');
+    await tripWithFile('over', addDays(lastKeptDay(), -1), 'old-ticket');
+    await engine.insert(ATTACHMENTS_SPEC, { ...passRow, owner_id: 'over-row' }, 'old-pass');
+    await engine.insert(ATTACHMENTS_SPEC, { ...passRow, owner_id: 'no-such-row' }, 'unknown-pass');
+    await syncAttachmentFiles(pulled);
+    expect(await localAttachmentFile('pass')).toEqual(bytes('pass'));
+    expect(await localAttachmentFile('old-pass')).toBeNull();
+    expect(await localAttachmentFile('unknown-pass')).toEqual(bytes('unknown'));
   });
 
   it("leaves a past trip's file this device holds where it is, and fetches again once its last day moves", async () => {

@@ -23,16 +23,27 @@ import { appPath, entryPath } from '../types';
 import InboxItemRow from './InboxItemRow';
 import {
   CREATE_TRIP_CHOICE,
+  boardingPassChoices,
   inboxTripChoices,
+  suggestedBoardingPassChoice,
   suggestedTripChoice,
   type InboxGroup,
 } from './grouping';
-import { confirmInbox, discardInbox, groupFileIds, openedFilesOf } from './inboxConfirm';
+import {
+  confirmBoardingPass,
+  confirmInbox,
+  discardInbox,
+  groupFileIds,
+  openedFilesOf,
+  type InboxWrites,
+} from './inboxConfirm';
 import { deleteInboxFiles } from './inboxFiles';
 import { inboxUndoState } from './inboxUndo';
 import { useMissingInboxFiles } from './useMissingInboxFiles';
 import {
+  ADD_BOARDING_PASS_LABEL,
   addInboxLabel,
+  boardingPassCountLabel,
   createTripLabel,
   inboxCountLabel,
   inboxSourceLabel,
@@ -43,18 +54,19 @@ import { useTrips } from './useTrips';
 import { useToday } from '../../hooks/useToday';
 
 /**
- * One email's suggestions, reviewed whole: what arrived, the trip to put it
- * in, and two ways out. Confirming writes the real rows, each with the PDFs
- * it came with, and leads to the trip, where it can be undone for a moment;
- * discarding asks first.
+ * One group of suggestions, reviewed whole: what arrived, where to put it,
+ * and two ways out. An email's bookings go into a trip; a boarding pass goes
+ * on a pasaje — one there is, or one made for it. Confirming writes the real
+ * rows, each with the files it came with, and leads to where they went, to
+ * be undone there for a moment; discarding asks first.
  */
 export default function InboxReviewPage() {
-  const { importId = '' } = useParams();
+  const { groupKey = '' } = useParams();
   const { groups, loading, error, remove } = useTripInbox();
   const { items: trips, loading: tripsLoading, error: tripsError, add: addTrip } = useTrips();
   // The rows go in as they came, capitals and all — not through the trip
   // rows' own `add`, which lower-cases what is typed into an add bar.
-  const { insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
+  const { items: tripItems, insert: addItem } = useOfflineTable(TRIP_ITEMS_SPEC);
   const { addOpened } = useAttachments();
   const { items: inboxKeys, loading: keysLoading } = useOfflineTable(INBOX_KEY_SPEC);
   const masterKey = useMasterKey();
@@ -65,16 +77,25 @@ export default function InboxReviewPage() {
   const [problem, setProblem] = useState<string | null>(null);
 
   const today = useToday();
-  const group = groups.find((candidate) => candidate.importId === importId);
-  const choices = useMemo(() => inboxTripChoices(trips, today), [trips, today]);
+  const group = groups.find((candidate) => candidate.key === groupKey);
+  const tripChoices = useMemo(() => inboxTripChoices(trips, today), [trips, today]);
+  const passChoices = useMemo(
+    () =>
+      group?.boardingPass ? boardingPassChoices(trips, tripItems, group.tripTitle, today) : [],
+    [group, trips, tripItems, today],
+  );
   // Nothing chosen yet means the suggestion, which is only known once the
   // trips are read, so it is resolved at render rather than stored.
   const [chosen, setChosen] = useState<string | null>(null);
-  const choice = chosen ?? suggestedTripChoice(choices);
+  const choice =
+    chosen ??
+    (group?.boardingPass
+      ? suggestedBoardingPassChoice(group.items[0], passChoices, tripItems)
+      : suggestedTripChoice(tripChoices));
 
-  // The group's PDFs come to every device with a sync. Until they are here
+  // The group's files come to every device with a sync. Until they are here
   // the group says so, and with no connection to bring them it waits: a row
-  // is never added short of its PDF.
+  // is never added short of its file.
   const fileIds = useMemo(() => (group ? groupFileIds(group) : []), [group]);
   const missing = useMissingInboxFiles(fileIds);
   const lacking = missing !== null && missing.length > 0;
@@ -90,25 +111,31 @@ export default function InboxReviewPage() {
       setProblem(errorMessage(e));
       return;
     }
-    const undo = await confirmInbox(
-      group,
-      choice,
-      {
-        addTrip,
-        addItem,
-        addAttachment: (owner, file) => addOpened(owner, file, key),
-        removeStaged: remove,
-        removeFiles: deleteInboxFiles,
-      },
-      files,
-    );
+    const writes: InboxWrites = {
+      addTrip,
+      addItem,
+      addAttachment: (owner, file) => addOpened(owner, file, key),
+      removeStaged: remove,
+      removeFiles: deleteInboxFiles,
+    };
+    const undo = group.boardingPass
+      ? await confirmBoardingPass(
+          group,
+          passChoices.find((candidate) => candidate.value === choice)?.target ?? {
+            kind: 'new-trip',
+          },
+          writes,
+          files,
+        )
+      : await confirmInbox(group, choice, writes, files);
     // In place of this page, which has nothing left to show: going back from
-    // the trip is going back to the inbox.
+    // where the rows went is going back to the inbox.
     if (undo) {
-      void navigate(entryPath('viajes', undo.tripId), {
-        replace: true,
-        state: inboxUndoState(undo),
-      });
+      const landing =
+        undo.itemId === null
+          ? entryPath('viajes', undo.tripId)
+          : entryPath('viajes', undo.tripId, undo.itemId);
+      void navigate(landing, { replace: true, state: inboxUndoState(undo) });
     }
   }
 
@@ -134,8 +161,8 @@ export default function InboxReviewPage() {
         >
           {lacking && !online && (
             <OfflineBanner className="mb-4">
-              Los PDF de este correo todavía no llegaron a este dispositivo: para agregarlo hace
-              falta conexión.
+              Los archivos de este correo todavía no llegaron a este dispositivo: para agregarlo
+              hace falta conexión.
             </OfflineBanner>
           )}
           <div className="flex items-start justify-between gap-3">
@@ -149,19 +176,39 @@ export default function InboxReviewPage() {
             <IconButton label="Descartar" icon={IconTrash} onClick={() => setDiscarding(true)} />
           </div>
 
-          <FormField label="Viaje">
-            <Select value={choice} onChange={(e) => setChosen(e.target.value)}>
-              {choices.map((trip) => (
-                <option key={trip.id} value={trip.id}>
-                  {tripChoiceLabel(trip, today)}
-                </option>
-              ))}
-              <option value={CREATE_TRIP_CHOICE}>{createTripLabel(group.tripTitle)}</option>
-            </Select>
-          </FormField>
+          {group.boardingPass ? (
+            <FormField label="Pasaje">
+              <Select value={choice} onChange={(e) => setChosen(e.target.value)}>
+                {passChoices.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          ) : (
+            <FormField label="Viaje">
+              <Select value={choice} onChange={(e) => setChosen(e.target.value)}>
+                {tripChoices.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {tripChoiceLabel(trip, today)}
+                  </option>
+                ))}
+                <option value={CREATE_TRIP_CHOICE}>{createTripLabel(group.tripTitle)}</option>
+              </Select>
+            </FormField>
+          )}
 
           <section>
-            <SectionLabel detail={inboxCountLabel(group.items.length)}>Qué llegó</SectionLabel>
+            <SectionLabel
+              detail={
+                group.boardingPass
+                  ? boardingPassCountLabel(fileIds.length)
+                  : inboxCountLabel(group.items.length)
+              }
+            >
+              Qué llegó
+            </SectionLabel>
             {lacking && online && <LoadingLine className="mb-2" />}
             <ul>
               {group.items.map((item) => (
@@ -171,7 +218,9 @@ export default function InboxReviewPage() {
           </section>
 
           <FormFooter
-            submitLabel={addInboxLabel(group.items.length)}
+            submitLabel={
+              group.boardingPass ? ADD_BOARDING_PASS_LABEL : addInboxLabel(group.items.length)
+            }
             submitDisabled={lacking && !online}
           />
 

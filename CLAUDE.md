@@ -112,9 +112,11 @@ are the rules on top of it.
   with "delete wins".
 - **A table that never leaves the device** (a blob cache, the engine's own
   bookkeeping) is a `LocalTableSpec` in `src/lib/offline/localTables.ts`,
-  created and wiped with the rest; its rows are read and written by whoever
-  owns them, over the engine's `localQuery` / `localWrite`. They are never in
-  `ALL_SPECS`.
+  created and wiped with the rest, and brought to its DDL's shape when the
+  store opens like a synced table is — so a column it gains must be one SQLite
+  can add in place, nullable or with a default; its rows are read and written
+  by whoever owns them, over the engine's `localQuery` / `localWrite`. They
+  are never in `ALL_SPECS`.
 - **What asks for a sync is installed once** (`installSyncTriggers`, from the
   shell's `AppProvider`, while a member is in): the connection coming back, and
   the app returning to the foreground. A table's hook asks to push after each
@@ -205,9 +207,10 @@ gate, what a sync does with the files. These are the rules on top of it.
   half that is not the private half's other half, so a replaced public key
   is caught before a file sealed to it is trusted.
 - **Which files every device keeps is `KEPT_OWNER_KINDS`** in
-  `attachmentFiles.ts`: documents and trip rows, the latter until
-  `TRIP_FILES_KEPT_DAYS` past the trip — the one exception to files being
-  fetched on demand. Adding a kind there puts its every file on every device
+  `attachmentFiles.ts`: documents and trip rows — a row's own files and a
+  flight's boarding passes, the two kinds in `TRIP_ROW_FILE_KINDS` — the
+  latter until `TRIP_FILES_KEPT_DAYS` past the trip — the one exception to
+  files being fetched on demand. Adding a kind there puts its every file on every device
   and is a decision to write up, never a default; files are still never pulled
   wholesale and never put in `ALL_SPECS`.
 - **The bucket is R2, and the files worker (`worker/src/files.ts`) is the
@@ -368,6 +371,34 @@ and what becomes of a forwarded email. These are the rules on top of it.
   a chore does. Airport codes are typed by hand and offered from the curated
   list in `airports.ts` — never a lookup, which does not work offline, and never
   the full IATA set, which would be precached on every device.
+- **A flight's boarding pass is an attachment of the pasaje under a kind of
+  its own**, `'boarding_pass'`, on a shelf of its own on the page — drawn
+  only for a flight (`isFlight`: a ticket with both airport codes), since a
+  bus boards with its ticket: the pasaje's other files — the e-ticket a
+  forwarded confirmation brings — never stand in for it. A trip row's files are the two kinds in
+  `TRIP_ROW_FILE_KINDS`: a delete takes both, Buscar finds both, the row's
+  mark counts both, and both are kept on every device by the trip-files
+  rule. The word is «boarding pass», lowercase in a row and invariable in
+  number (`BOARDING_PASS_LABEL`).
+- **The boarding pass Próximo asks for is deduced, never stored.**
+  `useTripsUpcoming` lists «boarding pass · {pasaje}» for a flight — a ticket
+  with both airport codes (`isFlight`); a bus leg has none and no check-in —
+  that is dated, has not left, is within `BOARDING_PASS_NOTICE_DAYS` (the day
+  before) and has no attachment of that kind. Nothing is ticked and no column
+  says so: the first file on the shelf ends it, and it is never overdue.
+  Never add a `checked_in` column or a pendiente for it.
+- **A forwarded boarding pass is staged, never mixed with bookings.** The
+  worker stages it as a `trip_inbox` row of kind `'boarding_pass'`, its
+  flight in the columns and its files beside it — pictures as well as PDFs,
+  each with its `mime`; an email that is bookings and a boarding pass at once
+  is refused with a reply, and one whose pass came as a link rather than a
+  file is answered with what to do instead. The app reviews each as a group
+  of its own (`InboxGroup.key` is the row, not the email) and asks for the
+  pasaje, not the trip: `suggestedBoardingPassChoice` preselects the flight
+  of a trip ahead that matches by day and airports, the pasaje — or the trip
+  too — can be made on the spot, and `confirmBoardingPass` seals each file
+  for that pasaje's shelf and lands on the pasaje with the undo. The worker
+  still never reads `trips` or `trip_items`.
 - **`trip_inbox` is staged by the email worker in `worker/`, never made up by the
   app**, which only confirms a group of staged rows into real ones (through the
   offline engine, undoable for a moment, which stages the rows again as new

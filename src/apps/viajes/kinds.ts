@@ -1,6 +1,13 @@
-import { IconBed, IconChecklist, IconMapPin, IconPlane, IconTicket } from '@tabler/icons-react';
+import {
+  IconBed,
+  IconChecklist,
+  IconMapPin,
+  IconPlane,
+  IconQrcode,
+  IconTicket,
+} from '@tabler/icons-react';
 import type { TablerIcon } from '@tabler/icons-react';
-import type { TripKind } from '../../lib/offline/specs';
+import type { TripItem, TripKind } from '../../lib/offline/specs';
 
 /** What a class of row is made of, so a section, a form and a row can never
  *  disagree about one. */
@@ -31,3 +38,13 @@ export const TRIP_KIND_SHAPES: Record<TripKind, TripKindShape> = {
 /** The class a row starts as: what is typed into the add bar is far more often
  *  something still to resolve than something already booked. */
 export const TRIP_KIND_DEFAULT: TripKind = 'todo';
+
+/** What stands before a staged boarding pass under review: no class of row,
+ *  but the files a flight is boarded with. */
+export const BOARDING_PASS_ICON: TablerIcon = IconQrcode;
+
+/** Whether a pasaje is a flight — one between two airports. The class also
+ *  covers a bus leg, which has no airports and nothing to check in for. */
+export function isFlight(item: Pick<TripItem, 'kind' | 'from_code' | 'to_code'>): boolean {
+  return item.kind === 'ticket' && item.from_code !== null && item.to_code !== null;
+}

@@ -1,16 +1,20 @@
 import type { RowInput, TripInboxItem } from '../../lib/offline/specs';
 
 /**
- * What confirming a group of suggestions did, carried to the trip's screen in
- * the navigation so it can be undone there and nowhere else: the rows and
- * attachments created, the trip if one was, the staged rows as they were, to
- * put back, and the staged files to let go of once the offer is over.
+ * What confirming a group of suggestions did, carried to the screen it led
+ * to in the navigation so it can be undone there and nowhere else: the rows
+ * and attachments created, the trip if one was, the staged rows as they
+ * were, to put back, and the staged files to let go of once the offer is
+ * over.
  */
 export interface InboxUndo {
   /** What the undo bar says. */
   label: string;
   tripCreated: boolean;
   tripId: string;
+  /** The pasaje a boarding pass went on — where the review leads — or null
+   *  when the group went into the trip as rows of its own. */
+  itemId: string | null;
   itemIds: string[];
   attachmentIds: string[];
   staged: TripInboxItem[];
@@ -32,12 +36,12 @@ export function settleInboxUndo(
   if (!taken) release(offer.fileIds);
 }
 
-/** What the review hands the trip's screen on its way there. */
+/** What the review hands the next screen on its way there. */
 export function inboxUndoState(undo: InboxUndo): { inboxUndo: InboxUndo } {
   return { inboxUndo: undo };
 }
 
-/** The undo a trip's screen arrived with, if it arrived with one. */
+/** The undo a screen arrived with, if it arrived with one. */
 export function inboxUndoOf(state: unknown): InboxUndo | undefined {
   const undo = (state as { inboxUndo?: unknown } | null)?.inboxUndo;
   return typeof undo === 'object' && undo !== null && 'itemIds' in undo

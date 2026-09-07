@@ -1,6 +1,6 @@
 // =============================================================================
-// Sealing a PDF for the household. The worker holds nothing that opens a file:
-// it encrypts each PDF under a fresh key of its own and wraps that key under
+// Sealing a file for the household. The worker holds nothing that opens a
+// file: it encrypts each under a fresh key of its own and wraps that key under
 // the household's inbox public key, which only the private half — sealed on
 // the server under the master key — can undo. Nothing here is ever decrypted.
 //
@@ -22,7 +22,7 @@ export function inboxFileBinding(id: string): string {
   return `trip_inbox_files/${id}`;
 }
 
-/** A sealed PDF and the wrapped key that opens it, as stored. */
+/** A sealed file and the wrapped key that opens it, as stored. */
 export interface SealedFile {
   data: Uint8Array;
   /** Base64: the file key under the inbox public key. */
@@ -42,8 +42,8 @@ export async function importInboxPublicKey(spki: string): Promise<CryptoKey> {
 
 /** `bytes` sealed under a fresh key of their own, that key wrapped under
  *  `publicKey`, bound to `boundTo`. Every call seals afresh: two seals of one
- *  PDF never share a key or a nonce. */
-export async function sealPdf(
+ *  file never share a key or a nonce. */
+export async function sealFile(
   publicKey: CryptoKey,
   bytes: Uint8Array,
   boundTo: string,

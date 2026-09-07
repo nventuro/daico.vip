@@ -1,12 +1,11 @@
 import type { AttachmentSource } from '../../hooks/useAttachments';
-import { PDF_TYPE } from '../../lib/attachmentFiles';
 import { openInboxFile, openInboxKey, rowBinding, type InboxKeyPair } from '../../lib/householdKey';
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { AttachmentOwner } from '../../types';
-import { CREATE_TRIP_CHOICE, type InboxGroup } from './grouping';
+import { CREATE_TRIP_CHOICE, type BoardingPassTarget, type InboxGroup } from './grouping';
 import { INBOX_FILES_TABLE, inboxFileIds, readInboxFiles } from './inboxFiles';
 import type { InboxUndo } from './inboxUndo';
-import { inboxAddedLabel } from './labels';
+import { boardingPassAddedLabel, inboxAddedLabel } from './labels';
 import { withKindFields, type TripItemInput } from './useTripItems';
 import type { TripInput } from './useTrips';
 
@@ -26,11 +25,12 @@ export interface InboxWrites {
 
 /** A staged row as the row of a trip it becomes: its class's own columns and
  *  nothing else, under its title as it came — a flight number or a hotel's
- *  name keeps its capitals, unlike what is typed into an add bar. */
+ *  name keeps its capitals, unlike what is typed into an add bar. A boarding
+ *  pass with no pasaje yet becomes the pasaje it is for. */
 export function tripItemFrom(row: TripInboxItem, tripId: string): TripItemWrite {
   return {
     ...withKindFields({
-      kind: row.kind,
+      kind: row.kind === 'boarding_pass' ? 'ticket' : row.kind,
       title: row.title,
       on_date: row.on_date,
       at_time: row.at_time,
@@ -67,13 +67,15 @@ export async function openedFilesOf(
   const ids = groupFileIds(group);
   if (ids.length === 0) return files;
   if (!pair)
-    throw new Error('Este dispositivo todavía no tiene la clave con la que se sellaron los PDF.');
+    throw new Error(
+      'Este dispositivo todavía no tiene la clave con la que se sellaron los archivos.',
+    );
   const read = await readInboxFiles(ids);
   const privateKey = await openInboxKey(masterKey, pair);
   for (const file of read) {
     files.set(file.id, {
       name: file.name,
-      mime: PDF_TYPE,
+      mime: file.mime,
       size: file.size,
       plain: await openInboxFile(
         privateKey,
@@ -131,11 +133,70 @@ export async function confirmInbox(
     label: inboxAddedLabel(itemIds.length),
     tripCreated,
     tripId,
+    itemId: null,
     itemIds,
     attachmentIds,
     staged,
     fileIds: groupFileIds(group),
   };
+}
+
+/**
+ * Puts a staged boarding pass on the pasaje it is for — one there is, one
+ * made for it in a trip, or one made in a trip made for it too — as
+ * attachments of the pasaje's boarding-pass kind, one per file the row
+ * lists, and clears the staged row once every file is on. A file this
+ * device does not have, or one that could not be attached, stops it there
+ * with the row still staged: a boarding pass short of its file is nothing.
+ * Resolves what it did, for the undo; undefined when the trip could not be
+ * created, in which case nothing was written.
+ */
+export async function confirmBoardingPass(
+  group: InboxGroup,
+  target: BoardingPassTarget,
+  writes: InboxWrites,
+  files: ReadonlyMap<string, AttachmentSource>,
+): Promise<InboxUndo | undefined> {
+  const [row] = group.items;
+  if (!row) return undefined;
+  const tripCreated = target.kind === 'new-trip';
+  const tripId = tripCreated
+    ? await writes.addTrip({ title: group.tripTitle, starts_on: null, ends_on: null })
+    : target.tripId;
+  if (tripId === undefined) return undefined;
+  const itemIds: string[] = [];
+  const attachmentIds: string[] = [];
+  const staged: TripInboxItem[] = [];
+  const fileIds = groupFileIds(group);
+  const undo = (flightId: string | null): InboxUndo => ({
+    label: boardingPassAddedLabel(attachmentIds.length),
+    tripCreated,
+    tripId,
+    itemId: flightId,
+    itemIds,
+    attachmentIds,
+    staged,
+    fileIds,
+  });
+  let flightId: string;
+  if (target.kind === 'flight') {
+    flightId = target.flightId;
+  } else {
+    const id = await writes.addItem(tripItemFrom(row, tripId));
+    if (id === undefined) return undo(null);
+    itemIds.push(id);
+    flightId = id;
+  }
+  for (const fileId of inboxFileIds(row)) {
+    const file = files.get(fileId);
+    const attachmentId =
+      file && (await writes.addAttachment({ kind: 'boarding_pass', id: flightId }, file));
+    if (attachmentId === undefined) return undo(flightId);
+    attachmentIds.push(attachmentId);
+  }
+  await writes.removeStaged(row.id);
+  staged.push(row);
+  return undo(flightId);
 }
 
 /** Clears a group, keeping nothing of it: its rows, then its files. */

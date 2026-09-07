@@ -1,11 +1,12 @@
 // =============================================================================
-// The email worker: what turns a forwarded confirmation email into staged
-// suggestions in Viajes. Cloudflare Email Routing hands every message sent to
-// the household's address to `email()` below, which lets only a verified
-// member through, has a model extract the bookings, seals the PDFs the
-// bookings are printed in for the household, inserts one row per booking
-// into `trip_inbox` with those PDFs beside it, and always replies to the
-// sender — success or failure — so a forward never vanishes without a word.
+// The email worker: what turns a forwarded confirmation email — or a
+// boarding pass email — into staged suggestions in Viajes. Cloudflare Email
+// Routing hands every message sent to the household's address to `email()`
+// below, which lets only a verified member through, has a model extract the
+// bookings, seals the files the bookings are printed in for the household,
+// inserts one row per booking into `trip_inbox` with those files beside it,
+// and always replies to the sender — success or failure — so a forward never
+// vanishes without a word.
 //
 // What the worker holds: an Anthropic key, and a Hyperdrive binding to the
 // database as `trip_inbox_writer`, a role that can insert into `trip_inbox`,
@@ -26,10 +27,12 @@ import { EmailMessage } from 'cloudflare:email';
 import type pg from 'pg';
 import { memberRejection, verdictRejection, type SenderRejection } from './gate';
 import {
+  FILE_TYPES,
   decide,
   extractBookings,
   type EmailContent,
-  type EmailPdf,
+  type EmailFile,
+  type FileType,
   type InboxRow,
 } from './extract';
 import {
@@ -49,7 +52,7 @@ import {
   openDb,
   type InboxFile,
 } from './db';
-import { importInboxPublicKey, inboxFileBinding, sealPdf } from './seal';
+import { importInboxPublicKey, inboxFileBinding, sealFile } from './seal';
 import { toBase64 } from './base64';
 
 export interface Env {
@@ -57,19 +60,22 @@ export interface Env {
   HYPERDRIVE: Hyperdrive;
 }
 
-const PDF_TYPE = 'application/pdf';
-/** What a PDF's bytes open with, whatever the attachment says it is. */
-const PDF_MAGIC = '%PDF-';
-
-/** Attachments over this are left out: the text usually carries the
- *  itinerary, and a scan this size is not a confirmation. It is also the
- *  largest file the app attaches, so a PDF kept here is one the app takes. */
+/** A PDF over this is left out: the text usually carries the itinerary, and
+ *  a scan this size is not a confirmation. It is also the largest file the
+ *  app attaches, so a file kept here is one the app takes. */
 const PDF_MAX_BYTES = 10 * 1024 * 1024;
-/** How many PDFs, and how many bytes of them together, one email may send
+/** A picture over this is left out: it is the most the model takes in one
+ *  image. */
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** A picture under this is no picture of anything — a logo, a tracking
+ *  pixel, an icon of the mail's layout — and is passed over without a word,
+ *  unlike a file that was meant and could not be kept. */
+const IMAGE_MIN_BYTES = 20 * 1024;
+/** How many files, and how many bytes of them together, one email may send
  *  the model: what the model takes in one request has a ceiling, and every
  *  byte of it is billed. */
-const PDF_MAX_COUNT = 4;
-const PDFS_MAX_BYTES = 16 * 1024 * 1024;
+const FILE_MAX_COUNT = 4;
+const FILES_MAX_BYTES = 16 * 1024 * 1024;
 /** How much of an email's text the model reads. */
 const TEXT_MAX_CHARS = 60_000;
 /** The longest Message-ID kept: a header line's worth. */
@@ -77,6 +83,15 @@ const MESSAGE_ID_MAX_CHARS = 998;
 
 /** What the sending server is told; deliberately says nothing more. */
 const REJECT_REASON = 'address not accepted';
+
+/** The extensions a file of each kept type comes named with. */
+const EXTENSIONS: Record<FileType, string[]> = {
+  'application/pdf': ['pdf'],
+  'image/jpeg': ['jpg', 'jpeg', 'jpe'],
+  'image/png': ['png'],
+  'image/webp': ['webp'],
+  'image/gif': ['gif'],
+};
 
 function firstHeader(email: Email, key: string): string | null {
   return email.headers.find((header) => header.key === key)?.value ?? null;
@@ -118,73 +133,103 @@ function bytesOf(content: ArrayBuffer | Uint8Array | string): Uint8Array | null 
   return null;
 }
 
-function isPdf(bytes: Uint8Array): boolean {
-  return new TextDecoder().decode(bytes.subarray(0, PDF_MAGIC.length)) === PDF_MAGIC;
+/** The type an attachment claims to be, by what it says it is or how it is
+ *  named; null when it claims to be nothing the app takes. */
+function claimedType(attachment: { mimeType: string; filename: string | null }): FileType | null {
+  const claimed = FILE_TYPES.find((type) => type === attachment.mimeType.toLowerCase());
+  if (claimed) return claimed;
+  const extension = attachment.filename?.split('.').pop()?.toLowerCase() ?? '';
+  return FILE_TYPES.find((type) => EXTENSIONS[type].includes(extension)) ?? null;
 }
 
-/** The PDF attachments, in the email's order, as many as the model takes:
- *  what says it is a PDF or is named one, and opens as one. The rest of
+function startsWith(bytes: Uint8Array, prefix: number[] | string, at = 0): boolean {
+  const expected = typeof prefix === 'string' ? [...prefix].map((c) => c.charCodeAt(0)) : prefix;
+  return expected.every((byte, i) => bytes[at + i] === byte);
+}
+
+/** What the bytes open as, whatever the attachment says it is: a file is
+ *  kept as what it is, or not at all. */
+function sniffedType(bytes: Uint8Array): FileType | null {
+  if (startsWith(bytes, '%PDF-')) return 'application/pdf';
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
+  if (startsWith(bytes, 'GIF87a') || startsWith(bytes, 'GIF89a')) return 'image/gif';
+  if (startsWith(bytes, 'RIFF') && startsWith(bytes, 'WEBP', 8)) return 'image/webp';
+  return null;
+}
+
+/** Whether a file of this type and size is one to keep at all: over the
+ *  type's ceiling it is left out and said so; a picture too small to be one
+ *  is passed over in silence. */
+function fits(type: FileType, size: number): boolean | 'silent' {
+  if (type === 'application/pdf') return size <= PDF_MAX_BYTES;
+  if (size < IMAGE_MIN_BYTES) return 'silent';
+  return size <= IMAGE_MAX_BYTES;
+}
+
+/** The attachments kept for the model, in the email's order, as many as it
+ *  takes: what claims to be a PDF or a picture and opens as one. The rest of
  *  those are counted, for the reply to say. */
-function pdfs(email: Email): { kept: EmailPdf[]; skipped: number } {
-  const kept: EmailPdf[] = [];
+function files(email: Email): { kept: EmailFile[]; skipped: number } {
+  const kept: EmailFile[] = [];
   let skipped = 0;
   let bytesKept = 0;
   for (const attachment of email.attachments) {
-    const named = attachment.filename?.toLowerCase().endsWith('.pdf') ?? false;
-    if (attachment.mimeType !== PDF_TYPE && !named) continue;
+    if (claimedType(attachment) === null) continue;
     const bytes = bytesOf(attachment.content);
-    if (
-      bytes === null ||
-      bytes.length === 0 ||
-      bytes.length > PDF_MAX_BYTES ||
-      !isPdf(bytes) ||
-      kept.length === PDF_MAX_COUNT ||
-      bytesKept + bytes.length > PDFS_MAX_BYTES
-    ) {
+    const type = bytes === null || bytes.length === 0 ? null : sniffedType(bytes);
+    if (bytes === null || type === null) {
       skipped += 1;
       continue;
     }
-    kept.push({ name: attachmentName(attachment.filename), bytes });
+    const fit = fits(type, bytes.length);
+    if (fit === 'silent') continue;
+    if (!fit || kept.length === FILE_MAX_COUNT || bytesKept + bytes.length > FILES_MAX_BYTES) {
+      skipped += 1;
+      continue;
+    }
+    kept.push({ name: attachmentName(attachment.filename), mime: type, bytes });
     bytesKept += bytes.length;
   }
   return { kept, skipped };
 }
 
 function contentOf(email: Email): { content: EmailContent; skipped: number } {
-  const { kept, skipped } = pdfs(email);
+  const { kept, skipped } = files(email);
   return {
     content: {
       subject: email.subject ?? null,
       text: bodyText(email).slice(0, TEXT_MAX_CHARS),
-      pdfs: kept,
+      files: kept,
     },
     skipped,
   };
 }
 
-/** The PDFs some row is printed in, sealed for the household, each bound to
- *  the row it is staged as; the rest of the email's PDFs are forgotten here. */
+/** The files some row is printed in, sealed for the household, each bound to
+ *  the row it is staged as; the rest of the email's files are forgotten here. */
 async function sealNamed(
-  pdfs: EmailPdf[],
+  files: EmailFile[],
   fileIds: string[],
   rows: InboxRow[],
   publicKey: CryptoKey,
 ): Promise<InboxFile[]> {
   const named = new Set(rows.flatMap((row) => row.file_ids));
-  const files: InboxFile[] = [];
-  for (const [index, pdf] of pdfs.entries()) {
+  const sealed: InboxFile[] = [];
+  for (const [index, file] of files.entries()) {
     const id = fileIds[index];
     if (!named.has(id)) continue;
-    const { data, wrappedKey } = await sealPdf(publicKey, pdf.bytes, inboxFileBinding(id));
-    files.push({
+    const { data, wrappedKey } = await sealFile(publicKey, file.bytes, inboxFileBinding(id));
+    sealed.push({
       id,
-      name: pdf.name,
-      size: pdf.bytes.length,
+      name: file.name,
+      mime: file.mime,
+      size: file.bytes.length,
       data: toBase64(data),
       wrapped_key: wrappedKey,
     });
   }
-  return files;
+  return sealed;
 }
 
 /** The rows as they are staged while the household has no inbox key: with
@@ -268,16 +313,16 @@ export default {
           return;
         }
         const { content, skipped } = contentOf(email);
-        // Each PDF gets the id it would be staged under before the model
+        // Each file gets the id it would be staged under before the model
         // names any, so the rows are built with the ids in hand.
-        const fileIds = content.pdfs.map(() => crypto.randomUUID());
+        const fileIds = content.files.map(() => crypto.randomUUID());
         const output = await extractBookings(env.ANTHROPIC_API_KEY, content);
         const decision =
           output === null
             ? { ok: false as const, problem: null }
             : decide(output, email.subject ?? null, fileIds);
         if (!decision.ok) {
-          await reply(failureBody(decision.problem));
+          await reply(failureBody(decision.problem, decision.advice));
           return;
         }
         const publicKey = await inboxPublicKey(db);
@@ -287,7 +332,7 @@ export default {
             : {
                 rows: decision.rows,
                 files: await sealNamed(
-                  content.pdfs,
+                  content.files,
                   fileIds,
                   decision.rows,
                   await importInboxPublicKey(publicKey),

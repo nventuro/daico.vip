@@ -1,4 +1,4 @@
-import type { Trip, TripItem, TripKind } from '../../lib/offline/specs';
+import type { Trip, TripInboxItem, TripItem, TripKind } from '../../lib/offline/specs';
 import {
   daysUntil,
   formatDayRange,
@@ -28,6 +28,13 @@ export const TRIP_SECTION_LABELS: Record<TripKind, string> = {
   booking: 'Reservas',
   place: 'Lugares',
 };
+
+/** What a flight's pass is called, the word as the household says it: it
+ *  does not change in number. */
+export const BOARDING_PASS_LABEL = 'boarding pass';
+
+/** The heading of a pasaje's boarding passes, singular like «Alojamiento». */
+export const BOARDING_PASS_SECTION_LABEL = 'Boarding pass';
 
 /** The definite article each class takes, for the sentences it appears in. */
 const TRIP_KIND_ARTICLES: Record<TripKind, string> = {
@@ -131,14 +138,47 @@ export function itemSubtitle(item: ItemLine, today: string): string | undefined 
   }
 }
 
+/** A staged boarding pass's line: what it is, then its flight as a pasaje's
+ *  line reads. */
+export function boardingPassSubtitle(item: Omit<ItemLine, 'kind'>, today: string): string {
+  return joined([BOARDING_PASS_LABEL, itemSubtitle({ ...item, kind: 'ticket' }, today)]) ?? '';
+}
+
+/** The line under a staged row, whichever kind it is. */
+export function inboxItemSubtitle(
+  item: Pick<TripInboxItem, keyof ItemLine>,
+  today: string,
+): string | undefined {
+  if (item.kind === 'boarding_pass') return boardingPassSubtitle(item, today);
+  return itemSubtitle({ ...item, kind: item.kind }, today);
+}
+
+/** What the home screen lists the day before a flight that has no boarding
+ *  pass yet: what is missing, and for which pasaje. */
+export function boardingPassDueLabel(flightTitle: string): string {
+  return `${BOARDING_PASS_LABEL} · ${flightTitle}`;
+}
+
 /** How many suggestions a group of them holds. */
 export function inboxCountLabel(count: number): string {
   return countLabel(count, 'ítem', 'ítems');
 }
 
-/** The line under a group in the list: how much it holds, and when it came. */
-export function inboxSubtitle(count: number, receivedAt: string, today: string): string {
-  return `${inboxCountLabel(count)} · ${relativeDayTime(today, receivedAt)}`;
+/** How many boarding passes: «2 boarding pass». */
+export function boardingPassCountLabel(count: number): string {
+  return countLabel(count, BOARDING_PASS_LABEL, BOARDING_PASS_LABEL);
+}
+
+/** The line under a group in the list: how much it holds — items, or the
+ *  boarding passes it is — and when it came. */
+export function inboxSubtitle(
+  count: number,
+  receivedAt: string,
+  today: string,
+  boardingPass = false,
+): string {
+  const what = boardingPass ? boardingPassCountLabel(count) : inboxCountLabel(count);
+  return `${what} · ${relativeDayTime(today, receivedAt)}`;
 }
 
 /** Where a group came from: the subject of the email. */
@@ -156,12 +196,43 @@ export function createTripLabel(tripTitle: string): string {
   return `Crear viaje «${tripTitle}»`;
 }
 
+/** A pasaje as the selector offers it for a boarding pass: which, when it
+ *  leaves, and on what trip. */
+export function flightChoiceLabel(
+  flight: Pick<TripItem, 'title' | 'on_date' | 'at_time'>,
+  tripTitle: string,
+  today: string,
+): string {
+  return `${flight.title} · ${dayAndTime(flight.on_date, flight.at_time, today) ?? 'sin fecha'} · ${tripTitle}`;
+}
+
+/** The choice of making the pasaje a boarding pass is for, in a trip there is. */
+export function createFlightLabel(tripTitle: string): string {
+  return `Crear el pasaje en «${tripTitle}»`;
+}
+
+/** The selector's last choice for a boarding pass: a trip made for it, named
+ *  as the model named it, with the pasaje. */
+export function createTripWithFlightLabel(tripTitle: string): string {
+  return `Crear viaje «${tripTitle}» con el pasaje`;
+}
+
 /** The review's main action: «Agregar 3 ítems». */
 export function addInboxLabel(count: number): string {
   return `Agregar ${inboxCountLabel(count)}`;
 }
 
+/** The review's main action for a boarding pass, which goes on a pasaje. */
+export const ADD_BOARDING_PASS_LABEL = 'Agregar al pasaje';
+
 /** What the undo bar says once they are in the trip. */
 export function inboxAddedLabel(count: number): string {
   return count === 1 ? 'Se agregó 1 ítem' : `Se agregaron ${count} ítems`;
+}
+
+/** What the undo bar says once a boarding pass's files are on the pasaje. */
+export function boardingPassAddedLabel(count: number): string {
+  return count === 1
+    ? `Se agregó 1 ${BOARDING_PASS_LABEL}`
+    : `Se agregaron ${count} ${BOARDING_PASS_LABEL}`;
 }

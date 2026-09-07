@@ -42,12 +42,23 @@ export function isPdf(mime: string): boolean {
 }
 
 /**
+ * The kinds a row of a trip owns files under: its own, and the boarding
+ * passes a pasaje boards with, which stand apart from its other files. What
+ * holds for a trip row's files holds for both.
+ */
+export const TRIP_ROW_FILE_KINDS: readonly AttachmentOwnerKind[] = ['trip_item', 'boarding_pass'];
+
+/**
  * The kinds of entry whose files every device fetches and keeps, so they can
  * be seen with no connection wherever they were added: what is asked for at
- * a counter, and what is needed on a trip. Every other kind's files are
- * fetched on demand. Adding a kind here puts its every file on every device.
+ * a counter, and what is needed on a trip — a boarding pass most of all.
+ * Every other kind's files are fetched on demand. Adding a kind here puts its
+ * every file on every device.
  */
-export const KEPT_OWNER_KINDS: readonly AttachmentOwnerKind[] = ['document', 'trip_item'];
+export const KEPT_OWNER_KINDS: readonly AttachmentOwnerKind[] = [
+  'document',
+  ...TRIP_ROW_FILE_KINDS,
+];
 
 /**
  * How many days after a trip's last day its rows' files are still kept. Once
@@ -57,8 +68,10 @@ export const KEPT_OWNER_KINDS: readonly AttachmentOwnerKind[] = ['document', 'tr
  */
 export const TRIP_FILES_KEPT_DAYS = 7;
 
-/** The kept kinds as SQL takes them: fixed names, never anything typed. */
+/** The kept kinds, and a trip row's, as SQL takes them: fixed names, never
+ *  anything typed. */
 const keptKindsSql = KEPT_OWNER_KINDS.map((kind) => `'${kind}'`).join(', ');
+const tripRowKindsSql = TRIP_ROW_FILE_KINDS.map((kind) => `'${kind}'`).join(', ');
 
 /**
  * SQL: whether the attachment aliased `a` is one every device keeps — a kept
@@ -70,7 +83,7 @@ const keptSql = `(a.owner_kind IN (${keptKindsSql})
   AND NOT EXISTS (
     SELECT 1 FROM ${engine.visibleSql(TRIP_ITEMS_SPEC)} i
       JOIN ${engine.visibleSql(TRIPS_SPEC)} t ON t.id = i.trip_id
-     WHERE a.owner_kind = 'trip_item' AND i.id = a.owner_id AND t.ends_on < ?))`;
+     WHERE a.owner_kind IN (${tripRowKindsSql}) AND i.id = a.owner_id AND t.ends_on < ?))`;
 
 /** The day `keptSql` takes, as of today. */
 function tripsOverBefore(): string {

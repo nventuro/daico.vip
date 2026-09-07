@@ -44,9 +44,10 @@ interface TableSearch<Row extends SyncedRow> {
   fields: (keyof Row & string)[];
   /** What a matching row reads like, told which of its fields matched. */
   hit: (row: Row, matched: keyof Row & string) => SearchHit;
-  /** Set when the app's entries take attachments: those named like the
-   *  query follow the entries, each under the entry it belongs to. */
-  attachments?: AttachmentOwnerKind;
+  /** Set when the app's entries take attachments, to the kind — or kinds —
+   *  they take them under: those named like the query follow the entries,
+   *  each under the entry it belongs to. */
+  attachments?: AttachmentOwnerKind | readonly AttachmentOwnerKind[];
 }
 
 /**
@@ -66,22 +67,25 @@ export async function searchTable<Row extends SyncedRow>(
   });
   if (!attachments) return hits;
   const owners = new Map(rows.map((row) => [row.id, hit(row, fields[0])]));
-  return [...hits, ...(await searchAttachments(attachments, query, owners))];
+  const kinds = typeof attachments === 'string' ? [attachments] : attachments;
+  return [...hits, ...(await searchAttachments(kinds, query, owners))];
 }
 
 /**
- * The attachments of `kind` whose name mentions `query`, each shown under the
- * entry it belongs to: `owners` maps an entry's id to its own hit, and an
+ * The attachments of `kinds` whose name mentions `query`, each shown under
+ * the entry it belongs to: `owners` maps an entry's id to its own hit, and an
  * attachment of an entry not in it is left out.
  */
 async function searchAttachments(
-  kind: AttachmentOwnerKind,
+  kinds: readonly AttachmentOwnerKind[],
   query: string,
   owners: Map<string, SearchHit>,
 ): Promise<SearchHit[]> {
   const attachments = await engine.listVisible(ATTACHMENTS_SPEC);
   return attachments.flatMap((attachment) => {
-    const owner = attachment.owner_kind === kind ? owners.get(attachment.owner_id) : undefined;
+    const owner = kinds.includes(attachment.owner_kind)
+      ? owners.get(attachment.owner_id)
+      : undefined;
     return owner && matches(attachment.name, query)
       ? [{ title: attachment.name, subtitle: owner.title, to: `${owner.to}/${attachment.id}` }]
       : [];

@@ -1,5 +1,5 @@
 // =============================================================================
-// The PDFs an email brought, sealed by the worker for the household: this
+// The files an email brought, sealed by the worker for the household: this
 // device's copies of them, fetched after every sync so a group is confirmed
 // with no connection; what a confirm reads; and their removal, here and on
 // the server, once no staged row needs them. Nothing here is ever opened: a
@@ -34,6 +34,8 @@ export interface InboxFile {
   data: Uint8Array<ArrayBuffer>;
   wrapped_key: string;
   created_at: string;
+  /** What the file is under the seal: a PDF, or a picture's type. */
+  mime: string;
 }
 
 /** A staged file as the server hands it out: the bytes as base64 text. */
@@ -72,8 +74,8 @@ async function keepInboxFile(file: InboxFile): Promise<void> {
   await engine.localWrite(
     INBOX_FILES.table,
     `INSERT OR REPLACE INTO ${INBOX_FILES.table}
-       (id, import_id, name, size, data, wrapped_key, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, import_id, name, size, data, wrapped_key, created_at, mime)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     file.id,
     file.import_id,
     file.name,
@@ -81,6 +83,7 @@ async function keepInboxFile(file: InboxFile): Promise<void> {
     file.data,
     file.wrapped_key,
     file.created_at,
+    file.mime,
   );
 }
 
@@ -93,7 +96,7 @@ async function fetchInboxFiles(ids: string[]): Promise<InboxFile[]> {
   for (const id of ids) {
     const { data, error } = await supabase
       .from(INBOX_FILES_TABLE)
-      .select('id, import_id, name, size, data, wrapped_key, created_at')
+      .select('id, import_id, name, size, data, wrapped_key, created_at, mime')
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
@@ -110,7 +113,7 @@ async function fetchInboxFiles(ids: string[]): Promise<InboxFile[]> {
  * The files with these ids: this device's copies, the rest fetched from the
  * server and kept. Throws, in the member's words, when one cannot be had —
  * no connection, or the server no longer has it — so a confirm can write
- * nothing rather than a row short of its PDF.
+ * nothing rather than a row short of its file.
  */
 export async function readInboxFiles(ids: string[]): Promise<InboxFile[]> {
   const held = await localInboxFiles(ids);
@@ -118,14 +121,14 @@ export async function readInboxFiles(ids: string[]): Promise<InboxFile[]> {
   const missing = ids.filter((id) => !have.has(id));
   if (missing.length > 0) {
     if (!navigator.onLine) {
-      throw new Error('Los PDF de este correo todavía no llegaron a este dispositivo.');
+      throw new Error('Los archivos de este correo todavía no llegaron a este dispositivo.');
     }
     held.push(...(await fetchInboxFiles(missing)));
   }
   const byId = new Map(held.map((file) => [file.id, file]));
   return ids.map((id) => {
     const file = byId.get(id);
-    if (!file) throw new Error('Alguno de los PDF de este correo ya no está en el servidor.');
+    if (!file) throw new Error('Alguno de los archivos de este correo ya no está en el servidor.');
     return file;
   });
 }

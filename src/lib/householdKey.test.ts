@@ -17,7 +17,7 @@ import {
   unwrapMasterKey,
 } from './householdKey';
 // The worker's copy of the file format: what it seals, this file opens.
-import { importInboxPublicKey, inboxFileBinding, sealPdf } from '../../worker/src/seal';
+import { importInboxPublicKey, inboxFileBinding, sealFile } from '../../worker/src/seal';
 
 const PHRASE = PHRASE_WORDS.slice(0, HOUSEHOLD_PHRASE_WORDS);
 const OTHER_PHRASE = PHRASE_WORDS.slice(HOUSEHOLD_PHRASE_WORDS, 2 * HOUSEHOLD_PHRASE_WORDS);
@@ -241,7 +241,7 @@ describe('the inbox key', () => {
     const { key: masterKey } = await createMasterKey(PHRASE);
     const pair = await createInboxKey(masterKey);
     const publicKey = await importInboxPublicKey(pair.public_key);
-    const sealed = await sealPdf(publicKey, bytes('%PDF hola'), STAGED);
+    const sealed = await sealFile(publicKey, bytes('%PDF hola'), STAGED);
     const privateKey = await openInboxKey(masterKey, pair);
     expect(text(await openInboxFile(privateKey, sealed.wrappedKey, sealed.data, STAGED))).toBe(
       '%PDF hola',
@@ -276,7 +276,7 @@ describe('the inbox key', () => {
     const pair = await createInboxKey(masterKey);
     const otherPair = await createInboxKey(masterKey);
     const publicKey = await importInboxPublicKey(otherPair.public_key);
-    const sealed = await sealPdf(publicKey, bytes('x'), STAGED);
+    const sealed = await sealFile(publicKey, bytes('x'), STAGED);
     const privateKey = await openInboxKey(masterKey, pair);
     await expect(
       openInboxFile(privateKey, sealed.wrappedKey, sealed.data, STAGED),

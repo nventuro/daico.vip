@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { TRIP_KINDS, type TripItem, type TripKind } from '../../lib/offline/specs';
-import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
+import { TRIP_ROW_FILE_KINDS } from '../../lib/attachmentFiles';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useEntry } from '../../hooks/useEntry';
 import { useLeave } from '../../hooks/useLeave';
-import { endUndo, offerUndo, type UndoOffer } from '../../lib/undo';
+import type { InboxUndo } from './inboxUndo';
 import AddBar from '../../components/AddBar';
 import CompletedSection from '../../components/CompletedSection';
 import DatePicker from '../../components/DatePicker';
@@ -22,9 +23,8 @@ import ItemRow from './ItemRow';
 import { tripSections } from './grouping';
 import { TRIP_KIND_SHAPES } from './kinds';
 import { TRIP_KIND_LABELS } from './labels';
-import { deleteInboxFiles } from './inboxFiles';
-import { inboxRowInput, inboxUndoOf, settleInboxUndo, type InboxUndo } from './inboxUndo';
-import { useTripInbox } from './useTripInbox';
+import { tripItemsWithFiles } from './marks';
+import { useInboxUndoArrival } from './useInboxUndo';
 import { NEW_TRIP_ITEM, useTripItems } from './useTripItems';
 import { useTrips } from './useTrips';
 import { useToday } from '../../hooks/useToday';
@@ -48,67 +48,18 @@ export default function TripPage() {
     setDone,
     remove: removeItem,
   } = useTripItems(tripId);
-  const { insert: restage } = useTripInbox();
-  const {
-    items: attachments,
-    remove: removeAttachment,
-    removeByIds: removeAttachments,
-  } = useAttachments();
-  const attached = useMemo(() => ownersWithAttachments(attachments, 'trip_item'), [attachments]);
+  const { items: attachments, remove: removeAttachment } = useAttachments();
+  const attached = useMemo(() => tripItemsWithFiles(attachments), [attachments]);
   const navigate = useNavigate();
   const leave = useLeave();
-  const location = useLocation();
-  const { pathname } = location;
-  const state: unknown = location.state;
-  // The undo of what the review just put in, while this screen offers it.
-  const inboxOffer = useRef<UndoOffer | null>(null);
   const [deleting, setDeleting] = useState(false);
   // The title typed into the bar, while its class is being asked.
   const [naming, setNaming] = useState<string | null>(null);
 
-  /** Takes the rows and their attachments out again and puts the suggestions
-   *  back as they were; a trip created for them goes too, and with it the
-   *  screen. */
-  const undoInbox = useCallback(
-    async (added: InboxUndo) => {
-      // By id: the offer is made as the screen opens, before the attachments
-      // have been read, and its undo is the closure made then.
-      await removeAttachments(added.attachmentIds);
-      for (const id of added.itemIds) await removeItem(id);
-      for (const row of added.staged) await restage(inboxRowInput(row));
-      if (added.tripCreated) {
-        await removeTrip(added.tripId);
-        leave(appPath('viajes'));
-      }
-    },
-    [removeAttachments, removeItem, restage, removeTrip, leave],
-  );
-
-  // What the review just put in arrives with the navigation and is offered
-  // for a moment; the navigation is then replaced without it, so coming
-  // back to the screen later does not offer it again. The staged files
-  // outlive the offer, so an undo finds the rows' PDFs where they were; once
-  // the offer is over any other way, they are let go of.
-  const arrived = inboxUndoOf(state);
-  useEffect(() => {
-    if (!arrived) return;
-    const offer: UndoOffer = {
-      message: arrived.label,
-      undo: () => undoInbox(arrived),
-      onEnd: (taken) => settleInboxUndo(arrived, taken, (ids) => void deleteInboxFiles(ids)),
-    };
-    inboxOffer.current = offer;
-    offerUndo(offer);
-    void navigate(pathname, { replace: true, state: null });
-  }, [arrived, undoInbox, navigate, pathname]);
-
-  // That undo needs this screen — it may take the trip, and the screen with
-  // it — so it does not follow the member out: leaving ends it.
-  useEffect(
-    () => () => {
-      if (inboxOffer.current) endUndo(inboxOffer.current);
-    },
-    [],
+  // What the review just put in is offered to be undone here; an undo that
+  // takes the trip created for it takes the screen too.
+  useInboxUndoArrival(
+    useCallback((undo: InboxUndo) => (undo.tripCreated ? appPath('viajes') : null), []),
   );
 
   /** A trip's rows have no meaning without it: the server cascades them, and
@@ -117,7 +68,7 @@ export default function TripPage() {
   async function removeWithRows(id: string) {
     for (const row of items) {
       for (const file of attachments) {
-        if (file.owner_kind === 'trip_item' && file.owner_id === row.id) {
+        if (TRIP_ROW_FILE_KINDS.includes(file.owner_kind) && file.owner_id === row.id) {
           await removeAttachment(file);
         }
       }

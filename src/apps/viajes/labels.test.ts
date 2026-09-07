@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { Trip, TripItem, TripKind } from '../../lib/offline/specs';
-import { itemSubtitle, tripSubtitle } from './labels';
+import {
+  boardingPassAddedLabel,
+  boardingPassDueLabel,
+  boardingPassSubtitle,
+  inboxSubtitle,
+  itemSubtitle,
+  tripSubtitle,
+} from './labels';
 
 const TODAY = '2026-09-01';
 
@@ -100,5 +107,26 @@ describe('tripSubtitle', () => {
   it('says only what is pending while the trip has no dates', () => {
     expect(tripSubtitle(trip(null), 1, TODAY)).toBe('1 pendiente');
     expect(tripSubtitle(trip(null), 0, TODAY)).toBeUndefined();
+  });
+});
+
+describe('a boarding pass', () => {
+  it('reads as what it is, then as its flight would', () => {
+    const pass = item('ticket', {
+      from_code: 'AEP',
+      to_code: 'BRC',
+      on_date: '2026-09-12',
+      at_time: '08:40',
+    });
+    expect(boardingPassSubtitle(pass, TODAY)).toBe('boarding pass · AEP → BRC · sáb 12 sept, 8:40');
+    expect(boardingPassSubtitle(item('ticket'), TODAY)).toBe('boarding pass');
+  });
+
+  it('is asked for by name on the home screen, and counted in a word that does not change', () => {
+    expect(boardingPassDueLabel('AR 1420 · ida')).toBe('boarding pass · AR 1420 · ida');
+    expect(inboxSubtitle(2, '2026-09-01T12:00:00Z', TODAY, true)).toContain('2 boarding pass ·');
+    expect(inboxSubtitle(2, '2026-09-01T12:00:00Z', TODAY)).toContain('2 ítems ·');
+    expect(boardingPassAddedLabel(1)).toBe('Se agregó 1 boarding pass');
+    expect(boardingPassAddedLabel(2)).toBe('Se agregaron 2 boarding pass');
   });
 });

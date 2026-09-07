@@ -1,7 +1,7 @@
 import type { TripInboxItem } from '../../lib/offline/specs';
 import EntryMarks from '../../components/EntryMarks';
-import { TRIP_KIND_SHAPES } from './kinds';
-import { itemSubtitle } from './labels';
+import { BOARDING_PASS_ICON, TRIP_KIND_SHAPES } from './kinds';
+import { inboxItemSubtitle } from './labels';
 import { tripInboxMarks } from './marks';
 
 interface InboxItemRowProps {
@@ -10,12 +10,14 @@ interface InboxItemRowProps {
 }
 
 /** One suggestion, reading exactly as it would once in the trip — the same
- *  glyph, the same line under it — but going nowhere: a group is reviewed
+ *  glyph, the same line under it; a boarding pass under a glyph of its own,
+ *  since it is no row of a trip — but going nowhere: a group is reviewed
  *  whole, never a row of it on its own. What the email said about it is a
  *  third line, since there is no screen of its own to read it on. */
 export default function InboxItemRow({ item, today }: InboxItemRowProps) {
-  const { icon: Icon } = TRIP_KIND_SHAPES[item.kind];
-  const subtitle = itemSubtitle(item, today);
+  const Icon =
+    item.kind === 'boarding_pass' ? BOARDING_PASS_ICON : TRIP_KIND_SHAPES[item.kind].icon;
+  const subtitle = inboxItemSubtitle(item, today);
   return (
     <li className="flex items-center gap-2 border-b border-border py-3">
       <Icon size={18} stroke={1.5} className="shrink-0 text-muted" />

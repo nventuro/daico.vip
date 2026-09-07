@@ -5,6 +5,7 @@ const OFFER: InboxUndo = {
   label: 'Se agregó 1 ítem',
   tripCreated: false,
   tripId: 'v1',
+  itemId: null,
   itemIds: ['i1'],
   attachmentIds: ['a1'],
   staged: [],

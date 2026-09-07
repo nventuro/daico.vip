@@ -69,22 +69,16 @@ function db(): Promise<SQLocal> {
 }
 
 /**
- * Every table brought to the shape its spec declares. A table a client created
- * under an older spec can be a column short or a column over: a column the
- * spec has gained is added in place and one it has lost is dropped in place,
- * which keeps the rows and whatever is queued on them. Only a gained column
- * SQLite cannot add — one every row must have a value for — is settled by
- * emptying the table.
+ * Every table brought to the shape its spec declares, the local-only ones
+ * too. A table a client created under an older spec can be a column short or
+ * a column over: a column the spec has gained is added in place and one it
+ * has lost is dropped in place, which keeps the rows and whatever is queued
+ * on them. Only a gained column SQLite cannot add — one every row must have
+ * a value for — is settled by making the table again.
  */
 async function migrateTables(c: SQLocal): Promise<void> {
   for (const spec of ALL_SPECS) {
-    const columns = localColumns(spec);
-    const info = await c.sql<{ name: string }>(`PRAGMA table_info(${spec.table})`);
-    const present = new Set(info.map((col) => col.name));
-    const expected = new Set(columns.map(([name]) => name));
-    const missing = columns.filter(([name]) => !present.has(name));
-    const over = [...present].filter((name) => !expected.has(name));
-    if (missing.some(([, ddl]) => !addable(ddl))) {
+    await bringToShape(c, spec.table, localColumns(spec), async () => {
       // A queued edit cannot be carried over: a row stored without a column
       // the shape now requires has no value to give it, and the server would
       // not take it either. A queued deletion is carried over, because it is
@@ -98,15 +92,74 @@ async function migrateTables(c: SQLocal): Promise<void> {
       );
       await c.sql(`DROP TABLE IF EXISTS ${spec.table}`);
       await c.sql(createTableSql(spec));
-      continue;
-    }
-    for (const name of over) {
-      await c.sql(`ALTER TABLE ${spec.table} DROP COLUMN ${name}`);
-    }
-    for (const [name, ddl] of missing) {
-      await c.sql(`ALTER TABLE ${spec.table} ADD COLUMN ${name} ${ddl}`);
+    });
+  }
+  for (const spec of LOCAL_SPECS) {
+    // What a local table holds is fetched again or queued again; nothing of
+    // it is carried over.
+    await bringToShape(c, spec.table, ddlColumns(spec.ddl), async () => {
+      await c.sql(`DROP TABLE IF EXISTS ${spec.table}`);
+      await c.sql(spec.ddl);
+    });
+  }
+}
+
+/**
+ * Brings `table` to `columns` — each a name and its declaration — in place: a
+ * column it lacks is added, one it has over is dropped. When a column it
+ * lacks cannot be added, `remake` makes the table again instead.
+ */
+async function bringToShape(
+  c: SQLocal,
+  table: string,
+  columns: [string, string][],
+  remake: () => Promise<void>,
+): Promise<void> {
+  const info = await c.sql<{ name: string }>(`PRAGMA table_info(${table})`);
+  const present = new Set(info.map((col) => col.name));
+  const expected = new Set(columns.map(([name]) => name));
+  const missing = columns.filter(([name]) => !present.has(name));
+  const over = [...present].filter((name) => !expected.has(name));
+  if (missing.some(([, ddl]) => !addable(ddl))) {
+    await remake();
+    return;
+  }
+  for (const name of over) {
+    await c.sql(`ALTER TABLE ${table} DROP COLUMN ${name}`);
+  }
+  for (const [name, ddl] of missing) {
+    await c.sql(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
+  }
+}
+
+/**
+ * The columns a CREATE TABLE declares, each with its declaration: every entry
+ * of the parenthesised body that names a column, in order; an entry that is a
+ * table constraint (a composite primary key) is not one.
+ */
+function ddlColumns(ddl: string): [string, string][] {
+  const body = ddl.slice(ddl.indexOf('(') + 1, ddl.lastIndexOf(')'));
+  const entries: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of body) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (char === ',' && depth === 0) {
+      entries.push(current);
+      current = '';
+    } else {
+      current += char;
     }
   }
+  entries.push(current);
+  return entries
+    .map((entry) => entry.trim().replace(/\s+/g, ' '))
+    .filter((entry) => entry !== '' && !/^(PRIMARY KEY|UNIQUE|CHECK|FOREIGN KEY)\b/i.test(entry))
+    .map((entry) => {
+      const space = entry.indexOf(' ');
+      return [entry.slice(0, space), entry.slice(space + 1)];
+    });
 }
 
 /** Whether SQLite takes this column on a table that already exists: it refuses

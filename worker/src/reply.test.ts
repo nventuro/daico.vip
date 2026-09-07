@@ -34,19 +34,28 @@ describe('successBody', () => {
     );
   });
 
-  it('says how many PDFs were kept, and nothing when none were', () => {
+  it('says how many files were kept, and nothing when none were', () => {
     expect(successBody('Bariloche', countsOf(['ticket', 'ticket']), 1)).toBe(
-      'Encontré 2 ítems para «Bariloche»: 2 pasajes, con 1 PDF.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
+      'Encontré 2 ítems para «Bariloche»: 2 pasajes, con 1 archivo.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
     );
     expect(successBody('Bariloche', countsOf(['ticket', 'lodging']), 2)).toContain(
-      ': un pasaje y un alojamiento, con 2 PDF.',
+      ': un pasaje y un alojamiento, con 2 archivos.',
     );
-    expect(successBody('Bariloche', countsOf(['ticket']), 0)).not.toContain('PDF');
+    expect(successBody('Bariloche', countsOf(['ticket']), 0)).not.toContain('archivo');
+  });
+
+  it('counts a boarding pass in a word that does not change', () => {
+    expect(successBody('Bariloche', countsOf(['boarding_pass']), 2)).toContain(
+      ': un boarding pass, con 2 archivos.',
+    );
+    expect(successBody('Bariloche', countsOf(['boarding_pass', 'boarding_pass']), 2)).toContain(
+      ': 2 boarding pass, con 2 archivos.',
+    );
   });
 
   it('says how many attachments were left out, when any were', () => {
     expect(successBody('Bariloche', countsOf(['ticket']), 1, 1)).toContain(
-      '\nDejé afuera un adjunto que no era un PDF o era demasiado grande.',
+      '\nDejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.',
     );
     expect(successBody('Bariloche', countsOf(['ticket']), 1, 3)).toContain(
       'Dejé afuera 3 adjuntos',
@@ -76,6 +85,12 @@ describe('failureBody', () => {
   it("carries the model's words, opened again if it closed them", () => {
     expect(failureBody('Es un recibo, no una confirmación.')).toBe(
       `Es un recibo, no una confirmación, así que no guardé nada.\n${second}`,
+    );
+  });
+
+  it('gives other advice than forwarding again when the problem calls for it', () => {
+    expect(failureBody('El correo mezcla cosas', 'Reenviá cada cosa por separado.')).toBe(
+      'El correo mezcla cosas, así que no guardé nada.\nReenviá cada cosa por separado.',
     );
   });
 });

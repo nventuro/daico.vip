@@ -5,7 +5,10 @@
 // the app's over the engine's local query API.
 // =============================================================================
 
-/** A local-only table: its name, and the whole CREATE TABLE that makes it. */
+/** A local-only table: its name, and the whole CREATE TABLE that makes it. A
+ *  table a device already has is brought to this shape column by column, so
+ *  a column gained here must be one SQLite can add to a table that exists:
+ *  nullable, or with a default. */
 export interface LocalTableSpec {
   table: string;
   ddl: string;
@@ -46,10 +49,11 @@ export const ATTACHMENT_FILES: LocalTableSpec = {
 };
 
 /**
- * The sealed PDFs waiting with the rows of an email, fetched whole after a
+ * The sealed files waiting with the rows of an email, fetched whole after a
  * sync so a group is confirmed with no connection, and dropped once no staged
  * row lists them. Kept sealed as they came: nothing here is ever opened, only
- * re-keyed at confirm into an attachment file.
+ * re-keyed at confirm into an attachment file. `mime` says what a file is
+ * under the seal, a PDF or a picture, for the attachment it becomes.
  */
 export const INBOX_FILES: LocalTableSpec = {
   table: 'inbox_files',
@@ -60,7 +64,8 @@ export const INBOX_FILES: LocalTableSpec = {
     size INTEGER NOT NULL,
     data BLOB NOT NULL,
     wrapped_key TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    mime TEXT NOT NULL DEFAULT 'application/pdf'
   )`,
 };
 

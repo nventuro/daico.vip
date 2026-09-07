@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CHORES_SPEC, DATES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
+import { INBOX_FILES } from './localTables';
 import { localDb, seedSql } from './testing/sqlocalInMemory';
 import * as engine from './engine';
 
@@ -53,6 +54,18 @@ seedSql.push(
     (id, name, checked, position, quantity, created_at, updated_at, pending_op, synced)
     VALUES ('old', 'Pan', 0, 'a0', '1 kg', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 1),
            ('queued', 'Leche', 1, 'a1', '2 l', '2026-01-01T00:00:00.000Z', '2026-01-03T00:00:00.000Z', 'upsert', 1)`,
+  // A local-only table before it gained `mime`, with a staged file in it.
+  `CREATE TABLE inbox_files (
+    id TEXT PRIMARY KEY,
+    import_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    data BLOB NOT NULL,
+    wrapped_key TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `INSERT INTO inbox_files (id, import_id, name, size, data, wrapped_key, created_at)
+    VALUES ('f1', 'e1', 'pasajes', 3, X'010203', 'k', '2026-01-01T00:00:00.000Z')`,
 );
 
 /** The table's columns, in the order they are declared. */
@@ -149,6 +162,23 @@ describe('table migration', () => {
     expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual(['gone']);
     await engine.markDeleted(DATES_SPEC, 'gone');
     expect(await engine.getPendingDeletes(DATES_SPEC)).toEqual([]);
+  });
+
+  it('adds the column a local-only table gained, keeping what it held', async () => {
+    await engine.listVisible(CHORES_SPEC);
+    expect(await columnsOf(INBOX_FILES.table)).toEqual([
+      'id',
+      'import_id',
+      'name',
+      'size',
+      'data',
+      'wrapped_key',
+      'created_at',
+      'mime',
+    ]);
+    expect(await rowsOf(INBOX_FILES.table)).toMatchObject([
+      { id: 'f1', name: 'pasajes', mime: 'application/pdf' },
+    ]);
   });
 
   it('drops a column the spec no longer has and keeps the rows, queued edits included', async () => {

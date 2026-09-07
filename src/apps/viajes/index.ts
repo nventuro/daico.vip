@@ -26,8 +26,9 @@ const viajes: AppModule = {
   // one.
   routes: [
     { index: true, Component: TripsPage },
-    // One email's suggestions, reviewed as a group.
-    { path: 'inbox/:importId', Component: InboxReviewPage },
+    // One email's suggestions — or one flight's boarding pass — reviewed as
+    // a group.
+    { path: 'inbox/:groupKey', Component: InboxReviewPage },
     { path: ':tripId', Component: TripPage },
     // A trip is written on its own page; `editar` leads there.
     { path: ':tripId/editar', Component: EditRedirect },
@@ -36,7 +37,7 @@ const viajes: AppModule = {
   ],
   useUpcoming: useTripsUpcoming,
   search: searchTrips,
-  // The PDFs an email brought wait beside its staged rows, sealed; every
+  // The files an email brought wait beside its staged rows, sealed; every
   // device keeps them so a group is confirmed with no connection.
   afterSync: syncInboxFiles,
 };

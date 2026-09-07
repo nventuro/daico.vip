@@ -67,7 +67,7 @@ export default function TripsPage() {
           <SectionLabel>Inbox</SectionLabel>
           <ul>
             {groups.map((group) => (
-              <InboxRow key={group.importId} group={group} today={today} />
+              <InboxRow key={group.key} group={group} today={today} />
             ))}
           </ul>
         </section>

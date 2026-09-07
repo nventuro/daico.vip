@@ -12,14 +12,15 @@ const VIAJES_URL = 'https://daico.vip/viajes';
  *  is refused by the platform, and the member hears nothing. */
 const SUBJECT_MAX_CHARS = 200;
 
-const TRY_FORWARDING_AGAIN =
+/** What to do about an email nothing came of, unless something else is. */
+export const TRY_FORWARDING_AGAIN =
   'Si era una confirmación de verdad, probá reenviarla de nuevo tal cual llegó.';
 
 export type KindCounts = Record<InboxKind, number>;
 
 /** How many of each class a list of rows holds. */
 export function countsOf(kinds: InboxKind[]): KindCounts {
-  const counts: KindCounts = { ticket: 0, lodging: 0, booking: 0 };
+  const counts: KindCounts = { ticket: 0, lodging: 0, booking: 0, boarding_pass: 0 };
   for (const kind of kinds) counts[kind] += 1;
   return counts;
 }
@@ -28,6 +29,8 @@ const KIND_WORDS: Record<InboxKind, { one: string; many: string }> = {
   ticket: { one: 'un pasaje', many: 'pasajes' },
   lodging: { one: 'un alojamiento', many: 'alojamientos' },
   booking: { one: 'una reserva', many: 'reservas' },
+  // The word does not change in number.
+  boarding_pass: { one: 'un boarding pass', many: 'boarding pass' },
 };
 
 function phrase(kind: InboxKind, count: number): string {
@@ -40,7 +43,7 @@ function listed(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
 }
 
-/** The lines of a successful reply: what was found, with how many PDFs were
+/** The lines of a successful reply: what was found, with how many files were
  *  kept with it when any were, where it went, and how many attachments were
  *  left out when any were. */
 export function successBody(
@@ -53,15 +56,15 @@ export function successBody(
   const parts = INBOX_KINDS.filter((kind) => counts[kind] > 0).map((kind) =>
     phrase(kind, counts[kind]),
   );
-  const kept = files > 0 ? `, con ${files} PDF` : '';
+  const kept = files === 0 ? '' : files === 1 ? ', con 1 archivo' : `, con ${files} archivos`;
   return [
     `Encontré ${total} ${total === 1 ? 'ítem' : 'ítems'} para «${tripTitle}»: ${listed(parts)}${kept}.`,
     `Quedaron para revisar en Viajes: ${VIAJES_URL}`,
     ...(skipped > 0
       ? [
           skipped === 1
-            ? 'Dejé afuera un adjunto que no era un PDF o era demasiado grande.'
-            : `Dejé afuera ${skipped} adjuntos que no eran PDF o eran demasiado grandes.`,
+            ? 'Dejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.'
+            : `Dejé afuera ${skipped} adjuntos que no eran PDF ni imágenes, o eran demasiado grandes.`,
         ]
       : []),
   ].join('\n');
@@ -78,11 +81,12 @@ export function alreadyStagedBody(): string {
 
 /** The two lines of a reply when the email was read and nothing came of it:
  *  what was wrong with it (the model's words, or the generic line), and what
- *  to try. A sentence the model closed with a period is opened again, since
- *  the line goes on. */
-export function failureBody(problem: string | null): string {
+ *  to do — to forward it again, unless the problem calls for something else.
+ *  A sentence the model closed with a period is opened again, since the
+ *  line goes on. */
+export function failureBody(problem: string | null, advice = TRY_FORWARDING_AGAIN): string {
   const said = problem?.trim().replace(/\.$/, '') || NO_BOOKINGS_FOUND;
-  return [`${said}, así que no guardé nada.`, TRY_FORWARDING_AGAIN].join('\n');
+  return [`${said}, así que no guardé nada.`, advice].join('\n');
 }
 
 /** The two lines of a reply when the email was never really read — the

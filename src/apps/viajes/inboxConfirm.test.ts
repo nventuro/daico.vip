@@ -5,6 +5,7 @@ import { CREATE_TRIP_CHOICE } from './grouping';
 import type { AttachmentSource } from '../../hooks/useAttachments';
 import type { AttachmentOwner } from '../../types';
 import {
+  confirmBoardingPass,
   confirmInbox,
   discardInbox,
   groupFileIds,
@@ -36,7 +37,9 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
 }
 
 const GROUP: InboxGroup = {
+  key: 'e1',
   importId: 'e1',
+  boardingPass: false,
   tripTitle: 'Bariloche',
   emailSubject: 'Fwd: Tu vuelo',
   receivedAt: '2026-09-01T10:00:00Z',
@@ -88,7 +91,40 @@ function writes(): InboxWrites & {
   };
 }
 
+/** One flight's boarding pass, staged on its own, with the files it is. */
+const PASS: InboxGroup = {
+  key: 'p1',
+  importId: 'e2',
+  boardingPass: true,
+  tripTitle: 'Bariloche',
+  emailSubject: 'Tu boarding pass',
+  receivedAt: '2026-09-11T10:00:00Z',
+  items: [
+    staged('p1', {
+      import_id: 'e2',
+      kind: 'boarding_pass',
+      comments: 'Ana 14A · Bruno 14B',
+      file_ids: '["f1", "f2"]',
+    }),
+  ],
+};
+
+/** The two passes, opened. */
+const PASS_FILES = new Map([
+  ['f1', opened('ana')],
+  ['f2', opened('bruno')],
+]);
+
 describe('tripItemFrom', () => {
+  it('makes a boarding pass the pasaje it is for', () => {
+    const flight = tripItemFrom(PASS.items[0], 'v1');
+    expect(flight.kind).toBe('ticket');
+    expect(flight.title).toBe('AR 1420');
+    expect(flight.from_code).toBe('AEP');
+    expect(flight.at_time).toBe('08:40');
+    expect(flight.ends_at).toBe('11:05');
+  });
+
   it('keeps the capitals of a title, and only what its class carries', () => {
     const item = tripItemFrom(GROUP.items[1], 'v1');
     expect(item.title).toBe('Hotel Cormorán');
@@ -139,6 +175,7 @@ describe('confirmInbox', () => {
       label: 'Se agregaron 3 ítems',
       tripCreated: false,
       tripId: 'v1',
+      itemId: null,
       itemIds: ['i1', 'i2', 'i3'],
       attachmentIds: [],
       staged: GROUP.items,
@@ -233,6 +270,111 @@ describe('confirmInbox', () => {
     const w = writes();
     const undo = await confirmInbox({ ...GROUP, items: [GROUP.items[0]] }, 'v1', w);
     expect(undo?.label).toBe('Se agregó 1 ítem');
+  });
+});
+
+describe('confirmBoardingPass', () => {
+  it('puts every file on the chosen pasaje, under the boarding-pass kind, and clears the row', async () => {
+    const w = writes();
+    const undo = await confirmBoardingPass(
+      PASS,
+      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      w,
+      PASS_FILES,
+    );
+    expect(w.addItem).not.toHaveBeenCalled();
+    expect(w.addTrip).not.toHaveBeenCalled();
+    expect(vi.mocked(w.addAttachment).mock.calls.map(([owner]) => owner)).toEqual([
+      { kind: 'boarding_pass', id: 'i9' },
+      { kind: 'boarding_pass', id: 'i9' },
+    ]);
+    expect(w.attached).toEqual([
+      ['i9', 'ana'],
+      ['i9', 'bruno'],
+    ]);
+    expect(w.removed).toEqual(['p1']);
+    expect(undo).toEqual({
+      label: 'Se agregaron 2 boarding pass',
+      tripCreated: false,
+      tripId: 'v1',
+      itemId: 'i9',
+      itemIds: [],
+      attachmentIds: ['a1', 'a2'],
+      staged: PASS.items,
+      fileIds: ['f1', 'f2'],
+    });
+  });
+
+  it('makes the pasaje in the chosen trip first when there is none, and lands on it', async () => {
+    const w = writes();
+    const undo = await confirmBoardingPass(
+      PASS,
+      { kind: 'new-flight', tripId: 'v1' },
+      w,
+      PASS_FILES,
+    );
+    expect(vi.mocked(w.addItem).mock.calls[0][0]).toMatchObject({
+      kind: 'ticket',
+      title: 'AR 1420',
+      trip_id: 'v1',
+    });
+    expect(w.attached).toEqual([
+      ['i1', 'ana'],
+      ['i1', 'bruno'],
+    ]);
+    expect(undo).toMatchObject({ tripCreated: false, tripId: 'v1', itemId: 'i1', itemIds: ['i1'] });
+  });
+
+  it('makes the trip and the pasaje when there is neither', async () => {
+    const w = writes();
+    const undo = await confirmBoardingPass(PASS, { kind: 'new-trip' }, w, PASS_FILES);
+    expect(w.addTrip).toHaveBeenCalledWith({ title: 'Bariloche', starts_on: null, ends_on: null });
+    expect(vi.mocked(w.addItem).mock.calls[0][0].trip_id).toBe('v-new');
+    expect(undo).toMatchObject({
+      tripCreated: true,
+      tripId: 'v-new',
+      itemId: 'i1',
+      itemIds: ['i1'],
+    });
+    expect(w.removed).toEqual(['p1']);
+  });
+
+  it('leaves the row staged when a file is not here or could not be attached', async () => {
+    const short = writes();
+    const kept = await confirmBoardingPass(
+      PASS,
+      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      short,
+      new Map([['f1', opened('ana')]]),
+    );
+    expect(short.attached).toEqual([['i9', 'ana']]);
+    expect(short.removed).toEqual([]);
+    expect(kept).toMatchObject({ attachmentIds: ['a1'], staged: [], itemId: 'i9' });
+
+    const refused = writes();
+    vi.mocked(refused.addAttachment).mockResolvedValueOnce(undefined);
+    await confirmBoardingPass(
+      PASS,
+      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      refused,
+      PASS_FILES,
+    );
+    expect(refused.removed).toEqual([]);
+  });
+
+  it('writes nothing when the trip could not be created, and says one in the singular', async () => {
+    const w = writes();
+    vi.mocked(w.addTrip).mockResolvedValueOnce(undefined);
+    expect(await confirmBoardingPass(PASS, { kind: 'new-trip' }, w, PASS_FILES)).toBeUndefined();
+    expect(w.attached).toEqual([]);
+    const one = writes();
+    const undo = await confirmBoardingPass(
+      { ...PASS, items: [{ ...PASS.items[0], file_ids: '["f1"]' }] },
+      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      one,
+      PASS_FILES,
+    );
+    expect(undo?.label).toBe('Se agregó 1 boarding pass');
   });
 });
 

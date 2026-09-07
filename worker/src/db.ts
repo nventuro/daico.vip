@@ -50,13 +50,15 @@ export async function alreadyStaged(db: pg.Client, messageId: string): Promise<b
   return rows.length > 0;
 }
 
-/** A PDF as it is staged beside the rows it belongs to: sealed, under the
+/** A file as it is staged beside the rows it belongs to: sealed, under the
  *  id those rows name it by. */
 export interface InboxFile {
   id: string;
   /** What the attachment was called, extension off; '' when it had no name. */
   name: string;
-  /** Of the PDF itself, before sealing. */
+  /** What the file is under the seal: a PDF, or a picture's type. */
+  mime: string;
+  /** Of the file itself, before sealing. */
   size: number;
   /** Base64: the sealed bytes. */
   data: string;
@@ -64,7 +66,7 @@ export interface InboxFile {
   wrapped_key: string;
 }
 
-const FILE_COLUMNS = ['id', 'import_id', 'name', 'size', 'data', 'wrapped_key'] as const;
+const FILE_COLUMNS = ['id', 'import_id', 'name', 'mime', 'size', 'data', 'wrapped_key'] as const;
 
 const ROW_COLUMNS = [
   'id',
@@ -105,7 +107,7 @@ function insertStatement(
 
 /**
  * Stages one email under a shared `import_id`: the email's own record, its
- * sealed PDFs, then its rows, in one transaction, so an email is either
+ * sealed files, then its rows, in one transaction, so an email is either
  * wholly staged or not at all — never a row naming a file that is not there,
  * and never twice: a second delivery of the same Message-ID fails on the
  * record, as AlreadyStagedError. An email with no Message-ID has no record
@@ -137,6 +139,7 @@ export async function insertRows(
               file.id,
               importId,
               file.name,
+              file.mime,
               file.size,
               file.data,
               file.wrapped_key,
