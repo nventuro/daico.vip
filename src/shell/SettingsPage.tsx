@@ -11,12 +11,14 @@ import { useDeviceStatus, type DeviceStatus } from '../hooks/useDeviceStatus';
 import { useOnline } from '../hooks/useOnline';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { useUpdateWaiting } from '../hooks/useUpdateWaiting';
+import { useBackupRuns } from '../hooks/useBackupRuns';
 import { applyUpdate } from '../lib/appUpdate';
 import { askToPersist, freeSpace } from '../lib/deviceStorage';
 import { syncAll } from '../lib/offline/sync';
 import { dayOf, relativeDayTime, todayIso } from '../utils/dateUtils';
 import { formatBytes } from '../utils/textUtils';
 import { useAppContext } from './appContext';
+import { STAGE_WORDS, backupTrouble, latestRun, latestRunWhere } from './backups';
 import StorageBar from './StorageBar';
 
 function plural(count: number, one: string, many: string): string {
@@ -40,6 +42,7 @@ export default function SettingsPage() {
   const online = useOnline();
   const updateWaiting = useUpdateWaiting();
   const { signOut } = useAppContext();
+  const { runs } = useBackupRuns();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -68,6 +71,12 @@ export default function SettingsPage() {
   const stale = completedAt === null || dayOf(completedAt) !== todayIso();
   const kept = storage.database + storage.files + storage.guideImages;
   const losing = unsavedWork(status);
+  // The nightly copy, as this device knows it: the last one that went well,
+  // the last one that did not, and whether either is a reason to look.
+  const lastCopy = latestRunWhere(runs, true);
+  const lastFailure = latestRunWhere(runs, false);
+  const copyTrouble = backupTrouble(runs, completedAt);
+  const failedSince = lastFailure !== null && latestRun(runs) === lastFailure;
 
   return (
     <div className="flex flex-col gap-7">
@@ -120,6 +129,38 @@ export default function SettingsPage() {
             Sincronizar ahora
           </Button>
         </div>
+      </section>
+
+      <section>
+        <SectionLabel>Copia de seguridad</SectionLabel>
+        <ul>
+          <ValueRow
+            label="Última copia"
+            value={lastCopy === null ? 'Nunca' : relativeDayTime(todayIso(), lastCopy.finished_at)}
+            bad={copyTrouble}
+            note={
+              lastCopy === null
+                ? undefined
+                : copyTrouble && !failedSince
+                  ? 'Ninguna desde entonces.'
+                  : `${formatBytes(lastCopy.bytes_sent)} · ${plural(lastCopy.objects_copied, 'archivo nuevo', 'archivos nuevos')}`
+            }
+          />
+          <ValueRow
+            label="Última falla"
+            value={
+              lastFailure === null ? 'Nunca' : relativeDayTime(todayIso(), lastFailure.finished_at)
+            }
+            bad={failedSince}
+            note={
+              lastFailure === null ? undefined : `Se detuvo en ${STAGE_WORDS[lastFailure.stage]}.`
+            }
+          />
+          <ValueRow
+            label="Archivos guardados"
+            value={lastCopy === null ? '—' : lastCopy.objects_total}
+          />
+        </ul>
       </section>
 
       <section>

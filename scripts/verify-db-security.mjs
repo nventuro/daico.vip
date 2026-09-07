@@ -58,6 +58,9 @@ const TABLE_PRIVILEGES = {
   // The record of every deletion, written and read by the triggers on the
   // app's behalf; the app itself only ever reads it.
   deleted_rows: ['select'],
+  // How each nightly backup went, written by the job through its function
+  // and only ever read here.
+  backup_runs: ['select'],
 };
 
 // The email worker's role: what the pipeline that stages trip suggestions may
@@ -131,10 +134,80 @@ const BEFORE_USER_CREATED_BODY = `
     ))
   end
 `;
+
+// The nightly backup's three: what its role may do, and all it may do. The
+// first two read — any public table, the two auth tables a restore needs,
+// the migrations list; a digest over a table's ids and stamps — and the
+// third writes the one thing the job may write, the record of its own run,
+// and keeps that table to ninety days.
+const READER_ROLE = 'backup_reader';
+const BACKUP_ROWS_BODY = `
+begin
+  if not (
+    (schema_name = 'public' and exists (
+      select 1
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = table_name and c.relkind in ('r', 'p')))
+    or (schema_name, table_name) in (
+      ('auth', 'users'), ('auth', 'identities'), ('supabase_migrations', 'schema_migrations'))
+  ) then
+    raise exception 'not a backed-up table: %.%', schema_name, table_name;
+  end if;
+  return query execute format('select to_jsonb(t) from %I.%I t', schema_name, table_name);
+end
+`;
+const BACKUP_DIGEST_BODY = `
+declare
+  digest text;
+begin
+  if schema_name <> 'public' then
+    raise exception 'not a backed-up table: %.%', schema_name, table_name;
+  end if;
+  execute format(
+    'select md5(coalesce(string_agg(id::text || %L || updated_at::text, %L order by id), %L)) from %I.%I',
+    ':', ',', '', schema_name, table_name)
+  into digest;
+  return digest;
+end
+`;
+const RECORD_BACKUP_BODY = `
+  insert into public.backup_runs
+    (id, started_at, finished_at, ok, stage, rows_read, objects_copied, objects_total, bytes_sent,
+     created_at, updated_at)
+  select gen_random_uuid(), r.started_at, r.finished_at, r.ok, coalesce(r.stage, ''),
+         coalesce(r.rows_read, 0), coalesce(r.objects_copied, 0), coalesce(r.objects_total, 0),
+         coalesce(r.bytes_sent, 0), now(), now()
+  from jsonb_populate_record(null::public.backup_runs, run) r;
+  delete from public.backup_runs where finished_at < now() - interval '90 days';
+`;
+
+// Every function pinned to its migration's text, with the volatility it was
+// declared with: 's' stable, 'v' volatile.
 const PINNED_FUNCTIONS = [
-  { name: 'is_member', body: IS_MEMBER_BODY },
-  { name: 'before_user_created', body: BEFORE_USER_CREATED_BODY },
+  { name: 'is_member', body: IS_MEMBER_BODY, volatility: 's' },
+  { name: 'before_user_created', body: BEFORE_USER_CREATED_BODY, volatility: 's' },
+  { name: 'backup_rows', body: BACKUP_ROWS_BODY, volatility: 's' },
+  { name: 'backup_digest', body: BACKUP_DIGEST_BODY, volatility: 's' },
+  { name: 'record_backup', body: RECORD_BACKUP_BODY, volatility: 'v' },
 ];
+
+// The functions in private that one outside role, and only it, may call: the
+// auth server's hook and the backup job's three. Any other role holding
+// execute on one could ask it what the role is trusted to ask.
+const PRIVATE_CALLERS = [
+  ['before_user_created', HOOK_ROLE],
+  ['backup_rows', READER_ROLE],
+  ['backup_digest', READER_ROLE],
+  ['record_backup', READER_ROLE],
+];
+
+// The roles that log in from outside with a credential of their own — the
+// email worker's and the backup job's — and must be able to do nothing but
+// what they are granted: no RLS bypass, no capability flags, no membership
+// in any role (membership in e.g. authenticated would OR the member policies
+// in).
+const SERVICE_ROLES = [WRITER_ROLE, READER_ROLE];
 const collapsed = (sql) => sql.replace(/\s+/g, ' ').trim().replace(/'/g, "''");
 
 // The triggers a table may carry, and nothing else: the last-write-wins guard
@@ -285,12 +358,11 @@ const CHECKS = [
                               and g.table_name = e.table_name
                               and g.privilege_type = e.privilege_type)`,
   },
-  {
-    // The narrow grants only mean something if the role cannot step around
-    // them: no RLS bypass, no capability flags, no membership in any role
-    // (membership in e.g. authenticated would OR the member policies in).
-    name: `${WRITER_ROLE} can log in and nothing more`,
-    sql: `select '${WRITER_ROLE}: ' || attr as violation
+  // The narrow grants only mean something if the role cannot step around
+  // them.
+  ...SERVICE_ROLES.map((role) => ({
+    name: `${role} can log in and nothing more`,
+    sql: `select '${role}: ' || attr as violation
           from pg_roles r,
                lateral (values ('superuser', r.rolsuper),
                                ('createdb', r.rolcreatedb),
@@ -298,17 +370,17 @@ const CHECKS = [
                                ('bypassrls', r.rolbypassrls),
                                ('replication', r.rolreplication),
                                ('cannot log in', not r.rolcanlogin)) as flags(attr, held)
-          where r.rolname = '${WRITER_ROLE}' and held
+          where r.rolname = '${role}' and held
           union all
-          select '${WRITER_ROLE}: member of ' || g.rolname as violation
+          select '${role}: member of ' || g.rolname as violation
           from pg_auth_members m
           join pg_roles r on r.oid = m.member
           join pg_roles g on g.oid = m.roleid
-          where r.rolname = '${WRITER_ROLE}'
+          where r.rolname = '${role}'
           union all
-          select '${WRITER_ROLE}: role does not exist' as violation
-          where not exists (select 1 from pg_roles where rolname = '${WRITER_ROLE}')`,
-  },
+          select '${role}: role does not exist' as violation
+          where not exists (select 1 from pg_roles where rolname = '${role}')`,
+  })),
   {
     name: 'no SECURITY DEFINER function lives in the public schema',
     sql: `select p.proname as violation
@@ -404,46 +476,57 @@ const CHECKS = [
               and i.indexname = t.index_name
               and i.indexdef like 'CREATE UNIQUE INDEX %((true))')`,
   },
-  ...PINNED_FUNCTIONS.map(({ name, body }) => ({
+  ...PINNED_FUNCTIONS.map(({ name, body, volatility }) => ({
     name: `private.${name}() reads exactly as its migration wrote it`,
     sql: `select 'private.${name}(): ' || case
                  when p.oid is null then 'missing'
                  when not p.prosecdef then 'not security definer'
-                 when p.provolatile <> 's' then 'not stable'
+                 when p.provolatile <> '${volatility}' then 'volatility differs'
                  else 'body differs'
                end as violation
           from (select 1) as one
           left join (pg_proc p join pg_namespace n on n.oid = p.pronamespace)
             on n.nspname = 'private' and p.proname = '${name}'
-          where p.oid is null or not p.prosecdef or p.provolatile <> 's'
+          where p.oid is null or not p.prosecdef or p.provolatile <> '${volatility}'
              or regexp_replace(btrim(p.prosrc, E' \\n\\t'), '\\s+', ' ', 'g') <> '${collapsed(body)}'`,
   })),
-  {
-    // The auth server's role is the hook's only caller: any other holding
-    // execute could ask it which emails are members'. A null ACL is the
-    // default a create leaves behind, execute for everyone.
-    name: `private.before_user_created() is callable by ${HOOK_ROLE}, who can see into private, and by nobody else`,
-    sql: `select 'private.before_user_created(): '
+  // A null ACL is the default a create leaves behind: execute for everyone.
+  ...PRIVATE_CALLERS.map(([fn, role]) => ({
+    name: `private.${fn}() is callable by ${role}, who can see into private, and by nobody else`,
+    sql: `select 'private.${fn}(): '
                  || case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end
                  || ' holds execute' as violation
           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
           cross join lateral aclexplode(p.proacl) a
-          where n.nspname = 'private' and p.proname = 'before_user_created'
-            and a.grantee <> '${HOOK_ROLE}'::regrole and a.grantee <> p.proowner
+          where n.nspname = 'private' and p.proname = '${fn}'
+            and a.grantee not in (select oid from pg_roles where rolname = '${role}')
+            and a.grantee <> p.proowner
           union all
-          select 'private.before_user_created(): ' || case
+          select 'private.${fn}(): ' || case
                    when p.oid is null then 'missing'
                    when p.proacl is null then 'callable by everyone'
-                   else '${HOOK_ROLE} cannot call it'
+                   else '${role} cannot call it'
                  end as violation
           from (select 1) as one
           left join (pg_proc p join pg_namespace n on n.oid = p.pronamespace)
-            on n.nspname = 'private' and p.proname = 'before_user_created'
+            on n.nspname = 'private' and p.proname = '${fn}'
           where p.oid is null or p.proacl is null
-             or not has_function_privilege('${HOOK_ROLE}', p.oid, 'EXECUTE')
+             or not (case when exists (select 1 from pg_roles where rolname = '${role}')
+                          then has_function_privilege('${role}', p.oid, 'EXECUTE')
+                          else false end)
           union all
-          select '${HOOK_ROLE} cannot see into private' as violation
-          where not has_schema_privilege('${HOOK_ROLE}', 'private', 'USAGE')`,
+          select '${role} cannot see into private' as violation
+          where not (case when exists (select 1 from pg_roles where rolname = '${role}')
+                          then has_schema_privilege('${role}', 'private', 'USAGE')
+                          else false end)`,
+  })),
+  {
+    // The job reads through its functions and nothing else: a privilege on a
+    // table would be a second way in that no check above pins.
+    name: `${READER_ROLE} holds no privilege on any table`,
+    sql: `select table_schema || '.' || table_name || ' [' || privilege_type || ']' as violation
+          from information_schema.role_table_grants
+          where grantee = '${READER_ROLE}'`,
   },
   {
     // The files live in R2, behind the files worker; nothing of the

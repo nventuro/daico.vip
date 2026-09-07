@@ -13,6 +13,7 @@ import NoAccessScreen from './NoAccessScreen';
 import UnlockScreen from './UnlockScreen';
 import FirstSyncScreen from './FirstSyncScreen';
 import InboxKeySetup from './InboxKeySetup';
+import BackupMark from './BackupMark';
 
 // Rarely shown (only a second tab hits it), so it's kept out of the main bundle.
 const TabConflictScreen = lazy(() => import('./TabConflictScreen'));
@@ -80,13 +81,16 @@ export default function MainLayout() {
               tone="band"
               className="px-2 py-1"
             />
-            <IconButton
-              label="Ajustes"
-              icon={IconSettings}
-              to="/ajustes"
-              tone="band"
-              className="px-2 py-1"
-            />
+            <span className="relative flex">
+              <IconButton
+                label="Ajustes"
+                icon={IconSettings}
+                to="/ajustes"
+                tone="band"
+                className="px-2 py-1"
+              />
+              <BackupMark />
+            </span>
           </div>
         </div>
       </header>

@@ -39,14 +39,17 @@ export function connectionString() {
   return url.toString();
 }
 
+/** The TLS side of any connection to the project's database: the server's
+ *  certificate verified against Supabase's own root, and nothing else
+ *  accepted. */
+export function tlsOptions() {
+  return {
+    ca: fs.readFileSync(path.join(root, 'supabase/ca.crt'), 'utf8'),
+    rejectUnauthorized: true,
+  };
+}
+
 /** Everything `new Client(...)` needs to reach the project's database. */
 export function clientOptions(extra = {}) {
-  return {
-    connectionString: connectionString(),
-    ssl: {
-      ca: fs.readFileSync(path.join(root, 'supabase/ca.crt'), 'utf8'),
-      rejectUnauthorized: true,
-    },
-    ...extra,
-  };
+  return { connectionString: connectionString(), ssl: tlsOptions(), ...extra };
 }

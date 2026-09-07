@@ -256,6 +256,35 @@ is confirmed with no connection; confirming makes the rows a trip's and the
 PDFs their attachments — each opened with the inbox key and sealed again for
 the attachment it becomes — and discarding drops both.
 
+## Backups
+
+Every night a job on GitHub Actions (`.github/workflows/backup.yml`, running
+`scripts/backup.mjs`) copies everything the household keeps to a Backblaze B2
+bucket nothing else can delete from: every table in one consistent snapshot,
+the two auth tables a restore needs and the applied migrations, sealed with
+[age](https://age-encryption.org) to a key whose private half the job never
+has; the guide tables once per import, under a digest; and every attachment
+file, as it is, once. It connects as `backup_reader`, a role that can call
+three functions and nothing else, reads the R2 bucket with a read-only token,
+and writes to B2 with a key that cannot delete. When it ends it writes a row
+of `backup_runs`, which Ajustes shows under «Copia de seguridad»; the gear in
+the header carries a mark when the last run failed or none has come for two
+days.
+
+The bucket's layout: `daily/<stamp>.age`, one a night, pruned by a lifecycle
+rule on the bucket; `monthly/<stamp>.age`, the month's first run, kept;
+`guides/<digest>.age`, kept; `objects/<id>`, kept.
+
+- `npm run backup:check [-- <stamp>]` fetches a night with the read key in
+  `.env`, opens it with the identity typed at the prompt, verifies every count
+  and hash, and compares the objects held with the night's attachment rows.
+- `npm run backup:restore [-- <stamp>]` loads a night into the linked
+  project, which must be empty and have the same migrations applied, and
+  copies the objects into its attachments bucket. Trying one is a scratch
+  project: linked, pushed, restored, then signed into from a phone.
+
+Setting it up is step 6 of the first-time setup.
+
 ## Importing guides
 
 ```
@@ -378,3 +407,25 @@ household's address with the action «Send to a Worker» → `trips-inbox`.
 `npm run worker:tail` follows the log; the first real forward is the test.
 Rotating the role's password is `npm run worker:hyperdrive` again, and every
 change to the worker is `npm run worker:deploy` again.
+
+### 6. Backups
+
+1. Backblaze: a private bucket with «keep all versions», a lifecycle rule on
+   the `daily/` prefix (hide after 35 days, delete a day after), and two
+   application keys restricted to that bucket — one with `listFiles` and
+   `writeFiles` for the job, one that may read for this machine.
+2. R2 → Manage API tokens: one with _Object Read only_ on the attachments
+   bucket for the job, one with read and write for a restore. The S3 endpoint
+   is `https://<account id>.r2.cloudflarestorage.com`.
+3. `npm run db:push`, then `npm run backup:reader`, which sets the role's
+   password and prints its connection string once.
+4. `npm run backup:key`: the recipient into GitHub, the identity into a note
+   in Notas.
+5. GitHub → Settings → Environments → `backup`, restricted to `main`, with
+   the secrets `BACKUP_DATABASE_URL`, `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY`, `B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` and the
+   variables `BACKUP_AGE_RECIPIENT`, `R2_ENDPOINT`, `B2_ENDPOINT`,
+   `B2_BUCKET`. Then Actions → Backup → Run workflow, and Ajustes after the
+   next sync.
+6. `.env` gets the read key and the read-write token, as `.env.example`
+   lists them, for `backup:check` and `backup:restore`.

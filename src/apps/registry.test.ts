@@ -47,6 +47,7 @@ describe('apps registry', () => {
       'household_key',
       'inbox_key',
       'attachments',
+      'backup_runs',
       'chores',
       'shopping_items',
       'dates',

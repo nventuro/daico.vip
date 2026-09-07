@@ -717,7 +717,50 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
 
 /** Tables no single app owns — the shell's own, and the ones several apps
  *  share — synced before any app's. */
-export const SHELL_SPECS: TableSpec[] = [HOUSEHOLD_KEY_SPEC, INBOX_KEY_SPEC, ATTACHMENTS_SPEC];
+// ─── Backups ─────────────────────────────────────────────────────────────────
+
+/** Where a backup run that failed stopped: reading the tables, reading the
+ *  guides, sending the night's files, or copying the objects. Empty for a run
+ *  that ended well. */
+export const BACKUP_STAGES = ['', 'tables', 'guides', 'upload', 'objects'] as const;
+export type BackupStage = (typeof BACKUP_STAGES)[number];
+
+/** One run of the nightly backup, written by the job when it ends and only
+ *  ever read here: how it went and how much it moved, never what. */
+export interface BackupRun extends SyncedRow {
+  /** ISO timestamps. */
+  started_at: string;
+  finished_at: string;
+  ok: boolean;
+  stage: BackupStage;
+  rows_read: number;
+  /** Objects copied that night, and objects the source bucket held. */
+  objects_copied: number;
+  objects_total: number;
+  bytes_sent: number;
+}
+
+export const BACKUP_RUNS_SPEC: TableSpec<BackupRun> = {
+  table: 'backup_runs',
+  columns: {
+    started_at: { ddl: 'TEXT NOT NULL' },
+    finished_at: { ddl: 'TEXT NOT NULL' },
+    ok: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    stage: { ddl: "TEXT NOT NULL DEFAULT ''" },
+    rows_read: { ddl: 'INTEGER NOT NULL DEFAULT 0' },
+    objects_copied: { ddl: 'INTEGER NOT NULL DEFAULT 0' },
+    objects_total: { ddl: 'INTEGER NOT NULL DEFAULT 0' },
+    bytes_sent: { ddl: 'INTEGER NOT NULL DEFAULT 0' },
+  },
+  orderBy: 'finished_at DESC',
+};
+
+export const SHELL_SPECS: TableSpec[] = [
+  HOUSEHOLD_KEY_SPEC,
+  INBOX_KEY_SPEC,
+  ATTACHMENTS_SPEC,
+  BACKUP_RUNS_SPEC,
+];
 
 /** Every offline-synced table, in sync order. */
 export const ALL_SPECS: TableSpec[] = [

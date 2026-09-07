@@ -1,0 +1,47 @@
+name: Backup
+
+# The nightly copy of everything the household keeps (scripts/backup.mjs says
+# what and where). On the schedule and by hand only: a run holds secrets, and
+# a pull request or a push is not a reason to hold them.
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, and a late one waits rather than cancels: a copy half
+# written is worth finishing.
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+# Every action is pinned to the commit it was reviewed at, as in deploy.yml.
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The secrets live on this environment, restricted to main.
+    environment: backup
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: node scripts/backup.mjs
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          B2_ENDPOINT: ${{ vars.B2_ENDPOINT }}
+          B2_BUCKET: ${{ vars.B2_BUCKET }}
+          B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}

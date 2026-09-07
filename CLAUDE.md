@@ -211,9 +211,11 @@ gate, what a sync does with the files. These are the rules on top of it.
   and is a decision to write up, never a default; files are still never pulled
   wholesale and never put in `ALL_SPECS`.
 - **The bucket is R2, and the files worker (`worker/src/files.ts`) is the
-  only way in.** The bucket has no address of its own — never enable its
-  public development URL, never give it a domain — and the worker holds
-  nothing but its binding: no secret, no database. Every request carries the
+  app's only way in.** The bucket has no address of its own — never enable
+  its public development URL, never give it a domain — and the worker holds
+  nothing but its binding: no secret, no database. The bucket has exactly two
+  other credentials, both under «Backups» below: the read-only token the
+  nightly job holds, and the read-write one a restore uses from `.env`. Every request carries the
   session's token, and the worker asks the database's API, with that token,
   for a count of `members`, so `private.is_member()` still decides. It takes
   only `application/octet-stream`, no larger than `ATTACHMENT_MAX_BYTES` plus
@@ -231,6 +233,46 @@ gate, what a sync does with the files. These are the rules on top of it.
   files worker) and `worker/src/files.test.ts` (the worker over a bucket in
   memory). A change to the file format, the queue states, the sweep or the
   worker's gate must come with one.
+
+## Backups — read before touching them
+
+The README's «Backups» says what the nightly copy holds, where it lands and
+how it comes back. These are the rules on top of it.
+
+- **The job reads through `backup_reader` and its three functions, and holds
+  nothing else.** The role has no privilege on any table:
+  `private.backup_rows` hands back a public table, `auth.users`,
+  `auth.identities` or the migrations list; `private.backup_digest` a hash
+  over a table's ids and stamps; `private.record_backup` writes the run's row
+  in `backup_runs` and prunes that table to ninety days. `db:verify` pins the
+  three bodies, that the reader alone may call them, that it can log in and
+  nothing more, and that it holds no table privilege. Never grant the role a
+  table, never give the job the service key or the database password, and
+  never add a function it may call without pinning it there.
+- **`backup_runs` is the one table the app never writes**: `select` to
+  `authenticated`, in `SHELL_SPECS` since no app owns it, the last-write-wins
+  trigger and no delete pair. It carries counts, never content — a stage, row
+  and object counts, bytes. Ajustes and `BackupMark` read it through
+  `src/shell/backups.ts`, whose `backupTrouble` is the one place that decides
+  when the mark shows and the line turns red; a change to it comes with a
+  test in `backups.test.ts`.
+- **A night's files are sealed to the age recipient and opened only by the
+  identity**, which lives in a note in Notas and in nothing that runs: never
+  in `.env`, never in a secret, never printed by anything but `backup:key`,
+  once. Objects are copied as they are, ciphertext under the household key.
+- **The job prints counts and nothing else.** Its log is public. No row, no
+  email, no key, no object id; a failure is its stage and its message.
+- **The job never deletes.** Pruning is the bucket's lifecycle rule on
+  `daily/`; `objects/`, `guides/` and `monthly/` are kept. The B2 key it
+  holds lists and writes and cannot delete, and the R2 token it holds reads.
+- **The scripts share `scripts/lib/s3.mjs` and `scripts/lib/snapshot.mjs`**,
+  a signed fetch and the file format, both tested. A change to the format
+  bumps `SNAPSHOT_VERSION` and comes with a test; a reader refuses a later
+  version. Never take the AWS SDK for what the fetch does: the job runs with
+  secrets in hand, and every dependency there is a party to trust.
+- **A restore goes into an empty project**, refuses one with rows or with
+  other migrations applied, and loads in one transaction. A change to it is
+  tried against a scratch project before it is trusted.
 
 ## Statements (Gastos) — read before touching them
 
