@@ -42,7 +42,7 @@ export default function SettingsPage() {
   const online = useOnline();
   const updateWaiting = useUpdateWaiting();
   const { signOut } = useAppContext();
-  const { runs } = useBackupRuns();
+  const { runs, loading: readingRuns } = useBackupRuns();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -75,7 +75,7 @@ export default function SettingsPage() {
   // the last one that did not, and whether either is a reason to look.
   const lastCopy = latestRunWhere(runs, true);
   const lastFailure = latestRunWhere(runs, false);
-  const copyTrouble = backupTrouble(runs, completedAt);
+  const copyTrouble = backupTrouble(readingRuns ? null : runs, completedAt);
   const failedSince = lastFailure !== null && latestRun(runs) === lastFailure;
 
   return (

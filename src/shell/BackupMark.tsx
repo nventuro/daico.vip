@@ -7,9 +7,9 @@ const NOTICE = 'La copia de seguridad necesita atención';
 /** The mark on the gear's corner when the nightly copy failed or stopped
  *  coming: Ajustes says which. Nothing is drawn while all is well. */
 export default function BackupMark() {
-  const { runs } = useBackupRuns();
+  const { runs, loading } = useBackupRuns();
   const completedAt = useSyncStatus((status) => status.completedAt);
-  if (!backupTrouble(runs, completedAt)) return null;
+  if (!backupTrouble(loading ? null : runs, completedAt)) return null;
   return (
     <span
       role="status"

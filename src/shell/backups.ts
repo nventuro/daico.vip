@@ -34,10 +34,12 @@ export function latestRunWhere(runs: readonly BackupRun[], ok: boolean): BackupR
  * Whether the copies need looking at, from what this device holds: the run
  * it knows of last failed, or the device has synced since that run by more
  * than the grace and no newer one came down. A device that has never synced
- * whole cannot tell, and says nothing.
+ * whole cannot tell, and says nothing; nor does one still reading the runs
+ * it holds (`runs` null), which would otherwise take an unread table for an
+ * empty one.
  */
-export function backupTrouble(runs: readonly BackupRun[], syncedAt: string | null): boolean {
-  if (syncedAt === null) return false;
+export function backupTrouble(runs: readonly BackupRun[] | null, syncedAt: string | null): boolean {
+  if (runs === null || syncedAt === null) return false;
   const latest = latestRun(runs);
   if (latest === null) return true;
   if (!latest.ok) return true;

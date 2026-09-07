@@ -22,6 +22,10 @@ describe('the backup runs a device knows of', () => {
     expect(backupTrouble([run('2026-09-01T06:00:00Z', false)], null)).toBe(false);
   });
 
+  it('say nothing while the device is still reading them', () => {
+    expect(backupTrouble(null, '2026-09-07T10:00:00Z')).toBe(false);
+  });
+
   it('are trouble when there is none', () => {
     expect(backupTrouble([], '2026-09-07T10:00:00Z')).toBe(true);
   });
