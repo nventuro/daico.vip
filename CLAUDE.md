@@ -243,7 +243,7 @@ how it comes back. These are the rules on top of it.
   nothing else.** The role has no privilege on any table:
   `private.backup_rows` hands back a public table, `auth.users`,
   `auth.identities` or the migrations list; `private.backup_digest` a hash
-  over a table's ids and stamps; `private.record_backup` writes the run's row
+  over a table's rows; `private.record_backup` writes the run's row
   in `backup_runs` and prunes that table to ninety days. `db:verify` pins the
   three bodies, that the reader alone may call them, that it can log in and
   nothing more, and that it holds no table privilege. Never grant the role a

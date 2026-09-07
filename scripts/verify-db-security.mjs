@@ -137,7 +137,7 @@ const BEFORE_USER_CREATED_BODY = `
 
 // The nightly backup's three: what its role may do, and all it may do. The
 // first two read — any public table, the two auth tables a restore needs,
-// the migrations list; a digest over a table's ids and stamps — and the
+// the migrations list; a digest over a table's rows — and the
 // third writes the one thing the job may write, the record of its own run,
 // and keeps that table to ninety days.
 const READER_ROLE = 'backup_reader';
@@ -165,8 +165,8 @@ begin
     raise exception 'not a backed-up table: %.%', schema_name, table_name;
   end if;
   execute format(
-    'select md5(coalesce(string_agg(id::text || %L || updated_at::text, %L order by id), %L)) from %I.%I',
-    ':', ',', '', schema_name, table_name)
+    'select md5(coalesce(string_agg(to_jsonb(t)::text, %L order by to_jsonb(t)::text), %L)) from %I.%I t',
+    ',', '', schema_name, table_name)
   into digest;
   return digest;
 end

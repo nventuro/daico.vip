@@ -134,6 +134,9 @@ async function main() {
     for (const [schema, table] of [...AUTH_TABLES, MIGRATIONS_TABLE]) {
       nightly[qualified(schema, table)] = await rowsOf(db, schema, table);
     }
+    tables = Object.keys(nightly).length;
+    run.rows_read = countRows(nightly);
+
     run.stage = 'guides';
     const guidesDigest = await digestOf(db, GUIDE_TABLES);
     let guides = null;
@@ -141,12 +144,12 @@ async function main() {
       guides = {};
       for (const table of GUIDE_TABLES)
         guides[qualified('public', table)] = await rowsOf(db, 'public', table);
+      tables += GUIDE_TABLES.length;
+      run.rows_read += countRows(guides);
     }
     await db.query('commit');
     await db.end();
     db = null;
-    tables = Object.keys(nightly).length + (guides === null ? 0 : GUIDE_TABLES.length);
-    run.rows_read = countRows(nightly) + (guides === null ? 0 : countRows(guides));
 
     run.stage = 'objects';
     const listing = [];
