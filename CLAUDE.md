@@ -223,9 +223,9 @@ gate, what a sync does with the files. These are the rules on top of it.
   worker lets through comes with a test there. It is deployed on its own with
   the `files:*` scripts, never by the app's deploy, and its address is a
   custom domain given in the dashboard — never a route in its config, so
-  that no token has to edit the zone's DNS. `db:verify` still refuses
-  any Supabase Storage bucket that is public or not gated, and any storage
-  policy that reaches `anon`.
+  that no token has to edit the zone's DNS. Nothing is kept in
+  Supabase Storage: `db:verify` refuses any bucket there, and any policy on
+  `storage.objects`.
 - **Tests**: `householdKey.test.ts` (Node's WebCrypto),
   `attachmentFiles.test.ts` (real SQLite + the fake server's stand-in for the
   files worker) and `worker/src/files.test.ts` (the worker over a bucket in

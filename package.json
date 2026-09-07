@@ -28,8 +28,7 @@
     "worker:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- npx wrangler tail",
     "files:bucket": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler r2 bucket create attachments",
     "files:deploy": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler deploy -c wrangler.files.jsonc",
-    "files:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler tail -c wrangler.files.jsonc",
-    "files:copy": "node scripts/with-env.mjs SUPABASE_SECRET_KEY CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- node scripts/copy-attachments.mjs"
+    "files:tail": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_FILES_API_TOKEN -- npx wrangler tail -c wrangler.files.jsonc"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

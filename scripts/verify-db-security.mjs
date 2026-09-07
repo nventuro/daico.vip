@@ -92,13 +92,6 @@ const OWNER_TABLES = ['checkups', 'health_records'];
 const OWNER_POLICY = '(private.is_member() AND (owner = auth.uid()))';
 const ownerTables = OWNER_TABLES.map((table) => `'${table}'`).join(', ');
 
-// The attachments bucket takes only opaque blobs — the real type lives in the
-// row — and nothing larger than the 10 MiB the app accepts plus the 29 bytes
-// sealing adds. What the migration set, pinned so a change in the dashboard
-// shows up here.
-const BUCKET_MIME_TYPES = ['application/octet-stream'];
-const BUCKET_MAX_BYTES = 10485789;
-
 // The one row each of the household's two keys: a second write must fail
 // rather than leave two, which is what these indexes are for.
 const WRITE_ONCE_INDEXES = [
@@ -453,42 +446,19 @@ const CHECKS = [
           where not has_schema_privilege('${HOOK_ROLE}', 'private', 'USAGE')`,
   },
   {
-    // Storage holds the attachment files: a public bucket would hand out
-    // unauthenticated URLs to them.
-    name: 'no storage bucket is public',
-    sql: `select id as violation from storage.buckets where public`,
+    // The files live in R2, behind the files worker; nothing of the
+    // household's is kept in Storage, so a bucket here is a place a file
+    // could end up ungated.
+    name: 'no storage bucket exists',
+    sql: `select id as violation from storage.buckets`,
   },
   {
-    name: 'every storage bucket takes only opaque blobs, no larger than the app seals',
-    sql: `select id || ': ' || coalesce(array_to_string(allowed_mime_types, ','), '(any type)')
-                 || ', ' || coalesce(file_size_limit::text, '(no limit)') || ' bytes' as violation
-          from storage.buckets
-          where allowed_mime_types is distinct from array[${BUCKET_MIME_TYPES.map((t) => `'${t}'`).join(', ')}]::text[]
-             or file_size_limit is distinct from ${BUCKET_MAX_BYTES}`,
-  },
-  {
-    name: 'every storage bucket is gated by a private.is_member() policy on storage.objects',
-    sql: `select b.id as violation
-          from storage.buckets b
-          where not exists (
-            select 1 from pg_policies p
-            where p.schemaname = 'storage' and p.tablename = 'objects'
-              and p.roles = '{authenticated}'::name[]
-              and coalesce(p.qual, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)
-              and coalesce(p.with_check, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id))`,
-  },
-  {
-    // Same reasoning as the public tables: one policy saying anything else is
-    // enough, and here it would hand out the household's files.
-    name: 'every policy on storage.objects names a bucket and private.is_member()',
+    // With no bucket there is nothing for a policy to gate, and one that
+    // appears is an opening.
+    name: 'no policy on storage.objects',
     sql: `select policyname as violation
-          from pg_policies p
-          where p.schemaname = 'storage' and p.tablename = 'objects'
-            and (p.roles <> '{authenticated}'::name[]
-                 or not exists (
-                   select 1 from storage.buckets b
-                   where coalesce(p.qual, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)
-                     and coalesce(p.with_check, '') = format('((bucket_id = %L::text) AND ${MEMBER_POLICY})', b.id)))`,
+          from pg_policies
+          where schemaname = 'storage' and tablename = 'objects'`,
   },
 ];
 
