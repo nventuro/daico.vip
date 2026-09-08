@@ -10,15 +10,15 @@ export const SALUD_KIND_LABELS: Record<
   { one: string; many: string; remove: string; question: string }
 > = {
   checkup: {
-    one: 'Control',
-    many: 'Controles',
-    remove: 'Eliminar control',
-    question: '¿Eliminar el control?',
+    one: 'Pendiente',
+    many: 'Pendientes',
+    remove: 'Eliminar pendiente',
+    question: '¿Eliminar el pendiente?',
   },
   record: {
-    one: 'Estudio',
-    many: 'Estudios',
-    remove: 'Eliminar estudio',
-    question: '¿Eliminar el estudio?',
+    one: 'Resultado',
+    many: 'Resultados',
+    remove: 'Eliminar resultado',
+    question: '¿Eliminar el resultado?',
   },
 };

@@ -69,6 +69,6 @@ describe('markMessage', () => {
 
   it('says a checkup done once is done', () => {
     const once = checkup({ repeat_every: null, repeat_unit: null, last_done_on: null });
-    expect(markMessage(once, '2026-09-04')).toBe('Control hecho');
+    expect(markMessage(once, '2026-09-04')).toBe('Pendiente hecho');
   });
 });

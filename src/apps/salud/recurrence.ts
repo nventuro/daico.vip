@@ -23,7 +23,7 @@ export function dueAfterMarking(checkup: Checkup, on: string): string | null {
  *  back, where it went. */
 export function markMessage(checkup: Checkup, today: string): string {
   const next = checkup.repeat_every === null ? null : dueAfterMarking(checkup, today);
-  return next ? `Hecho · vuelve el ${formatDayMonth(next)}` : 'Control hecho';
+  return next ? `Hecho · vuelve el ${formatDayMonth(next)}` : 'Pendiente hecho';
 }
 
 export interface CheckupGroups {

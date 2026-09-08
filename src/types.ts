@@ -32,7 +32,14 @@ export type EntryMark = 'comments' | 'repeat';
  *  trip row's too — the pasaje's, by its id — but on a shelf of its own: the
  *  pasaje's other files do not stand in for the one it boards with. */
 export type AttachmentOwnerKind =
-  'chore' | 'document' | 'note' | 'trip_item' | 'idea' | 'health_record' | 'boarding_pass';
+  | 'chore'
+  | 'document'
+  | 'note'
+  | 'trip_item'
+  | 'idea'
+  | 'checkup'
+  | 'health_record'
+  | 'boarding_pass';
 
 /** The entry an attachment belongs to. */
 export interface AttachmentOwner {

@@ -9,6 +9,7 @@ import CompletedSection from '../../components/CompletedSection';
 import EmptyState from '../../components/EmptyState';
 import EntryMarks from '../../components/EntryMarks';
 import KindPickDialog from '../../components/KindPickDialog';
+import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import LinkRow from '../../components/LinkRow';
 import ListPage from '../../components/ListPage';
 import SectionLabel from '../../components/SectionLabel';
@@ -30,6 +31,8 @@ const KIND_OPTIONS = SALUD_KINDS.map((kind) => ({ kind, label: SALUD_KIND_LABELS
 export default function SaludPage() {
   const checkups = useCheckups();
   const records = useHealthRecords();
+  const { items: attachments } = useAttachments();
+  const attached = useMemo(() => ownersWithAttachments(attachments, 'checkup'), [attachments]);
   const navigate = useNavigate();
   // The title typed into the bar, while its kind is being asked.
   const [naming, setNaming] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export default function SaludPage() {
         to={entryPath('salud', checkup.id)}
         subtitle={checkup.due_on ? relativeDay(today, checkup.due_on) : undefined}
         overdue={overdue}
-        trailing={<EntryMarks marks={checkupMarks(checkup)} />}
+        trailing={<EntryMarks marks={checkupMarks(checkup, attached.has(checkup.id))} />}
         onToggle={() => toggle(checkup)}
         toggleLabel={finished ? 'Marcar como pendiente' : 'Marcar como hecho'}
       />
@@ -98,12 +101,12 @@ export default function SaludPage() {
             setNaming(title);
             return false;
           }}
-          placeholder="Agregar un control o estudio..."
-          inputLabel="Nuevo control o estudio"
+          placeholder="Agregar un pendiente o resultado..."
+          inputLabel="Nuevo pendiente o resultado"
         />
       }
     >
-      {empty && <EmptyState>Todavía no hay controles ni estudios.</EmptyState>}
+      {empty && <EmptyState>Todavía no hay pendientes ni resultados.</EmptyState>}
       {pending.length > 0 && (
         <section className="mb-6">
           <SectionLabel>{SALUD_KIND_LABELS.checkup.many}</SectionLabel>

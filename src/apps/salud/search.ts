@@ -4,14 +4,15 @@ import { formatDateShort, relativeDay, todayIso } from '../../utils/dateUtils';
 import { entryPath, type SearchHit } from '../types';
 
 /** Checkups whose title or comments mention `query`, with their date when
- *  set; then studies whose title does, each with the day it was done, and the
- *  attachments named so under the study they belong to. Only the signed-in
- *  member's: nothing else is on the device. */
+ *  set; then studies whose title does, each with the day it was done; and
+ *  under either, the attachments named so. Only the signed-in member's:
+ *  nothing else is on the device. */
 export async function searchSalud(query: string): Promise<SearchHit[]> {
   const today = todayIso();
   const [checkups, records] = await Promise.all([
     searchTable(CHECKUPS_SPEC, query, {
       fields: ['title', 'comments'],
+      attachments: 'checkup',
       hit: (checkup) => ({
         title: checkup.title,
         subtitle: checkup.due_on ? relativeDay(today, checkup.due_on) : undefined,

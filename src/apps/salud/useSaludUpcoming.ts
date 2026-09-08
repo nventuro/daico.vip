@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { withinNotice } from '../../utils/dateUtils';
+import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { entryPath, upcomingFrom, type Upcoming } from '../types';
 import { useCheckups } from './useCheckups';
 import { checkupMarks } from './marks';
@@ -15,22 +16,22 @@ const CHECKUP_NOTICE_DAYS = 7;
  *  home screen. */
 export function useSaludUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useCheckups();
+  const { items: attachments } = useAttachments();
   const today = useToday();
-  return useMemo(
-    () =>
-      upcomingFrom({ items, loading }, (checkup) =>
-        !isDone(checkup) &&
-        checkup.due_on != null &&
-        withinNotice(today, checkup.due_on, CHECKUP_NOTICE_DAYS)
-          ? {
-              title: checkup.title,
-              on: checkup.due_on,
-              to: entryPath('salud', checkup.id),
-              appId: 'salud',
-              marks: checkupMarks(checkup),
-            }
-          : null,
-      ),
-    [items, loading, today],
-  );
+  return useMemo(() => {
+    const attached = ownersWithAttachments(attachments, 'checkup');
+    return upcomingFrom({ items, loading }, (checkup) =>
+      !isDone(checkup) &&
+      checkup.due_on != null &&
+      withinNotice(today, checkup.due_on, CHECKUP_NOTICE_DAYS)
+        ? {
+            title: checkup.title,
+            on: checkup.due_on,
+            to: entryPath('salud', checkup.id),
+            appId: 'salud',
+            marks: checkupMarks(checkup, attached.has(checkup.id)),
+          }
+        : null,
+    );
+  }, [items, loading, attachments, today]);
 }

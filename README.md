@@ -149,11 +149,13 @@ the page rather than the square that marks and leaves. Próximo lists every
 statement still to be paid, and a statement that is late to be imported.
 
 **Salud** — `checkups` and `health_records`, each row one member's and hidden
-from the others by the server. A checkup is a health check to have done — a
-chore that always comes back from the day it was marked, or a one-off
-appointment — with comments and no attachments. A health record is a study
-kept: a title, the day it was done and its files, which hold everything the
-study says. Both are born from one bar, whose + asks which of the two.
+from the others by the server. A checkup («Pendiente») is a health check to
+have done — a chore that always comes back from the day it was marked, or a
+one-off appointment — with comments and the files the check needs, which one
+that repeats keeps from one time to the next like a chore's. A health record
+(«Resultado») is a study kept: a title, the day it was done and its files,
+which hold everything the study says. Both are born from one bar, whose +
+asks which of the two.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, its timestamps and a sealed body, which is
@@ -213,7 +215,8 @@ the reader's own classes, so a body looks the same read or written.
 
 ## Adjuntos
 
-A chore, a document, a note, an idea, a study or a row of a trip can carry
+A chore, a document, a note, an idea, a checkup, a study or a row of a trip
+can carry
 attachments — pictures and PDFs — that are encrypted on the device before they
 leave it, so the server only ever stores ciphertext.
 

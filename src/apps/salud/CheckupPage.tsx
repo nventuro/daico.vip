@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Checkup } from '../../lib/offline/specs';
+import AttachmentGrid from '../../components/AttachmentGrid';
 import CheckRow from '../../components/CheckRow';
 import { StaticChip } from '../../components/Chip';
 import Comments from '../../components/Comments';
@@ -7,10 +8,12 @@ import DeleteDialog from '../../components/DeleteDialog';
 import DueDateChips from '../../components/DueDateChips';
 import EntryHead from '../../components/EntryHead';
 import FormField from '../../components/FormField';
+import SectionLabel from '../../components/SectionLabel';
+import { useAttachments } from '../../hooks/useAttachments';
 import { useLeave, useLeaveBack } from '../../hooks/useLeave';
 import { useTextSave } from '../../hooks/useTextSave';
 import { offerUndo } from '../../lib/undo';
-import { appPath } from '../types';
+import { appPath, entryPath } from '../types';
 import { SALUD_KIND_LABELS } from './kinds';
 import { isDone, markMessage } from './recurrence';
 import RepeatFields, { type RepeatValue } from './RepeatFields';
@@ -30,8 +33,9 @@ interface CheckupPageProps {
 /** A checkup, read and written on the same page: the title on blur, each
  *  control as it changes, the comments a moment after typing stops and on
  *  leaving. The one control that leaves the page is the square that marks
- *  it. No attachments: the row re-dates itself, and a file pinned to it
- *  would outlive the check it was about — what was done is kept as a study. */
+ *  it. Its files are what the check needs — the orden, the turno's
+ *  confirmation — so a checkup that repeats keeps them from one time to the
+ *  next; what a check found is kept as a study. */
 export default function CheckupPage({
   checkup,
   save,
@@ -40,6 +44,7 @@ export default function CheckupPage({
   unmark,
   restore,
 }: CheckupPageProps) {
+  const attachments = useAttachments({ kind: 'checkup', id: checkup.id });
   const leave = useLeave();
   const leaveBack = useLeaveBack();
   const [deleting, setDeleting] = useState(false);
@@ -72,6 +77,8 @@ export default function CheckupPage({
   }
 
   async function removeCheckup() {
+    // The checkup's files go with it; nothing else would ever list them.
+    await attachments.removeAll();
     await remove(checkup.id);
     leave(appPath('salud'));
   }
@@ -106,6 +113,14 @@ export default function CheckupPage({
       />
 
       <Comments value={checkup.comments ?? ''} onChange={commentsSave.onChange} />
+
+      <div>
+        <SectionLabel>Adjuntos</SectionLabel>
+        <AttachmentGrid
+          owner={{ kind: 'checkup', id: checkup.id }}
+          ownerPath={entryPath('salud', checkup.id)}
+        />
+      </div>
 
       <DeleteDialog
         open={deleting}

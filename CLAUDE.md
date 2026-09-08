@@ -440,20 +440,22 @@ the rules on top of it.
   above, so a device only ever holds the signed-in member's rows. Never add a
   way to see or write another member's, never a person picker or a name, and
   never key `owner` to anything but `auth.uid()`.
-- **A curtain, not a vault.** A study's pictures are ordinary `attachments`
-  rows and bucket objects, shared under the household's one key: the other
-  member's screens never show them, but their device syncs the rows. Never
-  present it as more than that.
+- **A curtain, not a vault.** A checkup's and a study's files are ordinary
+  `attachments` rows and bucket objects, shared under the household's one
+  key: the other member's screens never show them, but their device syncs
+  the rows. Never present it as more than that.
 - **A checkup always comes back from the day it was marked.** No `repeat_from`:
   the arithmetic is `addRepeats` from the day marked and never from the day it
   was due — a check is worth nothing twice in a row. One that does not repeat
   is done once marked; one that repeats stays overdue until marked, like a
   chore and unlike a date.
-- **A checkup has comments and no attachments; a study has attachments and no
-  comments.** A checkup's row re-dates itself, so a file pinned to it would
-  outlive the check it was about — what was done is a study, dated. A study
-  is its files, by Documentos' rule: never add a column that holds what a
-  study found. Its files are fetched on demand, never kept on every device.
+- **A checkup's files are what the check needs; a study's are what it
+  found.** A checkup has comments and attachments like a chore — the orden,
+  the turno's confirmation — and one that repeats keeps its files from one
+  time to the next, since they are about the check and not one occurrence.
+  A study has attachments and no comments: it is its files, by Documentos'
+  rule, so never add a column that holds what a study found. Both kinds'
+  files are fetched on demand, never kept on every device.
 - **Nothing links a checkup to a study**, not a key and not a shortcut: the
   title and the date already say which check a study came from, and a key
   between rows has the offline race Ideas' groups avoid.
