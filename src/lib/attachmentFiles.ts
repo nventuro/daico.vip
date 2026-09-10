@@ -6,6 +6,7 @@
 // =============================================================================
 import { FILES_URL } from '../config';
 import { supabase } from './supabase';
+import { REQUEST_TIMEOUT_MS, fetchWithin } from './fetchWithin';
 import { isPermanentStatus } from './refusals';
 import * as engine from './offline/engine';
 import { ATTACHMENT_FILES } from './offline/localTables';
@@ -245,6 +246,16 @@ function objectUrl(id: string): string {
   return `${FILES_URL}/${id}`;
 }
 
+/** The slowest link an upload is still given its time on, in bytes per
+ *  second: an upload's answer comes only after its whole body, so its bound
+ *  grows with the body where every other request's covers the answer alone. */
+const UPLOAD_MIN_BYTES_PER_S = 20 * 1024;
+
+/** How long an upload of `bytes` may go unanswered. */
+function uploadTimeoutMs(bytes: number): number {
+  return REQUEST_TIMEOUT_MS + (bytes / UPLOAD_MIN_BYTES_PER_S) * 1000;
+}
+
 /** What every request to the files worker carries: the session's token, by
  *  which the worker asks the server whether the caller is a member. With no
  *  session there is no one to ask for, and the request is not made. */
@@ -289,7 +300,7 @@ export async function uploadPending(): Promise<void> {
   for (const { id, data } of waiting) {
     // An attempt whose answer was lost simply goes through again: an id is
     // never reused, so what a second put writes is the same bytes.
-    const response = await fetch(objectUrl(id), {
+    const response = await fetchWithin(uploadTimeoutMs(data.byteLength), objectUrl(id), {
       method: 'PUT',
       headers: { ...(await authorization()), 'Content-Type': 'application/octet-stream' },
       body: data,
@@ -324,7 +335,9 @@ async function markUploaded(id: string): Promise<void> {
  *  it (the device that added it hasn't uploaded it yet). A failure that may
  *  pass later — no session, throttled, the network — is thrown. */
 async function downloadObject(id: string): Promise<Uint8Array | null> {
-  const response = await fetch(objectUrl(id), { headers: await authorization() });
+  const response = await fetchWithin(REQUEST_TIMEOUT_MS, objectUrl(id), {
+    headers: await authorization(),
+  });
   if (!response.ok) {
     if (isPermanentStatus(response.status)) return null;
     throw refusal(response);
@@ -422,7 +435,7 @@ async function sweepOrphans(): Promise<void> {
   for (let cursor: string | null = null; ;) {
     const url = new URL(FILES_URL);
     if (cursor !== null) url.searchParams.set('cursor', cursor);
-    const response = await fetch(url, { headers: await authorization() });
+    const response = await fetchWithin(REQUEST_TIMEOUT_MS, url, { headers: await authorization() });
     if (!response.ok) throw refusal(response);
     const page = (await response.json()) as ObjectsPage;
     for (const object of page.objects) {
@@ -434,7 +447,7 @@ async function sweepOrphans(): Promise<void> {
     if (cursor === null) break;
   }
   for (const id of orphans) {
-    const response = await fetch(objectUrl(id), {
+    const response = await fetchWithin(REQUEST_TIMEOUT_MS, objectUrl(id), {
       method: 'DELETE',
       headers: await authorization(),
     });

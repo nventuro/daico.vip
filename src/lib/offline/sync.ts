@@ -15,6 +15,7 @@
 // in front again — pulls.
 // =============================================================================
 import { supabase } from '../supabase';
+import { gotNoAnswer } from '../fetchWithin';
 import { isPermanentRowError } from '../refusals';
 import { ALL_SPECS, type TableSpec } from './specs';
 import { PENDING_DELETES, SYNC_PROBLEMS } from './localTables';
@@ -236,9 +237,12 @@ async function runPasses(first: RunMode): Promise<void> {
     let next: RunMode | null = first;
     while (next !== null && navigator.onLine) {
       rerun = null;
-      await pass(next, superseded);
+      const answered = await pass(next, superseded);
       // The data this run was for is gone: the run is nobody's to go on with.
       if (superseded()) return;
+      // A link that gives no answer gives the next pass none either: what was
+      // asked for meanwhile waits for the next trigger, queued as it is.
+      if (!answered) return;
       next = rerun;
     }
   } finally {
@@ -248,8 +252,11 @@ async function runPasses(first: RunMode): Promise<void> {
 
 /** One pass: every table's queued changes pushed, the tables brought down
  *  when asked or stale, then the work that follows them. Whatever fails waits
- *  for the next pass. */
-async function pass(mode: RunMode, superseded: () => boolean): Promise<void> {
+ *  for the next pass. Answers whether the server answered: a request that
+ *  got no answer within its bound says the link is dead, not the table, and
+ *  every request after it would wait the same bound for the same nothing,
+ *  so the pass ends there. */
+async function pass(mode: RunMode, superseded: () => boolean): Promise<boolean> {
   const pull = mode === 'pull' || pullIsStale();
   if (pull) {
     setStatus({
@@ -271,7 +278,14 @@ async function pass(mode: RunMode, superseded: () => boolean): Promise<void> {
       // first table rather than fail every one.
       if (err instanceof MultiTabError) {
         console.warn('[offline] another tab holds the store; not syncing here');
-        return;
+        return true;
+      }
+      if (gotNoAnswer(err)) {
+        if (pull) setTable(spec.table, 'pending');
+        console.warn(
+          `[offline] no answer from the server at ${spec.table}; not syncing further now`,
+        );
+        return false;
       }
       // Network blip, expired token, a column the server doesn't have yet…
       // Queued changes stay put; we retry on the next trigger (online
@@ -283,7 +297,7 @@ async function pass(mode: RunMode, superseded: () => boolean): Promise<void> {
       continue;
     }
     // Nothing more is brought down for data that is gone, and nothing follows.
-    if (superseded()) return;
+    if (superseded()) return true;
     if (pull) {
       synced.add(spec.table);
       setTable(spec.table, 'done');
@@ -298,15 +312,22 @@ async function pass(mode: RunMode, superseded: () => boolean): Promise<void> {
     } catch (err) {
       // Same contract as a table: whatever it left undone waits for the next run.
       whole = false;
+      if (gotNoAnswer(err)) {
+        console.warn(
+          '[offline] no answer from the server in after-sync work; not syncing further now',
+        );
+        return false;
+      }
       console.warn('[offline] after-sync work failed, will retry later:', describe(err));
     }
   }
-  if (superseded()) return;
+  if (superseded()) return true;
   if (whole) {
     const completedAt = new Date().toISOString();
     writeCompletedAt(completedAt);
     setStatus({ completedAt });
   }
+  return true;
 }
 
 /**

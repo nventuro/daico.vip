@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from './sync';
+import { NO_ANSWER } from '../fetchWithin';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
 import { server } from './testing/fakeSupabase';
 import { T0, T1, T2, at, network } from './testing/clock';
@@ -244,6 +245,37 @@ describe('syncAll', () => {
     await syncAll();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T0)]);
+  });
+
+  it('ends the run at a request that got no answer, and syncs whole once one comes', async () => {
+    server.seed('chores', [serverChore('c1', T0)]);
+    server.fail('select', 'chores', NO_ANSWER);
+    await syncAll();
+    // The link is dead, not the table: nothing after it is asked.
+    const whole = runCalls({});
+    const stopped = whole.slice(0, whole.indexOf('select:chores') + 1);
+    expect(callLog()).toEqual(stopped);
+    expect(getSyncStatus().syncing).toBe(false);
+    expect(getSyncStatus().completedAt).toBeNull();
+    server.restore();
+    await syncAll();
+    expect(callLog().slice(stopped.length)).toEqual(whole);
+    expect(await engine.listVisible(CHORES_SPEC)).toHaveLength(1);
+    expect(getSyncStatus().completedAt).toBe(T0);
+  });
+
+  it('ends the run at after-sync work that got no answer', async () => {
+    const second = vi.fn<AfterSyncListener>(() => Promise.resolve());
+    const stopFirst = afterSync(() => Promise.reject(new Error(NO_ANSWER)));
+    const stopSecond = afterSync(second);
+    try {
+      await syncAll();
+      expect(second).not.toHaveBeenCalled();
+      expect(getSyncStatus().completedAt).toBeNull();
+    } finally {
+      stopFirst();
+      stopSecond();
+    }
   });
 
   it('a failing table does not stop the others from syncing', async () => {

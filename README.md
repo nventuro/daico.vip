@@ -73,8 +73,11 @@ this work:
 
 The membership check is offline-tolerant too: the verdict cached per user
 answers first and the live read then confirms or revokes it, so no signal never
-locks a member out; the server's RLS is the real authority either way. Local
-data is wiped on sign-out.
+locks a member out; the server's RLS is the real authority either way. So is
+the session: the app opens from the one the device holds and never waits for
+the server to refresh its token — only the server refusing it ends a session.
+A request that gets no answer within a bound is given up, and a sync run ends
+at the first one. Local data is wiped on sign-out.
 
 ### Adding another offline table
 

@@ -156,6 +156,16 @@ are the rules on top of it.
   cut short holds the version back through `holdUpdates`, never any other
   way. A pull asks for `*`, never the columns a spec names, so a build a
   migration got ahead of still brings its tables down.
+- **The boot never waits for the server.** `App` draws from the session the
+  client kept on the device (`storedSession` in `src/lib/supabase.ts`), never
+  from `getSession()`, which refreshes an expiring token first and on a dead
+  link waits minutes for it; the one exception is the page Google sends the
+  member back to, where the session is still on its way. A session ends only
+  on the client's `SIGNED_OUT` — the button, or the server refusing the
+  refresh token — never on a request that got no answer. Every request the
+  client makes and every call to the files worker goes through `fetchWithin`
+  (`src/lib/fetchWithin.ts`), and a sync run ends at the first request that
+  gets no answer (`gotNoAnswer`): the link is dead, not the table.
 - **The membership check is offline-tolerant** (`AppContext` falls back to a
   per-user cached verdict when the live read fails). This is only a UI gate — the
   server's RLS is the real authority, so a stale `true` still reads nothing and has
