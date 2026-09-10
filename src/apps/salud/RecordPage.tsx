@@ -15,13 +15,16 @@ import type { HealthRecordInput } from './useHealthRecords';
 
 interface RecordPageProps {
   record: HealthRecord;
+  /** The name of the pet it belongs to; null for a member's own, which says
+   *  nothing of whose it is. */
+  petName: string | null;
   save: (id: string, patch: Partial<HealthRecordInput>) => Promise<unknown>;
   remove: (id: string) => Promise<unknown>;
 }
 
 /** A study, read and written on the same page: the title on blur, the day as
  *  it changes, and its files — which are what it says. */
-export default function RecordPage({ record, save, remove }: RecordPageProps) {
+export default function RecordPage({ record, petName, save, remove }: RecordPageProps) {
   const attachments = useAttachments({ kind: 'health_record', id: record.id });
   const leave = useLeave();
   const [deleting, setDeleting] = useState(false);
@@ -39,7 +42,12 @@ export default function RecordPage({ record, save, remove }: RecordPageProps) {
       <EntryHead
         title={record.title}
         onTitle={(title) => void save(record.id, { title })}
-        chips={<StaticChip>{labels.one}</StaticChip>}
+        chips={
+          <>
+            <StaticChip>{labels.one}</StaticChip>
+            {petName !== null && <StaticChip>{petName}</StaticChip>}
+          </>
+        }
         onDelete={() => setDeleting(true)}
         deleteLabel={labels.remove}
       />

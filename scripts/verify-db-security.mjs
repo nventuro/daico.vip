@@ -40,7 +40,8 @@ const TABLE_PRIVILEGES = {
   documents: CRUD,
   statements: CRUD,
   merchant_rules: CRUD,
-  // One member's each: the owner policy below hands a member only their own.
+  // One member's each — a person's or a pet's: the member-row policy below
+  // hands a member their own and the pets'.
   checkups: CRUD,
   health_records: CRUD,
   notes: CRUD,
@@ -86,14 +87,16 @@ const WRITER_GRANTS = [
 const MEMBER_POLICY = 'private.is_member()';
 
 // The one other shape, on the tables listed here alone: a member sees and
-// writes only the rows that are theirs — `owner` is the auth user id of
-// whoever created the row. Postgres prints the expression back in exactly this
-// form. A table here must carry this policy and no other: permissive policies
-// OR together, and the plain member one beside it would hand every member
-// every row.
-const OWNER_TABLES = ['checkups', 'health_records'];
-const OWNER_POLICY = '(private.is_member() AND (owner = auth.uid()))';
-const ownerTables = OWNER_TABLES.map((table) => `'${table}'`).join(', ');
+// writes their own rows and the pets' — `member_id` is a row of members, and
+// a row is the caller's when its member is the one their session signed in
+// as, or a pet's when its member has no email. Postgres prints the expression
+// back in exactly this form. A table here must carry this policy and no
+// other: permissive policies OR together, and the plain member one beside it
+// would hand every member every row.
+const MEMBER_ROW_TABLES = ['checkups', 'health_records'];
+const MEMBER_ROW_POLICY =
+  '(private.is_member() AND ((member_id = private.member_id()) OR private.is_pet(member_id)))';
+const memberRowTables = MEMBER_ROW_TABLES.map((table) => `'${table}'`).join(', ');
 
 // The one row each of the household's two keys: a second write must fail
 // rather than leave two, which is what these indexes are for.
@@ -114,6 +117,27 @@ const IS_MEMBER_BODY = `
     where i.user_id = auth.uid()
       and i.provider = 'google'
       and coalesce((i.identity_data ->> 'email_verified')::boolean, false)
+  )
+`;
+
+// The two the member-row policy asks, in the same terms: which row of members
+// the caller is — the same join, answering the id rather than yes — and
+// whether a member is a pet, one nobody signs in as. Both are called by
+// authenticated inside the policy, like is_member, and pinned like it.
+const MEMBER_ID_BODY = `
+  select m.id
+  from public.members m
+  join auth.identities i
+    on lower(i.identity_data ->> 'email') = lower(m.email)
+  where i.user_id = auth.uid()
+    and i.provider = 'google'
+    and coalesce((i.identity_data ->> 'email_verified')::boolean, false)
+  limit 1
+`;
+const IS_PET_BODY = `
+  select exists (
+    select 1 from public.members m
+    where m.id = member and m.email is null
   )
 `;
 
@@ -186,6 +210,8 @@ const RECORD_BACKUP_BODY = `
 // declared with: 's' stable, 'v' volatile.
 const PINNED_FUNCTIONS = [
   { name: 'is_member', body: IS_MEMBER_BODY, volatility: 's' },
+  { name: 'member_id', body: MEMBER_ID_BODY, volatility: 's' },
+  { name: 'is_pet', body: IS_PET_BODY, volatility: 's' },
   { name: 'before_user_created', body: BEFORE_USER_CREATED_BODY, volatility: 's' },
   { name: 'backup_rows', body: BACKUP_ROWS_BODY, volatility: 's' },
   { name: 'backup_digest', body: BACKUP_DIGEST_BODY, volatility: 's' },
@@ -300,9 +326,10 @@ const CHECKS = [
   {
     // Permissive policies OR together, so one policy that says something else
     // opens the table however careful the others are. Besides the member ones
-    // may exist the owner policy on the tables pinned for it, and the email
-    // worker's, in exactly the shapes pinned here — anything else is drift.
-    name: 'every policy on a public table is the is_member() policy, the owner policy on its tables, or a pinned writer policy',
+    // may exist the member-row policy on the tables pinned for it, and the
+    // email worker's, in exactly the shapes pinned here — anything else is
+    // drift.
+    name: 'every policy on a public table is the is_member() policy, the member-row policy on its tables, or a pinned writer policy',
     sql: `select p.tablename || ': ' || p.policyname as violation
           from pg_policies p
           where p.schemaname = 'public'
@@ -311,9 +338,9 @@ const CHECKS = [
                      and coalesce(p.with_check, '${MEMBER_POLICY}') = '${MEMBER_POLICY}'
                      and not (p.qual is null and p.with_check is null))
             and not (p.roles = '{authenticated}'::name[]
-                     and p.tablename in (${ownerTables})
-                     and coalesce(p.qual, '${OWNER_POLICY}') = '${OWNER_POLICY}'
-                     and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}'
+                     and p.tablename in (${memberRowTables})
+                     and coalesce(p.qual, '${MEMBER_ROW_POLICY}') = '${MEMBER_ROW_POLICY}'
+                     and coalesce(p.with_check, '${MEMBER_ROW_POLICY}') = '${MEMBER_ROW_POLICY}'
                      and not (p.qual is null and p.with_check is null))
             and not (p.roles = '{${WRITER_ROLE}}'::name[]
                      and ((p.tablename in ('trip_inbox', 'trip_inbox_files', 'trip_inbox_imports')
@@ -322,15 +349,15 @@ const CHECKS = [
                               and p.cmd = 'SELECT' and p.qual = 'true' and p.with_check is null)))`,
   },
   {
-    name: 'a per-member table carries the owner policy and no other',
+    name: 'a per-member table carries the member-row policy and no other',
     sql: `select p.tablename || ': ' || p.policyname as violation
           from pg_policies p
-          where p.schemaname = 'public' and p.tablename in (${ownerTables})
-            and not (coalesce(p.qual, '${OWNER_POLICY}') = '${OWNER_POLICY}'
-                     and coalesce(p.with_check, '${OWNER_POLICY}') = '${OWNER_POLICY}')
+          where p.schemaname = 'public' and p.tablename in (${memberRowTables})
+            and not (coalesce(p.qual, '${MEMBER_ROW_POLICY}') = '${MEMBER_ROW_POLICY}'
+                     and coalesce(p.with_check, '${MEMBER_ROW_POLICY}') = '${MEMBER_ROW_POLICY}')
           union all
           select t.table_name || ': no policy at all' as violation
-          from (values ${OWNER_TABLES.map((table) => `('${table}')`).join(', ')}) as t(table_name)
+          from (values ${MEMBER_ROW_TABLES.map((table) => `('${table}')`).join(', ')}) as t(table_name)
           where not exists (select 1 from pg_policies p
                             where p.schemaname = 'public' and p.tablename = t.table_name)`,
   },

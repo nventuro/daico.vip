@@ -5,6 +5,7 @@ import { server } from './offline/testing/fakeSupabase';
 import { newChore, serverChore } from './offline/testing/rows';
 import { getSyncStatus, syncAll } from './offline/sync';
 import { cachedVerdict, rememberVerdict } from './membershipCache';
+import { rememberViewed, rememberedViewed } from './viewedMember';
 import { clearDevice } from './clearDevice';
 import { localAttachmentFile, putAttachmentFile } from './attachmentFiles';
 
@@ -37,6 +38,7 @@ describe('clearDevice', () => {
     await engine.insert(CHORES_SPEC, newChore);
     await putAttachmentFile('a', new TextEncoder().encode('abc'), true);
     rememberVerdict('u1', true);
+    rememberViewed('m1');
     await syncAll();
     expect(getSyncStatus().completedAt).not.toBeNull();
 
@@ -45,6 +47,7 @@ describe('clearDevice', () => {
     expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
     expect(await localAttachmentFile('a')).toBeNull();
     expect(cachedVerdict('u1')).toBeNull();
+    expect(rememberedViewed()).toBeNull();
     expect(cleared).toHaveBeenCalled();
     expect(getSyncStatus().completedAt).toBeNull();
   });

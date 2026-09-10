@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import type { Checkup, HealthRecord } from '../../lib/offline/specs';
 import EntryPage from '../../components/EntryPage';
 import { useEntry } from '../../hooks/useEntry';
+import { useMembers } from '../../hooks/useMembers';
 import CheckupPage from './CheckupPage';
+import { petNames } from './household';
 import RecordPage from './RecordPage';
 import { useCheckups } from './useCheckups';
 import { useHealthRecords } from './useHealthRecords';
@@ -15,6 +18,8 @@ type Found = { kind: 'checkup'; checkup: Checkup } | { kind: 'record'; record: H
 export default function SaludEntryPage() {
   const checkups = useCheckups();
   const records = useHealthRecords();
+  const members = useMembers();
+  const pets = useMemo(() => petNames(members.items), [members.items]);
   const checkup = useEntry(checkups.items);
   const record = useEntry(records.items);
   const found: Found | undefined = checkup
@@ -35,6 +40,7 @@ export default function SaludEntryPage() {
           <CheckupPage
             key={entry.checkup.id}
             checkup={entry.checkup}
+            petName={pets.get(entry.checkup.member_id) ?? null}
             save={checkups.save}
             remove={checkups.remove}
             mark={checkups.mark}
@@ -45,6 +51,7 @@ export default function SaludEntryPage() {
           <RecordPage
             key={entry.record.id}
             record={entry.record}
+            petName={pets.get(entry.record.member_id) ?? null}
             save={records.save}
             remove={records.remove}
           />

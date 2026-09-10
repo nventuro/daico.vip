@@ -44,6 +44,7 @@ describe('apps registry', () => {
     expect(specs).toEqual(ALL_SPECS);
     const tables = specs.map((s) => s.table);
     expect(tables).toEqual([
+      'members',
       'household_key',
       'inbox_key',
       'attachments',

@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { HEALTH_RECORDS_SPEC } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
-import { useSession } from '../../hooks/useSession';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
 /** Everything the user decides about a study; the row's own columns minus the
@@ -12,22 +11,22 @@ export interface HealthRecordInput {
   on_date: string;
 }
 
-/** Local-first studies — the signed-in member's, since the server hands out
- *  no others: add / edit / delete, syncing in the background. */
+/** Local-first studies — the signed-in member's and the pets', since the
+ *  server hands out no others: add / edit / delete, syncing in the
+ *  background. */
 export function useHealthRecords() {
   const { items, loading, error, insert, update, remove } = useOfflineTable(HEALTH_RECORDS_SPEC);
-  const owner = useSession()?.user.id ?? null;
 
-  /** Creates a study of the signed-in member's, resolving the new id so the
-   *  caller can open it to add its files; undefined for a blank title, no
-   *  session, or a failed write. */
+  /** Creates a study of the member being viewed, resolving the new id so the
+   *  caller can open it to add its files; undefined for a blank title or a
+   *  failed write. */
   const add = useCallback(
-    (input: HealthRecordInput): Promise<string | undefined> => {
+    (input: HealthRecordInput, memberId: string): Promise<string | undefined> => {
       const title = lowercaseTrimmed(input.title);
-      if (!title || owner === null) return Promise.resolve(undefined);
-      return insert({ ...input, title, owner });
+      if (!title) return Promise.resolve(undefined);
+      return insert({ ...input, title, member_id: memberId });
     },
-    [insert, owner],
+    [insert],
   );
 
   const save = useCallback(

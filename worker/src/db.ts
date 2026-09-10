@@ -27,9 +27,12 @@ export async function openDb(connectionString: string): Promise<pg.Client> {
   return client;
 }
 
-/** The addresses mail is accepted from. */
+/** The addresses mail is accepted from: the people's. A pet is a member
+ *  with no email, and no address at all is not one to match. */
 export async function memberEmails(db: pg.Client): Promise<string[]> {
-  const { rows } = await db.query<{ email: string }>('select email from members');
+  const { rows } = await db.query<{ email: string }>(
+    'select email from members where email is not null',
+  );
   return rows.map((row) => row.email);
 }
 

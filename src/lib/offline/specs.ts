@@ -69,6 +69,25 @@ export function columnNames(spec: TableSpec): string[] {
 // ─── The shell's tables, and the ones several apps share ─────────────────────
 
 /**
+ * Someone in the household: a person, who signs in with `email`, or a pet,
+ * who has none. Read on every device, written only by hand.
+ */
+export interface Member extends SyncedRow {
+  email: string | null;
+  display_name: string;
+}
+
+export const MEMBERS_SPEC: TableSpec<Member> = {
+  table: 'members',
+  columns: {
+    email: { ddl: 'TEXT' },
+    display_name: { ddl: 'TEXT NOT NULL' },
+  },
+  orderBy: 'display_name COLLATE NOCASE ASC',
+  compare: (a, b) => compareTitles(a.display_name, b.display_name),
+};
+
+/**
  * The household's master key, wrapped under a key derived from the phrase the
  * members hold on paper, with the derivation parameters. One row per
  * household; synced so a device can unlock offline once it has pulled it.
@@ -460,12 +479,12 @@ export const MERCHANT_RULES_SPEC: TableSpec<MerchantRule> = {
  * A health check to have done — the dentist every six months, the flu shot
  * every year, a one-off appointment. A chore in all but two respects: it
  * always comes back from the day it was marked, never from a fixed calendar,
- * and it is one member's, whose id `owner` carries — the server hands each
- * member only their own.
+ * and it is one member's — a person's or a pet's — whose id `member_id`
+ * carries: the server hands each member their own and the pets'.
  */
 export interface Checkup extends SyncedRow {
-  /** The auth user id of the member it belongs to. */
-  owner: string;
+  /** The member it belongs to, a row of `members`. */
+  member_id: string;
   title: string;
   /** Whatever else there is to say about it: where to book, what to bring. */
   comments: string | null;
@@ -484,7 +503,9 @@ export interface Checkup extends SyncedRow {
 export const CHECKUPS_SPEC: TableSpec<Checkup> = {
   table: 'checkups',
   columns: {
-    owner: { ddl: 'TEXT NOT NULL' },
+    // The default is what lets the column be added to a table a device
+    // already has; a stored row holds the real id from its next pull on.
+    member_id: { ddl: "TEXT NOT NULL DEFAULT ''" },
     title: { ddl: 'TEXT NOT NULL' },
     comments: { ddl: 'TEXT' },
     // Dates as yyyy-mm-dd strings (date-only, no timezone).
@@ -502,11 +523,11 @@ export const CHECKUPS_SPEC: TableSpec<Checkup> = {
  * A study kept — a blood test, an X-ray, a vaccination certificate. Like a
  * document, its content is its files: the row holds the title and the day
  * it was done, which list it, and nothing that says what the study found.
- * One member's, like a checkup.
+ * One member's — a person's or a pet's — like a checkup.
  */
 export interface HealthRecord extends SyncedRow {
-  /** The auth user id of the member it belongs to. */
-  owner: string;
+  /** The member it belongs to, a row of `members`. */
+  member_id: string;
   title: string;
   /** The day it was done (yyyy-mm-dd). */
   on_date: string;
@@ -515,7 +536,7 @@ export interface HealthRecord extends SyncedRow {
 export const HEALTH_RECORDS_SPEC: TableSpec<HealthRecord> = {
   table: 'health_records',
   columns: {
-    owner: { ddl: 'TEXT NOT NULL' },
+    member_id: { ddl: "TEXT NOT NULL DEFAULT ''" },
     title: { ddl: 'TEXT NOT NULL' },
     on_date: { ddl: 'TEXT NOT NULL' },
   },
@@ -759,6 +780,9 @@ export const BACKUP_RUNS_SPEC: TableSpec<BackupRun> = {
 };
 
 export const SHELL_SPECS: TableSpec[] = [
+  // First, so the household is down before the tables whose rows name one
+  // of them.
+  MEMBERS_SPEC,
   HOUSEHOLD_KEY_SPEC,
   INBOX_KEY_SPEC,
   ATTACHMENTS_SPEC,

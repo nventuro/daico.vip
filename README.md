@@ -20,6 +20,11 @@ by an `AppModule` object (contract in `src/apps/types.ts`) and listed in
 `src/apps/registry.ts`. The router and the home screen are built from the
 registry; its order is the tile order.
 
+Membership is the `members` table, which is the household: a row per person,
+with the Google email they sign in with, and a row per pet, with none — a pet
+has health to keep but nothing to sign in as. The app reads the table on every
+device and never writes it; the rows are added by hand.
+
 Three screens are the shell's rather than any app's. **Buscar** (the magnifier
 in the header) searches every app at once, offline: a module takes part by
 exporting a `search(query)` adapter over its own local store, and the hits are
@@ -152,14 +157,18 @@ from its PDF, not the bar, and its page is the one whose head is not an
 the page rather than the square that marks and leaves. Próximo lists every
 statement still to be paid, and a statement that is late to be imported.
 
-**Salud** — `checkups` and `health_records`, each row one member's and hidden
-from the others by the server. A checkup («Pendiente») is a health check to
-have done — a chore that always comes back from the day it was marked, or a
-one-off appointment — with comments and the files the check needs, which one
-that repeats keeps from one time to the next like a chore's. A health record
-(«Resultado») is a study kept: a title, the day it was done and its files,
-which hold everything the study says. Both are born from one bar, whose +
-asks which of the two.
+**Salud** — `checkups` and `health_records`, each row one member's — a
+person's or a pet's — and the other person's hidden by the server: a device
+holds the signed-in member's rows and the pets'. The screen shows one member
+at a time, chosen on a row of chips over the list — you first, then the pets
+by name — and remembered on the device. A checkup («Pendiente») is a health
+check to have done — a chore that always comes back from the day it was
+marked, or a one-off appointment — with comments and the files the check
+needs, which one that repeats keeps from one time to the next like a chore's.
+A health record («Resultado») is a study kept: a title, the day it was done
+and its files, which hold everything the study says. Both are born from one
+bar, under the member being viewed, whose + asks which of the two. A pet's
+row says whose it is wherever it is drawn away from the list.
 
 **Notas** — `notes`: a title and a markdown body that never reaches the server
 in the clear — the row is a title, its timestamps and a sealed body, which is
@@ -377,9 +386,11 @@ Postgres function: schema `private`, function `before_user_created`. The auth
 server asks it before it makes a user, and it refuses any email that is not in
 `members`, so a stranger who signs in leaves no row behind.
 
-Then add the authorized Google account emails to the `members` table via the
-Supabase SQL editor — only those accounts can access
-the app. Until a member exists, the app denies everyone.
+Then add the household to the `members` table via the Supabase SQL editor:
+each person as a row with the Google account email they sign in with and a
+short `display_name`, and each pet as a row with a name and no email. Only
+the accounts with a row can access the app; until one exists, the app denies
+everyone.
 
 ### 4. Deploy
 

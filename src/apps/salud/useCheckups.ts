@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { CHECKUPS_SPEC, type Checkup } from '../../lib/offline/specs';
 import type { RepeatUnit } from '../../utils/recurrence';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
-import { useSession } from '../../hooks/useSession';
 import { todayIso } from '../../utils/dateUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 import { dueAfterMarking } from './recurrence';
@@ -25,22 +24,27 @@ function withRepeat<T extends Partial<CheckupInput>>(patch: T, every: number | n
   return every == null ? { ...patch, repeat_every: null, repeat_unit: null } : patch;
 }
 
-/** Local-first checkups — the signed-in member's, since the server hands out
- *  no others: add / edit / mark / delete, syncing in the background. */
+/** Local-first checkups — the signed-in member's and the pets', since the
+ *  server hands out no others: add / edit / mark / delete, syncing in the
+ *  background. */
 export function useCheckups() {
   const { items, loading, error, insert, update, remove, mutate } = useOfflineTable(CHECKUPS_SPEC);
-  const owner = useSession()?.user.id ?? null;
 
-  /** Creates a checkup of the signed-in member's from everything decided about
-   *  it, resolving the new id so the caller can open it; undefined for a blank
-   *  title, no session, or a failed write. */
+  /** Creates a checkup of the member being viewed from everything decided
+   *  about it, resolving the new id so the caller can open it; undefined for
+   *  a blank title or a failed write. */
   const add = useCallback(
-    (input: CheckupInput): Promise<string | undefined> => {
+    (input: CheckupInput, memberId: string): Promise<string | undefined> => {
       const title = lowercaseTrimmed(input.title);
-      if (!title || owner === null) return Promise.resolve(undefined);
-      return insert(withRepeat({ ...input, title, owner, last_done_on: null }, input.repeat_every));
+      if (!title) return Promise.resolve(undefined);
+      return insert(
+        withRepeat(
+          { ...input, title, member_id: memberId, last_done_on: null },
+          input.repeat_every,
+        ),
+      );
     },
-    [insert, owner],
+    [insert],
   );
 
   const save = useCallback(

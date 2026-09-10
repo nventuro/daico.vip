@@ -5,7 +5,7 @@ import { dueAfterMarking, groupCheckups, isDone, markMessage } from './recurrenc
 function checkup(overrides: Partial<Checkup> = {}): Checkup {
   return {
     id: 'c',
-    owner: 'member',
+    member_id: 'm',
     title: 'dentista',
     comments: null,
     due_on: '2026-09-04',

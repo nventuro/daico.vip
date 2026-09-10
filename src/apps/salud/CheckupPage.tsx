@@ -22,6 +22,9 @@ import { useToday } from '../../hooks/useToday';
 
 interface CheckupPageProps {
   checkup: Checkup;
+  /** The name of the pet it belongs to; null for a member's own, which says
+   *  nothing of whose it is. */
+  petName: string | null;
   save: (id: string, patch: Partial<CheckupInput>) => Promise<unknown>;
   remove: (id: string) => Promise<unknown>;
   mark: (checkup: Checkup) => Promise<unknown>;
@@ -38,6 +41,7 @@ interface CheckupPageProps {
  *  next; what a check found is kept as a study. */
 export default function CheckupPage({
   checkup,
+  petName,
   save,
   remove,
   mark,
@@ -88,7 +92,12 @@ export default function CheckupPage({
       <EntryHead
         title={checkup.title}
         onTitle={(title) => void save(checkup.id, { title })}
-        chips={<StaticChip>{labels.one}</StaticChip>}
+        chips={
+          <>
+            <StaticChip>{labels.one}</StaticChip>
+            {petName !== null && <StaticChip>{petName}</StaticChip>}
+          </>
+        }
         onDelete={() => setDeleting(true)}
         deleteLabel={labels.remove}
       />

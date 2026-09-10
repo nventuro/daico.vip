@@ -1,7 +1,7 @@
 // =============================================================================
 // What a device forgets once its session has ended: the local tables, the files
-// kept beside them, the master key, the sync stamp and the cached membership
-// verdict. It runs however the session ended — the button, a token refresh that
+// kept beside them, the master key, the sync stamp, the cached membership
+// verdict and which member Salud was showing. It runs however the session ended — the button, a token refresh that
 // failed, a sign-out from elsewhere — because a phone is shared and what stays
 // behind is the household's documents.
 //
@@ -12,6 +12,7 @@ import { clearMasterKey } from './masterKeyStore';
 import { clearAll } from './offline/engine';
 import { resetSyncStatus } from './offline/sync';
 import { forgetVerdict } from './membershipCache';
+import { forgetViewed } from './viewedMember';
 
 async function forget(what: string, run: () => Promise<void>): Promise<void> {
   try {
@@ -25,6 +26,7 @@ async function forget(what: string, run: () => Promise<void>): Promise<void> {
  *  `userId` is whose session it was, null when the device never knew. */
 export async function clearDevice(userId: string | null): Promise<void> {
   if (userId !== null) forgetVerdict(userId);
+  forgetViewed();
   resetSyncStatus();
   await forget('the local data', clearAll);
   await forget('the master key', clearMasterKey);

@@ -31,18 +31,23 @@ Chromium-only APIs are available everywhere.
   `private.before_user_created()` before it makes a user — its «Before User
   Created» hook, switched on in the dashboard and pointed at that function —
   and the function refuses any email not in `members`, so a stranger who
-  signs in leaves no row in `auth.users`. Adding a member is still the row in
-  `members` first, then their sign-in. `db:verify` pins the function's body
+  signs in leaves no row in `auth.users`. Adding a person is still their row
+  in `members` first, then their sign-in; a pet is a row with a name and no
+  email, inserted by hand. `db:verify` pins the function's body
   and that `supabase_auth_admin` alone may call it; the toggle is the other
   one it cannot see — **keep it on**.
 - **Never add an anon grant or a public view.** There is no public data. The anon
   role must always resolve to zero access; `db:verify` fails on any privilege
   it holds.
-- Membership is an allowlist: the `members` table holds the authorized Google
-  account emails. A signed-in account that is not a member is fully fail-closed
-  (sees nothing, can write nothing) and gets the "Sin acceso" screen. The client
-  detects membership by reading `members` (members see rows, non-members see none),
-  not via an RPC.
+- **`members` is the household**, not only the allowlist: a row per person,
+  with the Google email they sign in with, and a row per pet, with none.
+  `private.is_member()` binds to the rows that have an email, so a pet can
+  neither sign in nor be let in. A signed-in account that is in no row is
+  fully fail-closed (sees nothing, can write nothing) and gets the "Sin
+  acceso" screen. The client still detects membership by reading `members`
+  (members see rows, non-members see none), not via an RPC. The table is
+  synced read-only (`MEMBERS_SPEC`, in `SHELL_SPECS`) so the household is
+  known offline, and the app never writes it: every row is inserted by hand.
 - **Every new table must, in the same migration: (1) enable RLS, (2) add a
   `private.is_member()` policy, AND (3) `grant` the needed privileges to
   `authenticated`** (e.g. `grant select, insert, update, delete on public.<table>
@@ -53,15 +58,18 @@ to authenticated`). RLS is a _filter on top of_ SQL privileges, not a
   below, and `db:verify` refuses any other trigger on any table.
 - **Every policy is `private.is_member()` and nothing else, with two
   exceptions.** A table whose rows are one member's (`checkups`,
-  `health_records`) carries `owner uuid`, the auth user id of whoever created
-  the row, under the policy `private.is_member() and owner = auth.uid()` on
-  both `using` and `with check`: a select hands each member only their own
-  rows and a write for another owner is refused. `db:verify` pins that shape
-  to exactly the tables in its `OWNER_TABLES`, and a table there must never
-  also carry the plain policy — permissive policies OR together. Which tables
-  are per-member is a design decision (Salud's is written up below), never a
-  default. The other exception is the email worker's role, under Viajes
-  below, whose policies `db:verify` pins one by one.
+  `health_records`) carries `member_id uuid`, a row of `members`, under the
+  policy `private.is_member() and (member_id = private.member_id() or
+private.is_pet(member_id))` on both `using` and `with check`: a select
+  hands each member their own rows and the pets', and a write for the other
+  person is refused. `private.member_id()` is the caller's own row, by the
+  join `is_member()` makes; `private.is_pet()` is a row with no email.
+  `db:verify` pins that shape to exactly the tables in its
+  `MEMBER_ROW_TABLES` and the two functions' bodies, and a table there must
+  never also carry the plain policy — permissive policies OR together. Which
+  tables are per-member is a design decision (Salud's is written up below),
+  never a default. The other exception is the email worker's role, under
+  Viajes below, whose policies `db:verify` pins one by one.
 - SECURITY DEFINER helpers used by RLS live in the **non-exposed `private` schema**
   (e.g. `private.is_member()`), never in `public` — a SECURITY DEFINER function in
   `public` is callable by anyone via the PostgREST `/rpc` API. They must always
@@ -444,12 +452,24 @@ and what becomes of a forwarded email. These are the rules on top of it.
 The README's «Salud» says what a checkup and a health record are. These are
 the rules on top of it.
 
-- **Every row is one member's, and the server keeps it that way.** `checkups`
-  and `health_records` carry `owner` (the session's user id, stamped by the
-  hooks on create, read through `useSession`) under the per-member policy
-  above, so a device only ever holds the signed-in member's rows. Never add a
-  way to see or write another member's, never a person picker or a name, and
-  never key `owner` to anything but `auth.uid()`.
+- **Every row is one member's — a person's or a pet's — and the server keeps
+  it that way.** `checkups` and `health_records` carry `member_id`, a row of
+  `members`, under the per-member policy above, so a device only ever holds
+  the signed-in member's rows and the pets'. Never add a way to see or write
+  the other person's, and never a name in code: the names are
+  `members.display_name`, and the household is edited by hand. The server
+  fills `member_id` with the caller's own row when a build sends none, so
+  a build from before the column still writes.
+- **Salud shows one member at a time.** The row of chips over the list
+  (`MemberChips`) is you first, then the pets — `viewableMembers` in
+  `household.ts`, by the session's email — and the whole list is that
+  member's. The choice is remembered on the device (`src/lib/viewedMember.ts`,
+  forgotten on sign-out). The bar adds to the member being viewed, and the
+  member is chosen at birth and never changed, like the kind. A pet's row
+  says whose it is away from the list — a `StaticChip` on the page, «título
+  · nombre» in Próximo, «nombre · …» in Buscar — and a member's own says
+  nothing. No + for members anywhere in the app, and the chips are never a
+  filter of «all».
 - **A curtain, not a vault.** A checkup's and a study's files are ordinary
   `attachments` rows and bucket objects, shared under the household's one
   key: the other member's screens never show them, but their device syncs
