@@ -665,10 +665,28 @@ A migration is named `<utc stamp>_<what_it_does>.sql`
 stamps it to the second, and rounding the stamp by hand is fine as long as it
 sorts after the last one. A policy is named for who it lets in and what they may
 do: "Members have full access to <table>", or "Members can read <table>" for a
-table the app never writes. **Applied migrations are never edited**: fix forward
-with another one.
+table the app never writes, and it fits in Postgres's 63 characters, or it is
+stored cut short. **Applied migrations are never edited**: fix forward with
+another one.
 
-**A column is dropped one deploy after the code stopped reading it.** A device
-can run a build behind the database for a session, which costs nothing while a
-migration only adds; but a build that still knows a column pushes it with every
-row, and the server refuses a row for a column it no longer has.
+**A deploy assumes quiet devices.** A schema change ships as `db:push`, then
+the push to `main` that deploys the build — in that order, since the new
+build sends what the new schema takes — with `worker:deploy` before either
+when a worker is touched. Through all of it, take two things as given: no
+device holds a queued offline edit, and nobody touches the app between
+`db:push` and both phones running the new build. That is the household's
+undertaking, and it is what keeps a migration simple: a column the build
+stops sending is dropped in the same migration, nothing is kept nullable for
+one deploy, and a backfill never bumps `updated_at` — a pull takes a server
+row of the same instant whose columns read differently, so the value comes
+down on its own. The price is paid only in that window: a build that still
+sends a dropped column, or lacks one the schema now requires, has its writes
+refused for good (a column error is a permanent refusal to the engine), and a
+queued edit from before the update is refused the same way. **So when a
+migration has that shape — it drops or renames a column a running build
+sends, adds a required column that build does not send, or narrows what a
+policy accepts from it — say so plainly in the handover:** name the window,
+tell the owner to run the steps back to back and to write nothing in the app
+until both phones have the update, and say what a write in the window would
+cost. A migration that only adds a table, or a nullable or defaulted column,
+has no window and needs no warning.
