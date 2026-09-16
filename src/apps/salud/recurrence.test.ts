@@ -60,6 +60,12 @@ describe('groupCheckups', () => {
     const c = once({ id: 'c', last_done_on: null });
     expect(groupCheckups([a, b, c])).toEqual({ pending: [a, c], done: [b] });
   });
+
+  it('lists the done ones with the one marked last first', () => {
+    const older = once({ id: 'older', due_on: '2026-10-01', last_done_on: '2026-08-15' });
+    const newer = once({ id: 'newer', due_on: '2026-08-01', last_done_on: '2026-09-09' });
+    expect(groupCheckups([older, newer]).done).toEqual([newer, older]);
+  });
 });
 
 describe('markMessage', () => {

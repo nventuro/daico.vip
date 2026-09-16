@@ -65,6 +65,12 @@ describe('tripSections', () => {
     expect(done).toEqual([ticked]);
   });
 
+  it('lists the ticked pendientes with the one ticked last first', () => {
+    const early = item('early', 'todo', { done: true, updated_at: '2026-09-01T10:00:00Z' });
+    const late = item('late', 'todo', { done: true, updated_at: '2026-09-02T10:00:00Z' });
+    expect(tripSections([early, late]).done).toEqual([late, early]);
+  });
+
   it('drops the pendientes section once the last one is ticked, so the bookings rise', () => {
     const { sections, done } = tripSections([
       item('a', 'todo', { done: true }),

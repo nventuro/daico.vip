@@ -6,6 +6,7 @@ import {
   type TripKind,
 } from '../../lib/offline/specs';
 import { isPast } from '../../utils/dateUtils';
+import { compareLastWritten } from '../../utils/listUtils';
 import { normalize } from '../../utils/textUtils';
 import {
   TRIP_SECTION_LABELS,
@@ -24,11 +25,13 @@ export interface TripSection {
 /**
  * A trip's rows as its screen draws them: one section per class in
  * `TRIP_KINDS` order, empty ones left out, and the pendientes already ticked
- * apart. So the pendientes head the screen while any remain and the section
- * disappears on its own once the last is ticked, leaving the bookings on top.
+ * apart, the one ticked last first — a tick is a write, and the row keeps no
+ * day of its own for it. So the pendientes head the screen while any remain
+ * and the section disappears on its own once the last is ticked, leaving the
+ * bookings on top.
  */
 export function tripSections(items: TripItem[]): { sections: TripSection[]; done: TripItem[] } {
-  const done = items.filter((item) => item.done);
+  const done = items.filter((item) => item.done).sort(compareLastWritten);
   const sections = TRIP_KINDS.map((kind) => ({
     kind,
     label: TRIP_SECTION_LABELS[kind],

@@ -111,6 +111,12 @@ describe('groupChores', () => {
     expect(groups.done.map((c) => c.id)).toEqual(['done']);
   });
 
+  it('lists the done chores with the one marked last first', () => {
+    const older = chore({ id: 'older', due_on: '2026-10-01', last_done_on: '2026-08-15' });
+    const newer = chore({ id: 'newer', due_on: '2026-08-01', last_done_on: '2026-09-09' });
+    expect(groupChores([older, newer], TODAY).done.map((c) => c.id)).toEqual(['newer', 'older']);
+  });
+
   it('leaves a chore that repeats out of the done group', () => {
     const marked = { ...repeats, last_done_on: TODAY };
     expect(groupChores([marked], TODAY).done).toEqual([]);

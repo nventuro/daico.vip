@@ -1,5 +1,6 @@
 import type { Checkup } from '../../lib/offline/specs';
 import { formatDayMonth } from '../../utils/dateUtils';
+import { compareLastDone } from '../../utils/listUtils';
 import { addRepeats } from '../../utils/recurrence';
 
 /** Whether a checkup is finished for good: it was marked, and it is not coming
@@ -32,13 +33,14 @@ export interface CheckupGroups {
   done: Checkup[];
 }
 
-/** Checkups split into the two groups the list draws, each keeping the order
- *  it came in. Nothing is set aside as «Más adelante», as a chore is: a member
+/** Checkups split into the two groups the list draws: the pending ones
+ *  keeping the order they came in, and the done ones with the one marked last
+ *  first. Nothing is set aside as «Más adelante», as a chore is: a member
  *  has a handful of checkups, months or years apart, and the whole list reads
  *  at a glance — one due next year under one due next week is the point. */
 export function groupCheckups(checkups: Checkup[]): CheckupGroups {
   return {
     pending: checkups.filter((checkup) => !isDone(checkup)),
-    done: checkups.filter(isDone),
+    done: checkups.filter(isDone).sort(compareLastDone),
   };
 }

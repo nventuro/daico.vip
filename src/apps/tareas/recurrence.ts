@@ -1,5 +1,6 @@
 import type { Chore } from '../../lib/offline/specs';
 import { addDays, daysUntil, formatDayMonth } from '../../utils/dateUtils';
+import { compareLastDone } from '../../utils/listUtils';
 import { addRepeats, nextOccurrenceOnOrAfter } from '../../utils/recurrence';
 
 /** Beyond this many days ahead a chore waits under «Más adelante» instead of
@@ -47,8 +48,9 @@ export interface ChoreGroups {
 }
 
 /**
- * Chores split into the three groups the list draws, each keeping the order it
- * came in (done last, then by date, undated last of the rest).
+ * Chores split into the three groups the list draws: the chores still to do
+ * keeping the order they came in (by date, undated last), and the done ones
+ * with the one marked last first.
  */
 export function groupChores(chores: Chore[], today: string): ChoreGroups {
   const waits = (chore: Chore) =>
@@ -56,6 +58,6 @@ export function groupChores(chores: Chore[], today: string): ChoreGroups {
   return {
     soon: chores.filter((chore) => !isDone(chore) && !waits(chore)),
     later: chores.filter((chore) => !isDone(chore) && waits(chore)),
-    done: chores.filter(isDone),
+    done: chores.filter(isDone).sort(compareLastDone),
   };
 }

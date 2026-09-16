@@ -1,3 +1,5 @@
+import type { SyncedRow } from '../types';
+
 /**
  * Consecutive runs of items sharing a key, in the order they were given: a
  * list already sorted the way it is shown, cut where the key changes. What
@@ -25,6 +27,23 @@ const nameCollator = new Intl.Collator('es', { sensitivity: 'base' });
 /** Two titles in the order a person would look for them. */
 export function compareTitles(a: string, b: string): number {
   return nameCollator.compare(a, b);
+}
+
+/** Two rows, the one written on last first. */
+export function compareLastWritten(a: SyncedRow, b: SyncedRow): number {
+  // Compared as instants: the device and the server spell the same one
+  // differently.
+  return Date.parse(b.updated_at) - Date.parse(a.updated_at);
+}
+
+/** Two rows marked done, the one marked last first: by the day each was
+ *  marked, and on the same day by the one written on last, since a mark is a
+ *  write. */
+export function compareLastDone(
+  a: SyncedRow & { last_done_on: string | null },
+  b: SyncedRow & { last_done_on: string | null },
+): number {
+  return (b.last_done_on ?? '').localeCompare(a.last_done_on ?? '') || compareLastWritten(a, b);
 }
 
 /**
