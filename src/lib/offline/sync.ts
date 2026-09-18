@@ -1,6 +1,8 @@
 // =============================================================================
 // Sync engine. Reconciles every local table with its Postgres counterpart
-// whenever there's a connection. Per table, in order:
+// whenever there's a connection. Per table, in order, and several tables at a
+// time — what a pass waits on is the round trip and not the work, and the
+// merges cannot overlap anyway, since the store takes one write at a time:
 //
 //   1. PUSH queued upserts  → Supabase upsert, then clear the local flag.
 //   2. PUSH queued deletes  → Supabase delete, then drop the local tombstone.
@@ -14,6 +16,7 @@
 // is not recent; what asks for a run outright — the connection back, the app
 // in front again — pulls.
 // =============================================================================
+import { inParallel } from '../../utils/parallel';
 import { supabase } from '../supabase';
 import { gotNoAnswer } from '../fetchWithin';
 import { isPermanentRowError } from '../refusals';
@@ -31,6 +34,12 @@ export const SYNC_FRESH_MS = 60_000;
  *  table is read page by page until one comes back short. */
 export const SYNC_PULL_PAGE = 1000;
 
+/** How many tables a pass has in hand at once. What a pull waits on is the
+ *  round trip to the server, so the tables come down together rather than one
+ *  after another; the bound is what keeps a run from asking the far end for a
+ *  connection per table. */
+export const TABLES_AT_ONCE = 6;
+
 // ─── Status ──────────────────────────────────────────────────────────────────
 
 /** A table's place in the current run. */
@@ -40,6 +49,9 @@ export type TableSyncState = 'pending' | 'pulling' | 'done';
  *  got, and when this device last brought everything down. */
 export interface SyncStatus {
   syncing: boolean;
+  /** Whether the server has answered anything in the run going, whatever it
+   *  answered. Until it has, the link may be dead rather than slow. */
+  answered: boolean;
   /** Each table's place in the current run, by table name. */
   tables: Readonly<Record<string, TableSyncState>>;
   /** The documents' files fetched so far in this run, of those this device
@@ -74,6 +86,7 @@ function writeCompletedAt(iso: string | null): void {
 
 let status: SyncStatus = {
   syncing: false,
+  answered: false,
   tables: {},
   files: null,
   completedAt: readCompletedAt(),
@@ -87,6 +100,11 @@ function setStatus(patch: Partial<SyncStatus>): void {
 
 function setTable(table: string, state: TableSyncState): void {
   setStatus({ tables: { ...status.tables, [table]: state } });
+}
+
+/** Note that the server has spoken in this run: the link is alive. */
+function noteAnswer(): void {
+  if (!status.answered) setStatus({ answered: true });
 }
 
 /** The sync status right now, for code outside React. */
@@ -159,7 +177,7 @@ export function resetSyncStatus(): void {
   generation += 1;
   writeCompletedAt(null);
   lastPullAt = null;
-  setStatus({ tables: {}, files: null, completedAt: null });
+  setStatus({ tables: {}, files: null, completedAt: null, answered: false });
 }
 
 // ─── Runs ────────────────────────────────────────────────────────────────────
@@ -232,7 +250,7 @@ function pullIsStale(): boolean {
 async function runPasses(first: RunMode): Promise<void> {
   const run = generation;
   const superseded = () => generation !== run;
-  setStatus({ syncing: true });
+  setStatus({ syncing: true, answered: false });
   try {
     let next: RunMode | null = first;
     while (next !== null && navigator.onLine) {
@@ -269,40 +287,53 @@ async function pass(mode: RunMode, superseded: () => boolean): Promise<boolean> 
   let whole = pull;
   // The tables brought down, for the work that follows them.
   const synced = new Set<string>();
-  for (const spec of ALL_SPECS) {
-    if (pull) setTable(spec.table, 'pulling');
-    try {
-      await syncTable(spec, pull, superseded);
-    } catch (err) {
-      // A tab that does not own the store cannot sync at all: it stops at the
-      // first table rather than fail every one.
-      if (err instanceof MultiTabError) {
-        console.warn('[offline] another tab holds the store; not syncing here');
-        return true;
-      }
-      if (gotNoAnswer(err)) {
+  try {
+    await inParallel(ALL_SPECS, TABLES_AT_ONCE, async (spec) => {
+      // Nothing is brought down for data that is gone.
+      if (superseded()) return;
+      if (pull) setTable(spec.table, 'pulling');
+      try {
+        await syncTable(spec, pull, superseded);
+      } catch (err) {
         if (pull) setTable(spec.table, 'pending');
-        console.warn(
-          `[offline] no answer from the server at ${spec.table}; not syncing further now`,
-        );
-        return false;
+        // What ends the pass rather than this table: a tab that does not own
+        // the store cannot sync at all, and a link that gives no answer gives
+        // the next table none either. Thrown on, so that no table is taken up
+        // after it while those in hand are seen through.
+        if (err instanceof MultiTabError) {
+          console.warn('[offline] another tab holds the store; not syncing here');
+          throw err;
+        }
+        if (gotNoAnswer(err)) {
+          console.warn(
+            `[offline] no answer from the server at ${spec.table}; not syncing further now`,
+          );
+          throw err;
+        }
+        // Network blip, expired token, a column the server doesn't have yet…
+        // Queued changes stay put; we retry on the next trigger (online
+        // event, app focus, or the next user action). Caught per table so
+        // one table that keeps failing doesn't block the rest.
+        whole = false;
+        console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
+        return;
       }
-      // Network blip, expired token, a column the server doesn't have yet…
-      // Queued changes stay put; we retry on the next trigger (online
-      // event, app focus, or the next user action). Caught per table so
-      // one table that keeps failing doesn't block the rest.
-      whole = false;
-      if (pull) setTable(spec.table, 'pending');
-      console.warn(`[offline] sync of ${spec.table} failed, will retry later:`, describe(err));
-      continue;
-    }
-    // Nothing more is brought down for data that is gone, and nothing follows.
-    if (superseded()) return true;
-    if (pull) {
-      synced.add(spec.table);
-      setTable(spec.table, 'done');
-    }
+      if (superseded()) return;
+      if (pull) {
+        synced.add(spec.table);
+        setTable(spec.table, 'done');
+      }
+    });
+  } catch (err) {
+    // Only the two ends above leave the work, and only once what was in hand
+    // is through: a link that gave no answer ends the run, another tab's hold
+    // on the store does not.
+    if (gotNoAnswer(err)) return false;
+    if (err instanceof MultiTabError) return true;
+    throw err;
   }
+  // Nothing follows for data that is gone.
+  if (superseded()) return true;
   // Stamped once a table came down and not otherwise: after a pass that failed
   // on every table, the next screen to open asks again.
   if (synced.size > 0) lastPullAt = Date.now();
@@ -405,6 +436,7 @@ async function pullTable(spec: TableSpec): Promise<Record<string, unknown>[]> {
     if (after !== null) query = query.gt('id', after);
     const { data, error } = await query;
     if (error) throw error;
+    noteAnswer();
     const page = (data ?? []) as unknown as Record<string, unknown>[];
     rows.push(...page);
     if (page.length < SYNC_PULL_PAGE) return rows;
@@ -424,6 +456,7 @@ async function syncTable(spec: TableSpec, pull: boolean, superseded: () => boole
       if (!(await refusedForGood(spec.table, row.id, error))) throw error;
       continue;
     }
+    noteAnswer();
     await engine.markUpserted(spec, row.id, row.updated_at);
   }
 
@@ -436,6 +469,7 @@ async function syncTable(spec: TableSpec, pull: boolean, superseded: () => boole
       if (!(await refusedForGood(spec.table, id, error))) throw error;
       continue;
     }
+    noteAnswer();
     await engine.markDeleted(spec, id);
   }
 

@@ -2,13 +2,20 @@ import { useEffect } from 'react';
 import { IconCheck, IconCloudDownload } from '@tabler/icons-react';
 import { apps } from '../apps/registry';
 import { appHue, type AppHue, type AppModule } from '../apps/types';
-import { syncAll, type SyncStatus, type TableSyncState } from '../lib/offline/sync';
+import { type SyncStatus, type TableSyncState } from '../lib/offline/sync';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { useOnline } from '../hooks/useOnline';
 import Button from '../components/Button';
 import Gate from './Gate';
 import LoadingLine from '../components/LoadingLine';
 import { hueStyle } from '../components/hue';
+
+/** How long a device that already holds everything gives the server to say
+ *  anything at all before it takes the link for dead and lets the member in:
+ *  the run goes on behind them, and the diamond by the wordmark says so. A
+ *  device that has never brought the household down waits however long it
+ *  takes, since what is behind this screen is empty. */
+const FIRST_ANSWER_MS = 2_000;
 
 /** Where an app stands in the run: done once every table of its own is. */
 function appState(app: AppModule, tables: SyncStatus['tables']): TableSyncState {
@@ -62,24 +69,29 @@ function PullRow({ label, state, hue, share, detail }: PullRowProps) {
 }
 
 /**
- * What a device sees the first time, while everything the household has comes
- * down: each app as its tables are pulled, then the documents' files. Stays up
- * until a run has gone through whole, unless the member goes in meanwhile.
+ * What a device shows while what the household has comes down: each app as its
+ * tables are pulled, then the files that are kept. It is up on every open, so
+ * that what is read is what there is — the shell asks for that run and this
+ * screen watches it — and the member can always go in meanwhile.
  */
 export default function FirstSyncScreen({ onEnter }: { onEnter: () => void }) {
-  const { tables, files } = useSyncStatus();
+  const { tables, files, completedAt, answered } = useSyncStatus();
   const online = useOnline();
 
-  // No table's hook is mounted here to ask for a run, so this screen does.
+  // A link the device believes it has but that carries nothing would hold this
+  // screen up for as long as a request's own bound: waiting is for a server
+  // that is answering.
   useEffect(() => {
-    void syncAll();
-  }, []);
+    if (completedAt === null || answered) return;
+    const timer = setTimeout(onEnter, FIRST_ANSWER_MS);
+    return () => clearTimeout(timer);
+  }, [completedAt, answered, onEnter]);
 
   return (
     <Gate
       icon={IconCloudDownload}
       title="Preparando este dispositivo"
-      text="Se baja todo lo de la casa una sola vez; después anda sin conexión."
+      text="Se baja todo lo de la casa; después anda sin conexión."
     >
       <ul className="mt-7 w-full">
         {apps.map((app) => (

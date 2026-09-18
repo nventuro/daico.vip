@@ -133,6 +133,20 @@ are the rules on top of it.
   listeners of its own. Nothing syncs before the member is in: there
   is nothing to sync for anyone else, and a run after a sign-out would build
   the local store again right after the sign-out wiped it.
+- **The one run the app is ever held for is the one it asks for as it opens**
+  (`MainLayout`, once the member is all the way in): `FirstSyncScreen` is up
+  while that run goes, and never for one a screen, a write or a return to the
+  foreground asked for. A device that has never brought everything down waits
+  for a whole run; any other gives the server `FIRST_ANSWER_MS` to say
+  anything at all (`answered` on the sync status) and lets the member in when
+  it says nothing, the link being dead rather than slow. The way in meanwhile
+  is always there, and a device with no connection never waits.
+- **A run has several tables on their way at once** (`TABLES_AT_ONCE`, and
+  `FILES_AT_ONCE` for the kept files): what a pull waits on is the round trip
+  and not the work, and the merges cannot overlap anyway, since the store
+  takes one write at a time. Per table the order is still push, then pull, and
+  a link that gives no answer still ends the run — with the tables in hand
+  seen through and none taken up after them.
 - **The engine and sync are tested against real SQLite and a stand-in server**
   (`src/lib/offline/*.test.ts`, over `testing/sqlocalInMemory.ts` and
   `testing/fakeSupabase.ts`). A change to CRUD, the sync order or the conflict

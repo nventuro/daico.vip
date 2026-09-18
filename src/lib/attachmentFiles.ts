@@ -13,6 +13,7 @@ import { ATTACHMENT_FILES } from './offline/localTables';
 import { ATTACHMENTS_SPEC, TRIP_ITEMS_SPEC, TRIPS_SPEC, type Attachment } from './offline/specs';
 import { reportFiles } from './offline/sync';
 import type { AttachmentOwnerKind } from '../types';
+import { inParallel } from '../utils/parallel';
 import { tooLargeMessage } from '../utils/textUtils';
 import { addDays, todayIso } from '../utils/dateUtils';
 
@@ -365,11 +366,16 @@ export async function fetchAttachmentFile(id: string): Promise<Uint8Array | null
   return bytes;
 }
 
+/** How many kept files are on their way at once. Each is a round trip of its
+ *  own to the bucket, and a device that has just been given the phrase has
+ *  every document to fetch before the app it is opening is up to date. */
+export const FILES_AT_ONCE = 6;
+
 /**
  * Fetch every kept file this device lacks, so its entry can be seen with no
  * connection wherever it was added. One the bucket does not have yet is left
- * for a later run; a failure that may pass later stops the run, with the rest
- * left for the next.
+ * for a later run; a failure that may pass later stops the run, with the files
+ * on their way seen through and the rest left for the next.
  */
 async function fetchKeptFiles(): Promise<void> {
   const missing = await engine.localQuery<{ id: string }>(
@@ -381,11 +387,11 @@ async function fetchKeptFiles(): Promise<void> {
   );
   reportFiles(0, missing.length);
   let done = 0;
-  for (const { id } of missing) {
+  await inParallel(missing, FILES_AT_ONCE, async ({ id }) => {
     const bytes = await downloadObject(id);
     if (bytes) await putAttachmentFile(id, bytes, true);
     reportFiles(++done, missing.length);
-  }
+  });
 }
 
 /** localStorage key of when the sweep last went through on this device. */

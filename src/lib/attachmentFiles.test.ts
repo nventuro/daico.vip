@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import { ATTACHMENT_ORPHAN_MIN_AGE_MS, TRIP_FILES_KEPT_DAYS } from './attachmentFiles';
+import {
+  ATTACHMENT_ORPHAN_MIN_AGE_MS,
+  FILES_AT_ONCE,
+  TRIP_FILES_KEPT_DAYS,
+} from './attachmentFiles';
 import { ATTACHMENTS_SPEC, TRIP_ITEMS_SPEC, TRIPS_SPEC } from './offline/specs';
 import { addDays, todayIso } from '../utils/dateUtils';
 import { FILES, FILES_LIST_PAGE, server } from './offline/testing/fakeSupabase';
@@ -78,6 +82,10 @@ async function tripWithFile(
 const lastKeptDay = () => addDays(todayIso(), -TRIP_FILES_KEPT_DAYS);
 
 const uploads = () => server.calls.filter((c) => c.op === 'upload').length;
+const downloads = () => server.calls.filter((c) => c.op === 'download').length;
+
+/** Let whatever is on its way arrive: one turn of the event loop, no more. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** A run in which the attachments table came down, as a healthy one does. */
 const pulled = new Set([ATTACHMENTS_SPEC.table]);
@@ -306,6 +314,22 @@ describe('syncAttachmentFiles', () => {
     await engine.update(TRIPS_SPEC, 'past', { ends_on: todayIso() });
     await syncAttachmentFiles(pulled);
     expect(await localAttachmentFile('later')).toEqual(bytes('later'));
+  });
+
+  it('fetches as many kept files at once as it may, and no more', async () => {
+    const ids = Array.from({ length: FILES_AT_ONCE + 2 }, (_, i) => `doc${i}`);
+    server.seedFiles(ids.map((id) => ({ name: id, data: bytes(id), uploaded: T0 })));
+    for (const id of ids) await engine.insert(ATTACHMENTS_SPEC, documentRow, id);
+
+    const download = server.hold('download', FILES);
+    const run = syncAttachmentFiles(pulled);
+    await download.started;
+    await settle();
+    expect(downloads()).toBe(FILES_AT_ONCE);
+    download.release();
+    await run;
+
+    for (const id of ids) expect(await localAttachmentFile(id)).toEqual(bytes(id));
   });
 
   it("leaves a document's file the bucket does not have yet for a later run", async () => {

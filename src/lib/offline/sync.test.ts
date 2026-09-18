@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import { SYNC_FRESH_MS, SYNC_PULL_PAGE } from './sync';
+import { SYNC_FRESH_MS, SYNC_PULL_PAGE, TABLES_AT_ONCE } from './sync';
 import { NO_ANSWER } from '../fetchWithin';
 import { ALL_SPECS, CHORES_SPEC, SHOPPING_SPEC, type Chore } from './specs';
 import { server } from './testing/fakeSupabase';
@@ -22,11 +22,24 @@ vi.mock('sqlocal', () => import('./testing/sqlocalInMemory'));
 vi.mock('../supabase', () => import('./testing/fakeSupabase'));
 
 const callLog = () => server.calls.map((c) => `${c.op}:${c.table}`);
+const selects = () => callLog().filter((c) => c.startsWith('select:'));
 
-/** The calls a whole run makes: every table pulled, in spec order, each one
- *  after whatever it had queued to push. */
-function runCalls(pushes: Record<string, string[]>): string[] {
-  return ALL_SPECS.flatMap((spec) => [...(pushes[spec.table] ?? []), `select:${spec.table}`]);
+/** Let whatever is on its way arrive: one turn of the event loop, no more. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** What each table was asked, in the order it was asked it. The tables go
+ *  several at a time, so what one was asked is told apart from the rest. */
+function callsPerTable(): Record<string, string[]> {
+  const perTable: Record<string, string[]> = {};
+  for (const call of server.calls) (perTable[call.table] ??= []).push(call.op);
+  return perTable;
+}
+
+/** Every table pulled, each one after whatever it had queued to push. */
+function runCalls(pushes: Record<string, string[]>): Record<string, string[]> {
+  return Object.fromEntries(
+    ALL_SPECS.map((spec) => [spec.table, [...(pushes[spec.table] ?? []), 'select']]),
+  );
 }
 
 let warn: MockInstance<typeof console.warn>;
@@ -77,7 +90,7 @@ describe('syncAll', () => {
     expect(await bookkeeping('chores', 'b')).toBeNull();
   });
 
-  it('per table pushes upserts, then deletes, then pulls, in spec order', async () => {
+  it('per table pushes upserts, then deletes, then pulls', async () => {
     server.seed('chores', [serverChore('a', T0)]);
     server.seed('shopping_items', [
       { id: 's', name: 'Pan', checked: false, position: null, created_at: T0, updated_at: T0 },
@@ -91,11 +104,8 @@ describe('syncAll', () => {
     await engine.remove(SHOPPING_SPEC, 's');
     await syncAll();
 
-    expect(callLog()).toEqual(
-      runCalls({
-        chores: ['upsert:chores', 'upsert:chores'],
-        shopping_items: ['delete:shopping_items'],
-      }),
+    expect(callsPerTable()).toEqual(
+      runCalls({ chores: ['upsert', 'upsert'], shopping_items: ['delete'] }),
     );
   });
 
@@ -247,21 +257,31 @@ describe('syncAll', () => {
     expect(await engine.listVisible<Chore>(CHORES_SPEC)).toEqual([serverChore('a', T0)]);
   });
 
-  it('ends the run at a request that got no answer, and syncs whole once one comes', async () => {
+  it('takes up no more tables at a request that got no answer, and syncs whole once one comes', async () => {
     server.seed('chores', [serverChore('c1', T0)]);
-    server.fail('select', 'chores', NO_ANSWER);
+    server.fail('select', ALL_SPECS[0].table, NO_ANSWER);
     await syncAll();
-    // The link is dead, not the table: nothing after it is asked.
-    const whole = runCalls({});
-    const stopped = whole.slice(0, whole.indexOf('select:chores') + 1);
-    expect(callLog()).toEqual(stopped);
-    expect(getSyncStatus().syncing).toBe(false);
-    expect(getSyncStatus().completedAt).toBeNull();
+    // The link is dead, not the table: the tables in hand are seen through and
+    // none is taken up after them.
+    expect(selects()).toEqual(ALL_SPECS.slice(0, TABLES_AT_ONCE).map((s) => `select:${s.table}`));
+    expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: null });
     server.restore();
+    server.calls.length = 0;
     await syncAll();
-    expect(callLog().slice(stopped.length)).toEqual(whole);
+    expect(selects()).toHaveLength(ALL_SPECS.length);
     expect(await engine.listVisible(CHORES_SPEC)).toHaveLength(1);
     expect(getSyncStatus().completedAt).toBe(T0);
+  });
+
+  it('has as many tables on their way at once as it may, and no more', async () => {
+    const pull = server.hold('select');
+    const run = syncAll();
+    await pull.started;
+    await settle();
+    expect(selects()).toHaveLength(TABLES_AT_ONCE);
+    pull.release();
+    await run;
+    expect(selects()).toHaveLength(ALL_SPECS.length);
   });
 
   it('ends the run at after-sync work that got no answer', async () => {
@@ -284,7 +304,7 @@ describe('syncAll', () => {
     await syncAll();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);
-    expect(callLog()).toEqual(runCalls({ shopping_items: ['upsert:shopping_items'] }));
+    expect(callsPerTable()).toEqual(runCalls({ shopping_items: ['upsert'] }));
   });
 
   it('coalesces overlapping calls into one extra run that picks up later changes', async () => {
@@ -580,12 +600,13 @@ describe('a run whose data is wiped under it', () => {
     const run = syncAll();
     await pull.started;
     await wiped();
+    const asked = server.calls.length;
     pull.release();
     await run;
 
     expect(await engine.listVisible(CHORES_SPEC)).toEqual([]);
     for (const spec of ALL_SPECS) expect(await engine.listVisible(spec)).toEqual([]);
-    expect(callLog().at(-1)).toBe('select:chores');
+    expect(server.calls).toHaveLength(asked);
   });
 
   it('leaves the run unstamped and runs none of the after-sync work', async () => {
@@ -611,24 +632,43 @@ describe('a run whose data is wiped under it', () => {
 });
 
 describe('sync status', () => {
-  it('reports each table in turn and stamps the run once everything went through', async () => {
+  it('reports the tables as they come down and stamps the run once everything went through', async () => {
     expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: null });
     const seen: string[] = [];
     const stop = subscribeSyncStatus(() => {
       const { syncing, tables } = getSyncStatus();
-      const pulling = Object.entries(tables).find(([, state]) => state === 'pulling')?.[0];
-      seen.push(`${syncing ? 'on' : 'off'}:${pulling ?? '-'}`);
+      const pulling = Object.values(tables).filter((state) => state === 'pulling').length;
+      seen.push(`${syncing ? 'on' : 'off'}:${pulling}`);
     });
     await syncAll();
     stop();
 
-    expect(seen[0]).toBe('on:-');
-    expect(seen.at(-1)).toBe('off:-');
-    // Each table is the one being pulled, in spec order, and never two at once.
-    const pulled = seen.filter((s) => s !== 'on:-' && s !== 'off:-').map((s) => s.slice(3));
-    expect(pulled).toEqual(ALL_SPECS.map((spec) => spec.table));
+    expect(seen[0]).toBe('on:0');
+    expect(seen.at(-1)).toBe('off:0');
+    // Several tables are on their way at a time, and never more than it may
+    // have in hand; every one of them is ticked off by the end.
+    const pulling = seen.map((s) => Number(s.slice(s.indexOf(':') + 1)));
+    expect(Math.max(...pulling)).toBe(TABLES_AT_ONCE);
     expect(Object.values(getSyncStatus().tables)).toEqual(ALL_SPECS.map(() => 'done'));
     expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: T0 });
+  });
+
+  it('says whether the server has answered anything in the run going', async () => {
+    const pull = server.hold('select');
+    const run = syncAll();
+    await pull.started;
+    expect(getSyncStatus().answered).toBe(false);
+    pull.release();
+    await run;
+    expect(getSyncStatus().answered).toBe(true);
+
+    // A run of its own again: what the last one heard says nothing about this.
+    const next = server.hold('select');
+    const second = syncAll();
+    await next.started;
+    expect(getSyncStatus().answered).toBe(false);
+    next.release();
+    await second;
   });
 
   it('leaves the run unstamped when a table or the after-sync work fails', async () => {
