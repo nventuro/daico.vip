@@ -587,6 +587,8 @@ export interface Idea extends SyncedRow {
   title: string;
   group_name: string;
   body: string;
+  /** Out of the way: listed under «Archivadas», and found by Buscar as such. */
+  archived: boolean;
 }
 
 export const IDEAS_SPEC: TableSpec<Idea> = {
@@ -595,11 +597,14 @@ export const IDEAS_SPEC: TableSpec<Idea> = {
     title: { ddl: 'TEXT NOT NULL' },
     group_name: { ddl: 'TEXT NOT NULL' },
     body: { ddl: "TEXT NOT NULL DEFAULT ''" },
+    archived: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
   },
-  // The section a row falls in is its group; inside one, the idea last
-  // written on comes first. Groups are ordered again on display, in the
-  // household's language, since this order puts an accented name last.
-  orderBy: 'group_name ASC, updated_at DESC, created_at DESC',
+  // The archived ideas come after every other, so whatever reads the list in
+  // order meets them last. The section a row falls in is its group; inside
+  // one, the idea last written on comes first. Groups are ordered again on
+  // display, in the household's language, since this order puts an accented
+  // name last.
+  orderBy: 'archived ASC, group_name ASC, updated_at DESC, created_at DESC',
 };
 
 // ─── Viajes ──────────────────────────────────────────────────────────────────

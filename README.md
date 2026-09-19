@@ -179,6 +179,10 @@ text such as «comer» or «películas») and a markdown body, all in the clear 
 a recipe. A group is not a table: it is whatever ideas name it, and goes when
 the last of them does; an idea can also be filed under none, and those are
 listed ahead of the groups. Born in the group of the idea last written on.
+An idea that was tried, or dropped, is archived from its page (`archived`):
+it leaves the list for the «Archivadas» at its foot, filed under the same
+groups, stays written on like any other, and Buscar still finds it, after the
+rest and saying so.
 
 **Viajes** — `trips` (a title and its days, both optional) and `trip_items`,
 every row of a trip in one table told apart by `kind`: a pendiente to resolve

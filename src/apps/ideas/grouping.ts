@@ -27,7 +27,8 @@ export function groupIdeas(ideas: Idea[]): IdeaGroup[] {
 }
 
 /** The names of the groups there are, in name order; none for the ideas
- *  filed under none. */
+ *  filed under none. The archived ideas' groups are there too, since an idea
+ *  can be moved to a group only they still name. */
 export function groupNames(ideas: Idea[]): string[] {
   return groupIdeas(ideas)
     .map((group) => group.name)

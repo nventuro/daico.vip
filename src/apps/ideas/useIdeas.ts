@@ -3,8 +3,8 @@ import { IDEAS_SPEC } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { lowercaseTrimmed } from '../../utils/textUtils';
 
-/** Everything the user decides about an idea: its title, the group it is
- *  filed under — `''` for none — and the body as it is written. */
+/** What an idea is born with: its title, the group it is filed under — `''`
+ *  for none — and the body as it is written. */
 export interface IdeaInput {
   title: string;
   group_name: string;
@@ -22,7 +22,7 @@ export function useIdeas() {
     (input: IdeaInput): Promise<string | undefined> => {
       const title = lowercaseTrimmed(input.title);
       if (!title) return Promise.resolve(undefined);
-      return insert({ ...input, title });
+      return insert({ ...input, title, archived: false });
     },
     [insert],
   );

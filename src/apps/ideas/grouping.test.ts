@@ -8,6 +8,7 @@ function idea(id: string, group: string, editedAt = '2026-09-01T12:00:00.000Z'):
     title: id,
     group_name: group,
     body: '',
+    archived: false,
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: editedAt,
   };

@@ -388,6 +388,19 @@ The README's «Ideas» says what an idea is. These are the rules on top of it.
   Their order is the household's language (`Intl.Collator('es')` in
   `grouping.ts`), with the ideas filed under none — `group_name` empty,
   `NO_GROUP` — ahead of them all and under no divider.
+- **An idea is archived one at a time, from its page, and never frozen.**
+  `ideas.archived` is flipped by the icon beside the trash — one tap, no
+  question, the page stays — and an archived idea is written on like any
+  other. The list keeps them in the one «Archivadas» at its foot
+  (`CompletedSection`), under the same dividers; never a fold per group,
+  which would keep a group on the list with nothing under it, and never a
+  group archived whole. **Buscar finds an archived idea**, after the ones on
+  the list and saying «Archivada» — unlike an archived guide, left out
+  because its chapters would flood the results: an archived idea is often the
+  record of something tried. The groups offered on a page are every idea's,
+  the archived ones' included; the group a new idea is born in is that of
+  the idea last written on **among those on the list**, since archiving is a
+  write too.
 
 ## Viajes — read before touching them
 
