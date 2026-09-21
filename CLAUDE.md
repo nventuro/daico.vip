@@ -411,9 +411,31 @@ and what becomes of a forwarded email. These are the rules on top of it.
   and a row's kind is never changed. **Only a dated pendiente reaches Próximo.**
 - **Everything travels in the clear**: a row's free text is `comments`, like a
   chore's, so Buscar matches a booking code, and a row carries pictures the way
-  a chore does. Airport codes are typed by hand and offered from the curated
-  list in `airports.ts` — never a lookup, which does not work offline, and never
-  the full IATA set, which would be precached on every device.
+  a chore does.
+- **The airports are every airport, bundled and never looked up.**
+  `airportList.ts` is written by `npm run airports:generate` from the
+  OurAirports dataset — every open airport with an IATA code — and never
+  edited by hand. A lookup does not work offline, and a list picked by hand is
+  either a guess at where the household flies or a record of it, in a public
+  repository. An airport is called by its city, in the city's own name
+  («München») or the English one where the language is not written in the
+  Latin alphabet («Tokyo»), and a parenthesis says only what tells it from
+  another entry: the airport's name where its city has several, the country
+  where the city's name is also another place's — every such place taking it,
+  none being the default. **The parenthesis is always the script's**: what is
+  written by hand (`scripts/generate-airports/names.mjs`) is a city's name or
+  an airport's short name, never a whole label, and the script refuses to
+  write two airports that read alike. A change to how a label is worked out
+  comes with a test in `labels.test.mjs`, and the dataset is kept by
+  volunteers, so a regenerated list's diff is read before it is kept.
+- **An airport's field offers from the browser's own `<datalist>`, handed only
+  what fits what is typed** (`airportMatches`) — never the whole list as
+  options, and never a control of our own in its place. A browser hides an
+  option that does not contain the letters as they were typed, so an option
+  is written the way it is being typed (`airportOptionText`), and reads back
+  as the same code. A field left with text that means no airport, or any of
+  several, goes back to the airport it held (`airportAfterTyping`); three
+  letters are always a code, listed or not.
 - **A pasaje says what it travels on** (`transport`, one of `TRIP_TRANSPORTS`),
   null on every other class. It is chosen on the pasaje's page, by the chips
   over Salida, and unlike the kind it may be changed: every transport draws

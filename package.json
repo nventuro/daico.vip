@@ -20,6 +20,7 @@
     "db:verify": "node scripts/verify-db-security.mjs",
     "db:migration:new": "supabase migration new",
     "guides:import": "node scripts/import-guides.mjs",
+    "airports:generate": "node scripts/generate-airports.mjs",
     "worker:test": "npm --prefix worker test && npm --prefix worker run check",
     "worker:deploy": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN -- npx wrangler deploy",
     "worker:secret": "cd worker && node ../scripts/with-env.mjs CLOUDFLARE_API_TOKEN=CLOUDFLARE_INBOX_API_TOKEN ANTHROPIC_API_KEY -- sh -c 'printf %s \"$ANTHROPIC_API_KEY\" | npx wrangler secret put ANTHROPIC_API_KEY'",

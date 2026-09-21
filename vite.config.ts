@@ -173,7 +173,10 @@ export default defineConfig({
         // ProseMirror is the bulk of the editor, which only a body loads: in a
         // chunk of its own the editor's stays under that size too, and the
         // part that never changes between builds keeps its cache entry.
+        // The airports are a list as large as a library and change as rarely:
+        // in the main chunk every update would bring them down again.
         manualChunks: (id) => {
+          if (id.endsWith('/src/apps/viajes/airportList.ts')) return 'airports';
           if (id.includes('node_modules/@supabase/')) return 'supabase';
           if (id.includes('node_modules/prosemirror-') || id.includes('node_modules/@tiptap/pm/'))
             return 'prosemirror';

@@ -61,13 +61,15 @@ describe("a pasaje's controls", () => {
     expect(pressed(html)).toEqual(['Tren']);
   });
 
-  it('shows a flight its airports by name, offered from the list of them', () => {
+  it('shows a flight its airports by name, offering the ones already flown through', () => {
     const html = pasaje({ transport: 'flight', origin: 'AEP', destination: 'XQX' });
     expect(html).toContain('aria-label="Aeropuerto de salida"');
     expect(html).toContain('value="AEP — Buenos Aires (Aeroparque)"');
     // One the list has never heard of is still its code.
     expect(html).toContain('value="XQX"');
     expect(html).toContain('<option value="BRC — Bariloche">');
+    // The list is thousands: until something is typed, only its own are drawn.
+    expect(html).not.toContain('<option value="MAD');
     expect(html).not.toContain('Estación Norte');
   });
 

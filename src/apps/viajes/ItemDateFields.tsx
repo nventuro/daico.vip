@@ -7,7 +7,7 @@ import TimePicker from '../../components/TimePicker';
 import { CONTROL_CLASS } from '../../components/controlClasses';
 import AirportField from './AirportField';
 import StationField from './StationField';
-import { AIRPORT_LIST_ID, airportOptionValue, airportOptions } from './airports';
+import { ownAirports } from './airports';
 import { TRIP_TRANSPORT_DEFAULT, TRIP_TRANSPORT_ICONS } from './kinds';
 import { TRIP_TRANSPORT_LABELS, TRIP_TRANSPORT_PLACES } from './labels';
 import { STATION_LIST_ID, stationOptions } from './stations';
@@ -42,7 +42,7 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
   // What the household has already travelled through ranks first, so a list
   // opens on the handful of places it actually uses.
   const { items } = useTripItems();
-  const airports = useMemo(() => airportOptions(items), [items]);
+  const airports = useMemo(() => ownAirports(items), [items]);
   const stations = useMemo(() => stationOptions(items), [items]);
 
   switch (kind) {
@@ -69,12 +69,7 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
         const change = (value: string | null) =>
           onChange(end === 'origin' ? { origin: value } : { destination: value });
         return flight ? (
-          <AirportField
-            value={fields[end]}
-            onChange={change}
-            label={label}
-            list={AIRPORT_LIST_ID}
-          />
+          <AirportField value={fields[end]} onChange={change} label={label} own={airports} />
         ) : (
           <StationField
             value={fields[end]}
@@ -107,13 +102,8 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
               );
             })}
           </div>
-          {flight ? (
-            <datalist id={AIRPORT_LIST_ID}>
-              {airports.map(([code, city]) => (
-                <option key={code} value={airportOptionValue(code, city)} />
-              ))}
-            </datalist>
-          ) : (
+          {/* An airport's field draws its own list, from what is typed in it. */}
+          {!flight && (
             <datalist id={STATION_LIST_ID}>
               {stations.map((name) => (
                 <option key={name} value={name} />

@@ -194,7 +194,11 @@ deleting a trip takes its rows with it. A pasaje says what it travels on
 (`transport`: a flight, a train or a bus), which is the icon its row wears, and
 where it leaves from and arrives — an airport, held as its IATA code and shown
 by name, or a station's name as the ticket prints it — and its row reads a line
-for each end: when, then where. A pasaje keeps its boarding passes — what it
+for each end: when, then where. The airports it knows are every open airport
+with an IATA code, bundled so the list works offline: `npm run
+airports:generate` writes them from the public-domain
+[OurAirports](https://ourairports.com/data/) dataset, each called by its city
+and by only as much more as tells it from another. A pasaje keeps its boarding passes — what it
 is boarded with, an airline's or a train's or a bus's ticket with its code —
 on a shelf of their own, apart from its other files, and ahead of its leaving
 the home screen asks for one until a file is on that shelf: from the day
