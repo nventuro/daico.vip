@@ -653,24 +653,6 @@ describe('sync status', () => {
     expect(getSyncStatus()).toMatchObject({ syncing: false, completedAt: T0 });
   });
 
-  it('says whether the server has answered anything in the run going', async () => {
-    const pull = server.hold('select');
-    const run = syncAll();
-    await pull.started;
-    expect(getSyncStatus().answered).toBe(false);
-    pull.release();
-    await run;
-    expect(getSyncStatus().answered).toBe(true);
-
-    // A run of its own again: what the last one heard says nothing about this.
-    const next = server.hold('select');
-    const second = syncAll();
-    await next.started;
-    expect(getSyncStatus().answered).toBe(false);
-    next.release();
-    await second;
-  });
-
   it('leaves the run unstamped when a table or the after-sync work fails', async () => {
     server.fail('select', 'chores');
     await syncAll();

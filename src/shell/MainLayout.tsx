@@ -1,10 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { Link, NavigationType, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { IconSearch, IconSettings } from '@tabler/icons-react';
 import IconButton from '../components/IconButton';
 import UndoNotice from '../components/UndoNotice';
 import { recordVisit } from '../lib/visited';
-import { syncAll } from '../lib/offline/sync';
 import { useAppContext } from './appContext';
 import { useDbOwnership } from '../hooks/useDbOwnership';
 import { useMasterKey } from '../hooks/useMasterKey';
@@ -26,29 +25,6 @@ export default function MainLayout() {
   const syncing = useSyncStatus((status) => status.syncing);
   const completedAt = useSyncStatus((status) => status.completedAt);
   const [enteredEarly, setEnteredEarly] = useState(false);
-  const enter = useCallback(() => setEnteredEarly(true), []);
-  // Whether the run this page load asks for is still going. A device with no
-  // connection asks for none, so it has nothing to wait for.
-  const [opening, setOpening] = useState(() => navigator.onLine);
-  const asked = useRef(false);
-  // The member is all the way in: the store is this tab's and the key is here,
-  // so there is somewhere to sync into and the screens can be read.
-  const inside =
-    Boolean(session) && isMember && dbOwnership === 'owner' && masterKey.status === 'unlocked';
-  // The one run the app asks for on its own account, told apart from every
-  // other by being this one's to wait on: what a table's screen or a write
-  // asks for later is nobody's to hold the app for.
-  useEffect(() => {
-    if (!inside) {
-      asked.current = false;
-      return;
-    }
-    if (asked.current) return;
-    asked.current = true;
-    // A device with no connection asks for a run that is over before it began,
-    // so it waits for nothing.
-    void syncAll().finally(() => setOpening(false));
-  }, [inside]);
   // Every screen's way out reads this record, so every screen is told to it —
   // whichever gate below the layout stops at.
   const { key, pathname } = useLocation();
@@ -74,12 +50,10 @@ export default function MainLayout() {
   // is typed: the documents it would show are unreadable without it.
   if (masterKey.status === 'loading') return null;
   if (masterKey.status === 'locked') return <UnlockScreen />;
-  // What is on its way is shown while it comes: on a device that has never
-  // brought everything down until it has, and on every other open while the
-  // run this page load asked for goes — unless the member would rather go in
-  // meanwhile.
-  if ((opening || completedAt === null) && !enteredEarly)
-    return <FirstSyncScreen onEnter={enter} />;
+  // A device that has never brought everything down shows what is on its way,
+  // unless the member would rather go in meanwhile.
+  if (completedAt === null && !enteredEarly)
+    return <FirstSyncScreen onEnter={() => setEnteredEarly(true)} />;
 
   return (
     <div className="flex min-h-dvh flex-col bg-surface text-on-surface">

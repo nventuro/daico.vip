@@ -49,9 +49,6 @@ export type TableSyncState = 'pending' | 'pulling' | 'done';
  *  got, and when this device last brought everything down. */
 export interface SyncStatus {
   syncing: boolean;
-  /** Whether the server has answered anything in the run going, whatever it
-   *  answered. Until it has, the link may be dead rather than slow. */
-  answered: boolean;
   /** Each table's place in the current run, by table name. */
   tables: Readonly<Record<string, TableSyncState>>;
   /** The documents' files fetched so far in this run, of those this device
@@ -86,7 +83,6 @@ function writeCompletedAt(iso: string | null): void {
 
 let status: SyncStatus = {
   syncing: false,
-  answered: false,
   tables: {},
   files: null,
   completedAt: readCompletedAt(),
@@ -100,11 +96,6 @@ function setStatus(patch: Partial<SyncStatus>): void {
 
 function setTable(table: string, state: TableSyncState): void {
   setStatus({ tables: { ...status.tables, [table]: state } });
-}
-
-/** Note that the server has spoken in this run: the link is alive. */
-function noteAnswer(): void {
-  if (!status.answered) setStatus({ answered: true });
 }
 
 /** The sync status right now, for code outside React. */
@@ -177,7 +168,7 @@ export function resetSyncStatus(): void {
   generation += 1;
   writeCompletedAt(null);
   lastPullAt = null;
-  setStatus({ tables: {}, files: null, completedAt: null, answered: false });
+  setStatus({ tables: {}, files: null, completedAt: null });
 }
 
 // ─── Runs ────────────────────────────────────────────────────────────────────
@@ -250,7 +241,7 @@ function pullIsStale(): boolean {
 async function runPasses(first: RunMode): Promise<void> {
   const run = generation;
   const superseded = () => generation !== run;
-  setStatus({ syncing: true, answered: false });
+  setStatus({ syncing: true });
   try {
     let next: RunMode | null = first;
     while (next !== null && navigator.onLine) {
@@ -436,7 +427,6 @@ async function pullTable(spec: TableSpec): Promise<Record<string, unknown>[]> {
     if (after !== null) query = query.gt('id', after);
     const { data, error } = await query;
     if (error) throw error;
-    noteAnswer();
     const page = (data ?? []) as unknown as Record<string, unknown>[];
     rows.push(...page);
     if (page.length < SYNC_PULL_PAGE) return rows;
@@ -456,7 +446,6 @@ async function syncTable(spec: TableSpec, pull: boolean, superseded: () => boole
       if (!(await refusedForGood(spec.table, row.id, error))) throw error;
       continue;
     }
-    noteAnswer();
     await engine.markUpserted(spec, row.id, row.updated_at);
   }
 
@@ -469,7 +458,6 @@ async function syncTable(spec: TableSpec, pull: boolean, superseded: () => boole
       if (!(await refusedForGood(spec.table, id, error))) throw error;
       continue;
     }
-    noteAnswer();
     await engine.markDeleted(spec, id);
   }
 

@@ -133,14 +133,12 @@ are the rules on top of it.
   listeners of its own. Nothing syncs before the member is in: there
   is nothing to sync for anyone else, and a run after a sign-out would build
   the local store again right after the sign-out wiped it.
-- **The one run the app is ever held for is the one it asks for as it opens**
-  (`MainLayout`, once the member is all the way in): `FirstSyncScreen` is up
-  while that run goes, and never for one a screen, a write or a return to the
-  foreground asked for. A device that has never brought everything down waits
-  for a whole run; any other gives the server `FIRST_ANSWER_MS` to say
-  anything at all (`answered` on the sync status) and lets the member in when
-  it says nothing, the link being dead rather than slow. The way in meanwhile
-  is always there, and a device with no connection never waits.
+- **The app is held for a sync only on a device that has never brought
+  everything down** (`completedAt` null, in `MainLayout`): `FirstSyncScreen`
+  asks for a run and stays up until one goes through whole, with the way in
+  meanwhile always there. Every other open goes straight in with what the
+  device holds, and the run its screens ask for goes on behind the diamond —
+  never a screen over the app for it.
 - **A run has several tables on their way at once** (`TABLES_AT_ONCE`, and
   `FILES_AT_ONCE` for the kept files): what a pull waits on is the round trip
   and not the work, and the merges cannot overlap anyway, since the store
