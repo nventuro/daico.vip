@@ -1,8 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import type { TripItem } from '../../lib/offline/specs';
-import { AIRPORTS, airportOptionValue, airportOptions, resolveAirportCode } from './airports';
+import type { TripItem, TripTransport } from '../../lib/offline/specs';
+import {
+  AIRPORTS,
+  airportFieldValue,
+  airportLabel,
+  airportOptionValue,
+  airportOptions,
+  resolveAirportCode,
+} from './airports';
 
-function pasaje(from: string | null, to: string | null): TripItem {
+function pasaje(
+  from: string | null,
+  to: string | null,
+  transport: TripTransport = 'flight',
+): TripItem {
   return {
     id: `${from}${to}`,
     trip_id: 'v',
@@ -12,8 +23,9 @@ function pasaje(from: string | null, to: string | null): TripItem {
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: from,
-    to_code: to,
+    transport,
+    origin: from,
+    destination: to,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -49,6 +61,30 @@ describe('airportOptions', () => {
   it('offers a code of its own that the list has never heard of', () => {
     const [first] = airportOptions([pasaje('ZZZ', null)]);
     expect(first).toEqual(['ZZZ', '']);
+  });
+
+  it('never offers a station, whether a train names it or a flight was left holding it', () => {
+    const items = [pasaje('MAD', 'BCN', 'train'), pasaje('London St Pancras', 'EZE')];
+    const offered = airportOptions(items).map(([code]) => code);
+    expect(offered[0]).toBe('EZE');
+    expect(offered).not.toContain('London St Pancras');
+    expect(offered).toHaveLength(AIRPORTS.length);
+  });
+});
+
+describe('an airport by name', () => {
+  it('is its code and city in a row, and what its option reads in its field', () => {
+    expect(airportLabel('BRC')).toBe('BRC Bariloche');
+    expect(airportFieldValue('BRC')).toBe('BRC — Bariloche');
+  });
+
+  it('is the code alone for one the list cannot name', () => {
+    expect(airportLabel('ZZZ')).toBe('ZZZ');
+    expect(airportFieldValue('ZZZ')).toBe('ZZZ');
+  });
+
+  it('reads back as the same code once its field is left untouched', () => {
+    expect(resolveAirportCode(airportFieldValue('LGW'))).toBe('LGW');
   });
 });
 

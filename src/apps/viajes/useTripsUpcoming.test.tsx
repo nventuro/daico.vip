@@ -16,8 +16,9 @@ function item(id: string, kind: TripKind, overrides: Partial<TripItem> = {}): Tr
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: null,
-    to_code: null,
+    transport: null,
+    origin: null,
+    destination: null,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -31,8 +32,9 @@ function flight(id: string, days: number, overrides: Partial<TripItem> = {}): Tr
   return item(id, 'ticket', {
     on_date: addDays(TODAY, days),
     at_time: '08:40',
-    from_code: 'AEP',
-    to_code: 'BRC',
+    transport: 'flight',
+    origin: 'AEP',
+    destination: 'BRC',
     ...overrides,
   });
 }
@@ -94,35 +96,51 @@ describe('useTripsUpcoming', () => {
     expect(upcoming()).toEqual(['vencido /viajes/v1/vencido']);
   });
 
-  it('never takes anything already booked, however soon it is — save a flight without its boarding pass', () => {
-    state.attachments = [];
+  it('never takes anything already booked, however soon it is — save a pasaje without its boarding pass', () => {
     state.items = [
-      item('pasaje', 'ticket', { on_date: addDays(TODAY, 1) }),
+      flight('pasaje', 1),
       item('alojamiento', 'lodging', { on_date: addDays(TODAY, 1) }),
       item('reserva', 'booking', { on_date: addDays(TODAY, 1) }),
       item('lugar', 'place'),
     ];
+    state.attachments = [file('boarding_pass', 'pasaje')];
     expect(upcoming()).toEqual([]);
   });
 
-  it('asks for a boarding pass from the day before a flight until it has left, and never for a bus', () => {
+  it('asks for a boarding pass from the day before a flight until it has left', () => {
     state.attachments = [];
     state.items = [
       flight('mañana', 1),
       flight('hoy', 0),
       flight('pasado mañana', 2),
       flight('ayer', -1),
-      // A ticket with no airports is a bus: nothing to check in for.
-      item('micro', 'ticket', { on_date: addDays(TODAY, 1) }),
+      // A flight asks whether or not its airports are written down.
+      flight('sin aeropuertos', 1, { origin: null, destination: null }),
       flight('sin día', 1, { on_date: null }),
     ];
     expect(upcoming()).toEqual([
       'boarding pass · mañana /viajes/v1/mañana',
       'boarding pass · hoy /viajes/v1/hoy',
+      'boarding pass · sin aeropuertos /viajes/v1/sin aeropuertos',
     ]);
   });
 
-  it('stops asking with the first boarding pass on the flight, and only a boarding pass', () => {
+  it('asks a train and a bus for theirs as early as a pendiente, since it comes with the booking', () => {
+    state.attachments = [];
+    state.items = [
+      flight('tren', 7, { transport: 'train', origin: 'Estación Norte' }),
+      flight('micro', 3, { transport: 'bus' }),
+      flight('vuelo', 3),
+      flight('tren lejano', 8, { transport: 'train' }),
+      flight('micro que salió', -1, { transport: 'bus' }),
+    ];
+    expect(upcoming()).toEqual([
+      'boarding pass · tren /viajes/v1/tren',
+      'boarding pass · micro /viajes/v1/micro',
+    ]);
+  });
+
+  it('stops asking with the first boarding pass on the pasaje, and only a boarding pass', () => {
     state.items = [flight('con pase', 1), flight('con e-ticket', 1)];
     state.attachments = [file('boarding_pass', 'con pase'), file('trip_item', 'con e-ticket')];
     expect(upcoming()).toEqual(['boarding pass · con e-ticket /viajes/v1/con e-ticket']);

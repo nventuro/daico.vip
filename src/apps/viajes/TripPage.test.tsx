@@ -22,8 +22,9 @@ function item(id: string, kind: TripKind, done = false): TripItem {
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: null,
-    to_code: null,
+    transport: null,
+    origin: null,
+    destination: null,
     done,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -92,6 +93,32 @@ describe('TripPage', () => {
     expect(booking).toBeLessThan(place);
     // Nothing was booked to sleep in, so the section is not drawn at all.
     expect(html).not.toContain('Alojamiento');
+  });
+
+  it('draws each pasaje under what it travels on, a line for each end of it', () => {
+    state.items = [
+      { ...item('vuelo', 'ticket'), transport: 'flight', origin: 'AEP', destination: 'BRC' },
+      {
+        ...item('tren', 'ticket'),
+        transport: 'train',
+        origin: 'Estación Norte',
+        destination: 'Estación Sur',
+      },
+      { ...item('micro', 'ticket'), transport: 'bus' },
+    ];
+    const html = render();
+    const [plane, train, bus] = positions(html, [
+      'tabler-icon-plane',
+      'tabler-icon-train',
+      'tabler-icon-bus',
+    ]);
+    expect(plane).toBeGreaterThan(-1);
+    expect(plane).toBeLessThan(train);
+    expect(train).toBeLessThan(bus);
+    expect(html).toContain('>AEP Buenos Aires (Aeroparque)<');
+    expect(html).toContain('>BRC Bariloche<');
+    expect(html).toContain('>Estación Norte<');
+    expect(html).toContain('>Estación Sur<');
   });
 
   it('leaves the ticked pendientes out of the list, under Hechos', () => {

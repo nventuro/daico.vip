@@ -10,9 +10,9 @@ import { compareLastWritten } from '../../utils/listUtils';
 import { normalize } from '../../utils/textUtils';
 import {
   TRIP_SECTION_LABELS,
-  createFlightLabel,
-  createTripWithFlightLabel,
-  flightChoiceLabel,
+  createTicketLabel,
+  createTripWithTicketLabel,
+  ticketChoiceLabel,
 } from './labels';
 
 /** One drawn section of a trip: everything of one class it holds. */
@@ -86,7 +86,7 @@ export interface InboxGroup {
   /** When the email was read, as an ISO instant: the earliest of its rows. */
   receivedAt: string;
   items: TripInboxItem[];
-  /** Whether the group is one flight's boarding pass rather than bookings. */
+  /** Whether the group is one pasaje's boarding pass rather than bookings. */
   boardingPass: boolean;
 }
 
@@ -173,20 +173,20 @@ export function suggestedTripChoice(choices: Trip[]): string {
 /** Where a boarding pass goes: on a pasaje there is, on one made for it in a
  *  trip there is, or on one made in a trip made for it too. */
 export type BoardingPassTarget =
-  | { kind: 'flight'; tripId: string; flightId: string }
-  | { kind: 'new-flight'; tripId: string }
+  | { kind: 'ticket'; tripId: string; ticketId: string }
+  | { kind: 'new-ticket'; tripId: string }
   | { kind: 'new-trip' };
 
 /** One option of the selector a boarding pass is placed with. */
 export interface BoardingPassChoice {
-  /** What the option is worth to the control; a flight's id, or a word no
+  /** What the option is worth to the control; a pasaje's id, or a word no
    *  uuid can be. */
   value: string;
   label: string;
   target: BoardingPassTarget;
 }
 
-const NEW_FLIGHT_PREFIX = 'new:';
+const NEW_TICKET_PREFIX = 'new:';
 
 /**
  * The places a boarding pass may go, in the selector's order: the pasajes of
@@ -201,50 +201,55 @@ export function boardingPassChoices(
   today: string,
 ): BoardingPassChoice[] {
   const candidates = inboxTripChoices(trips, today);
-  const flights = candidates.flatMap((trip) =>
+  const tickets = candidates.flatMap((trip) =>
     items
       .filter((item) => item.trip_id === trip.id && item.kind === 'ticket')
-      .map((flight): BoardingPassChoice => ({
-        value: flight.id,
-        label: flightChoiceLabel(flight, trip.title, today),
-        target: { kind: 'flight', tripId: trip.id, flightId: flight.id },
+      .map((ticket): BoardingPassChoice => ({
+        value: ticket.id,
+        label: ticketChoiceLabel(ticket, trip.title, today),
+        target: { kind: 'ticket', tripId: trip.id, ticketId: ticket.id },
       })),
   );
-  const newFlights = candidates.map((trip): BoardingPassChoice => ({
-    value: `${NEW_FLIGHT_PREFIX}${trip.id}`,
-    label: createFlightLabel(trip.title),
-    target: { kind: 'new-flight', tripId: trip.id },
+  const newTickets = candidates.map((trip): BoardingPassChoice => ({
+    value: `${NEW_TICKET_PREFIX}${trip.id}`,
+    label: createTicketLabel(trip.title),
+    target: { kind: 'new-ticket', tripId: trip.id },
   }));
   return [
-    ...flights,
-    ...newFlights,
+    ...tickets,
+    ...newTickets,
     {
       value: CREATE_TRIP_CHOICE,
-      label: createTripWithFlightLabel(tripTitle),
+      label: createTripWithTicketLabel(tripTitle),
       target: { kind: 'new-trip' },
     },
   ];
 }
 
-/** Words as a flight number is compared: case, accents and spacing aside. */
+/** Words as a flight's or a train's number is compared: case, accents and
+ *  spacing aside. */
 function compact(text: string): string {
   return normalize(text).replace(/\s+/g, '');
 }
 
 /**
  * How well a pasaje matches a staged boarding pass: leaving the same day
- * between the same airports is best, the same day with one airport or none
- * next, and the same flight number on another day is worth something still;
- * nothing else is.
+ * between the same places is best, the same day with one place or none next,
+ * and the same number on another day is worth something still; nothing else
+ * is, and neither is a pasaje that travels on something else — a train's pass
+ * is never a flight's, whatever the day.
  */
-function matchScore(row: TripInboxItem, flight: TripItem): number {
-  if (row.on_date !== null && flight.on_date === row.on_date) {
-    const codes = [row.from_code, row.to_code].filter(
-      (code, i) => code !== null && code === (i === 0 ? flight.from_code : flight.to_code),
-    ).length;
-    return 2 + codes;
+function matchScore(row: TripInboxItem, ticket: TripItem): number {
+  if (row.transport !== null && ticket.transport !== null && row.transport !== ticket.transport) {
+    return 0;
   }
-  return compact(flight.title).includes(compact(row.title)) ? 1 : 0;
+  if (row.on_date !== null && ticket.on_date === row.on_date) {
+    const places = [row.origin, row.destination].filter(
+      (place, i) => place !== null && place === (i === 0 ? ticket.origin : ticket.destination),
+    ).length;
+    return 2 + places;
+  }
+  return compact(ticket.title).includes(compact(row.title)) ? 1 : 0;
 }
 
 /**
@@ -259,11 +264,11 @@ export function suggestedBoardingPassChoice(
 ): string {
   let best: { value: string; score: number } | null = null;
   for (const { value, target } of choices) {
-    if (target.kind !== 'flight') continue;
-    const flight = items.find((item) => item.id === target.flightId);
-    const score = flight ? matchScore(row, flight) : 0;
+    if (target.kind !== 'ticket') continue;
+    const ticket = items.find((item) => item.id === target.ticketId);
+    const score = ticket ? matchScore(row, ticket) : 0;
     if (score > 0 && (best === null || score > best.score)) best = { value, score };
   }
   if (best) return best.value;
-  return choices.find((choice) => choice.target.kind === 'new-flight')?.value ?? CREATE_TRIP_CHOICE;
+  return choices.find((choice) => choice.target.kind === 'new-ticket')?.value ?? CREATE_TRIP_CHOICE;
 }

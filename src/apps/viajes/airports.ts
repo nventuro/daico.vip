@@ -1,5 +1,6 @@
 import type { TripItem } from '../../lib/offline/specs';
 import { normalize } from '../../utils/textUtils';
+import { isFlight } from './kinds';
 
 /**
  * The airports a pasaje offers, by IATA code. Curated on purpose: the full IATA
@@ -446,8 +447,23 @@ export const AIRPORT_LIST_ID = 'viajes-aeropuertos';
 /** How long an IATA code is, and so how much of an option's value is one. */
 const IATA_LENGTH = 3;
 
+/** What an IATA code reads like. */
+const IATA_CODE = /^[A-Z]{3}$/;
+
 /** The city each listed code stands for. */
 const CITIES = new Map(AIRPORTS.map(([code, city]) => [code, city]));
+
+/** An airport as a row names it: its code, then the city when the list knows
+ *  it — an airport is remembered by where it is, not by three letters. */
+export function airportLabel(code: string): string {
+  const city = CITIES.get(code);
+  return city ? `${code} ${city}` : code;
+}
+
+/** An airport as its field shows it once chosen: what its option reads. */
+export function airportFieldValue(code: string): string {
+  return airportOptionValue(code, CITIES.get(code) ?? '');
+}
 
 /**
  * How an airport is offered: the code first, then the city, in one string.
@@ -469,7 +485,7 @@ export function airportOptionValue(code: string, city: string): string {
 export function resolveAirportCode(text: string): string | null {
   const typed = text.trim();
   const head = typed.slice(0, IATA_LENGTH).toUpperCase();
-  const isCode = /^[A-Z]{3}$/.test(head);
+  const isCode = IATA_CODE.test(head);
   const alone = typed.length === IATA_LENGTH;
 
   // A picked option hands over its whole value, which the code leads.
@@ -491,15 +507,16 @@ export function resolveAirportCode(text: string): string | null {
 
 /**
  * The codes to offer, the household's own first: every airport already used in
- * a pasaje, most used first, then the bundled list. Where the household flies
+ * a flight, most used first, then the bundled list. Where the household flies
  * is private, so that half is read from the device's own rows and never
  * committed.
  */
 export function airportOptions(items: readonly TripItem[]): (readonly [string, string])[] {
   const used = new Map<string, number>();
-  for (const item of items) {
-    for (const code of [item.from_code, item.to_code]) {
-      if (code) used.set(code, (used.get(code) ?? 0) + 1);
+  for (const item of items.filter(isFlight)) {
+    for (const code of [item.origin, item.destination]) {
+      // A flight that was written as a train first may still name a station.
+      if (code && IATA_CODE.test(code)) used.set(code, (used.get(code) ?? 0) + 1);
     }
   }
   const own = [...used.entries()]

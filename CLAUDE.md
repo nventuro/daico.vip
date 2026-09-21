@@ -414,34 +414,64 @@ and what becomes of a forwarded email. These are the rules on top of it.
   a chore does. Airport codes are typed by hand and offered from the curated
   list in `airports.ts` — never a lookup, which does not work offline, and never
   the full IATA set, which would be precached on every device.
-- **A flight's boarding pass is an attachment of the pasaje under a kind of
-  its own**, `'boarding_pass'`, on a shelf of its own on the page — drawn
-  only for a flight (`isFlight`: a ticket with both airport codes), since a
-  bus boards with its ticket: the pasaje's other files — the e-ticket a
-  forwarded confirmation brings — never stand in for it. A trip row's files are the two kinds in
+- **A pasaje says what it travels on** (`transport`, one of `TRIP_TRANSPORTS`),
+  null on every other class. It is chosen on the pasaje's page, by the chips
+  over Salida, and unlike the kind it may be changed: every transport draws
+  the same fields, so nothing is lost. A pasaje typed by hand is born a
+  flight (`TRIP_TRANSPORT_DEFAULT`); the + asks nothing more. The transport is
+  the row's icon (`ItemIcon`) and **what makes a flight a flight** (`isFlight`:
+  its places are airports, and its boarding pass only exists once it is
+  checked in for) — never whether its airports are filled in.
+- **`origin` and `destination` hold an IATA code on a flight and a name
+  otherwise** — the station's or the terminal's, as the ticket prints it, since
+  a city has several. A flight still stores the code — a forwarded boarding
+  pass is matched by it, and the household's own airports are ranked by it —
+  and is shown by name (`airportLabel`, `airportFieldValue`): an airport is
+  remembered by where it is. A station is free text, offered from the
+  household's own past pasajes (`stationOptions`) and never from a bundled
+  list. A pasaje's row reads a line for each end, when and then where
+  (`itemLines`): a line too long is cut at its tail, and the tail of a name is
+  what can be spared — never put the hour after the place.
+- **A boarding pass is what a pasaje is boarded with, whatever it travels
+  on**: what an airline issues at check-in, a train's or a bus's ticket with
+  its code. It is an attachment of the pasaje under a kind of its own,
+  `'boarding_pass'`, on a shelf of its own on every pasaje's page: the
+  pasaje's other files — a flight's e-ticket, a receipt — never stand in for
+  it. A trip row's files are the two kinds in
   `TRIP_ROW_FILE_KINDS`: a delete takes both, Buscar finds both, the row's
   mark counts both, and both are kept on every device by the trip-files
   rule. The word is «boarding pass», lowercase in a row and invariable in
   number (`BOARDING_PASS_LABEL`).
 - **The boarding pass Próximo asks for is deduced, never stored.**
-  `useTripsUpcoming` lists «boarding pass · {pasaje}» for a flight — a ticket
-  with both airport codes (`isFlight`); a bus leg has none and no check-in —
-  that is dated, has not left, is within `BOARDING_PASS_NOTICE_DAYS` (the day
-  before) and has no attachment of that kind. Nothing is ticked and no column
-  says so: the first file on the shelf ends it, and it is never overdue.
-  Never add a `checked_in` column or a pendiente for it.
-- **A forwarded boarding pass is staged, never mixed with bookings.** The
-  worker stages it as a `trip_inbox` row of kind `'boarding_pass'`, its
-  flight in the columns and its files beside it — pictures as well as PDFs,
-  each with its `mime`; an email that is bookings and a boarding pass at once
+  `useTripsUpcoming` lists «boarding pass · {pasaje}» for every pasaje that
+  is dated, has not left, is within its transport's
+  `BOARDING_PASS_NOTICE_DAYS` and has no attachment of that kind. A flight's
+  is asked for from the day before, since it does not exist until the
+  check-in opens; a train's and a bus's comes with the booking, so it is
+  asked for as early as a pendiente is. What there is to do differs — check
+  in, or put the file on — and the row says the same either way: what is
+  missing. Nothing is ticked and no column says so: the first file on the
+  shelf ends it, and it is never overdue. Never add a `checked_in` column or
+  a pendiente for it.
+- **A boarding pass reaches a pasaje by email in one of two ways.** With
+  the booking — a train's or a bus's usually does — it rides on the staged
+  pasaje: `boarding_pass_file_ids` names which of the row's files are boarded
+  with, `file_ids` the rest, no file in both, and `confirmInbox` puts the
+  first on the shelf and the others among the pasaje's files. On its own, for
+  a pasaje booked before — an airline's check-in, a ticket sent later — it
+  is **staged, never mixed with bookings**: a `trip_inbox` row of kind
+  `'boarding_pass'`, its pasaje in the columns and its files beside it —
+  pictures as well as PDFs, each with its `mime`, every one of them a pass
+  whichever list names it; an email that is bookings and such a row at once
   is refused with a reply, and one whose pass came as a link rather than a
   file is answered with what to do instead. The app reviews each as a group
   of its own (`InboxGroup.key` is the row, not the email) and asks for the
-  pasaje, not the trip: `suggestedBoardingPassChoice` preselects the flight
-  of a trip ahead that matches by day and airports, the pasaje — or the trip
-  too — can be made on the spot, and `confirmBoardingPass` seals each file
-  for that pasaje's shelf and lands on the pasaje with the undo. The worker
-  still never reads `trips` or `trip_items`.
+  pasaje, not the trip: `suggestedBoardingPassChoice` preselects the pasaje
+  of a trip ahead that matches by day and places — never one that travels on
+  something else — the pasaje, or the trip too, can be made on the spot, and
+  `confirmBoardingPass` seals each file for that pasaje's shelf and lands on
+  the pasaje with the undo. The worker still never reads `trips` or
+  `trip_items`.
 - **`trip_inbox` is staged by the email worker in `worker/`, never made up by the
   app**, which only confirms a group of staged rows into real ones (through the
   offline engine, undoable for a moment, which stages the rows again as new

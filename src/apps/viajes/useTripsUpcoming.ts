@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { daysUntil, isPast, withinNotice } from '../../utils/dateUtils';
 import { ownersWithAttachments, useAttachments } from '../../hooks/useAttachments';
 import { entryPath, upcomingFrom, type Upcoming } from '../types';
-import { isFlight } from './kinds';
+import type { TripTransport } from '../../lib/offline/specs';
+import { TRIP_TRANSPORT_DEFAULT } from './kinds';
 import { boardingPassDueLabel } from './labels';
 import { tripItemMarks, tripItemsWithFiles } from './marks';
 import { useTripItems } from './useTripItems';
@@ -11,18 +12,24 @@ import { useToday } from '../../hooks/useToday';
 /** How many days ahead a dated pendiente shows on the home screen. */
 const TRIP_TODO_NOTICE_DAYS = 7;
 
-/** How many days ahead of a flight its missing boarding pass is asked for:
- *  the day before, when the airline lets one check in. */
-const BOARDING_PASS_NOTICE_DAYS = 1;
+/** How many days ahead of a pasaje its missing boarding pass is asked for. A
+ *  flight's only exists from the day before, when the airline lets one check
+ *  in; a train's and a bus's comes with the booking, so it is asked for as
+ *  early as anything else still to resolve. */
+const BOARDING_PASS_NOTICE_DAYS: Record<TripTransport, number> = {
+  flight: 1,
+  train: TRIP_TODO_NOTICE_DAYS,
+  bus: TRIP_TODO_NOTICE_DAYS,
+};
 
 /**
  * What of every trip the home screen announces: the pendientes that are
- * dated and still open, and — from the day before a flight until it has
- * left — the boarding pass the flight still lacks. Nothing else of a trip
+ * dated and still open, and — from some days ahead of a pasaje until it has
+ * left — the boarding pass the pasaje still lacks. Nothing else of a trip
  * is announced: a pasaje, an alojamiento or a reserva is something already
  * resolved, and the trip itself is not a task. The boarding pass is no row
- * of any table: it is read off the flight and its files, and goes away with
- * the first file put on the flight's shelf.
+ * of any table: it is read off the pasaje and its files, and goes away with
+ * the first file put on the pasaje's shelf.
  */
 export function useTripsUpcoming(): Upcoming[] | undefined {
   const { items, loading } = useTripItems();
@@ -45,11 +52,12 @@ export function useTripsUpcoming(): Upcoming[] | undefined {
             }
           : null;
       }
-      // A flight that has left asks for nothing, so this is never overdue.
-      return isFlight(item) &&
+      // A pasaje that has left asks for nothing, so this is never overdue.
+      return item.kind === 'ticket' &&
         item.on_date !== null &&
         !isPast(item.on_date, today) &&
-        daysUntil(today, item.on_date) <= BOARDING_PASS_NOTICE_DAYS &&
+        daysUntil(today, item.on_date) <=
+          BOARDING_PASS_NOTICE_DAYS[item.transport ?? TRIP_TRANSPORT_DEFAULT] &&
         !withPasses.has(item.id)
         ? {
             title: boardingPassDueLabel(item.title),

@@ -1,4 +1,10 @@
-import type { Trip, TripInboxItem, TripItem, TripKind } from '../../lib/offline/specs';
+import type {
+  Trip,
+  TripInboxItem,
+  TripItem,
+  TripKind,
+  TripTransport,
+} from '../../lib/offline/specs';
 import {
   daysUntil,
   formatDayRange,
@@ -7,6 +13,8 @@ import {
   relativeDayTime,
 } from '../../utils/dateUtils';
 import { countLabel } from '../../utils/textUtils';
+import { airportLabel } from './airports';
+import { isFlight } from './kinds';
 
 /** What each class is called: the word its control offers and its chip states. */
 export const TRIP_KIND_LABELS: Record<TripKind, string> = {
@@ -15,6 +23,20 @@ export const TRIP_KIND_LABELS: Record<TripKind, string> = {
   lodging: 'Alojamiento',
   booking: 'Reserva',
   place: 'Lugar',
+};
+
+/** What a pasaje travels on, as its page offers it. */
+export const TRIP_TRANSPORT_LABELS: Record<TripTransport, string> = {
+  flight: 'Avión',
+  train: 'Tren',
+  bus: 'Micro',
+};
+
+/** Where each transport leaves from and arrives, as its field is named. */
+export const TRIP_TRANSPORT_PLACES: Record<TripTransport, string> = {
+  flight: 'Aeropuerto',
+  train: 'Estación',
+  bus: 'Terminal',
 };
 
 /** What the undo bar says once a pendiente is ticked. */
@@ -29,7 +51,7 @@ export const TRIP_SECTION_LABELS: Record<TripKind, string> = {
   place: 'Lugares',
 };
 
-/** What a flight's pass is called, the word as the household says it: it
+/** What a pasaje is boarded with, the word as the household says it: it
  *  does not change in number. */
 export const BOARDING_PASS_LABEL = 'boarding pass';
 
@@ -85,11 +107,11 @@ export function tripSubtitle(trip: Trip, pending: number, today: string): string
   return joined([tripDatesLabel(trip, today), pending > 0 ? pendingLabel(pending) : undefined]);
 }
 
-/** What of a row its line reads: its class and its days, hours and airports —
+/** What of a row its lines read: its class and its days, hours and places —
  *  which a staged row carries as a trip's row does. */
 export type ItemLine = Pick<
   TripItem,
-  'kind' | 'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'from_code' | 'to_code'
+  'kind' | 'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'transport' | 'origin' | 'destination'
 >;
 
 /** A moment as a row says it: the day the way a person would, and the hour
@@ -99,21 +121,32 @@ function dayAndTime(day: string | null, time: string | null, today: string): str
   return time ? `${relativeDay(today, day)}, ${formatTime(time)}` : relativeDay(today, day);
 }
 
-/** Where a pasaje goes, by the codes it carries; nothing while it has none. */
-function routeLabel(item: ItemLine): string | undefined {
-  const codes = [item.from_code, item.to_code].filter((code) => code);
-  return codes.length > 0 ? codes.join(' → ') : undefined;
+/** Where a pasaje leaves from or arrives, as a row names it: an airport by
+ *  its code and city, a station by the name it carries. */
+function placeLabel(item: ItemLine, place: string | null): string | undefined {
+  if (!place) return undefined;
+  return isFlight(item) ? airportLabel(place) : place;
 }
 
-/** A pasaje's «sáb 12 sep, 8:40 – 11:05» — the arrival day repeated only when
- *  it is another one, which is what keeps an overnight flight from reading as
- *  landing before it left. */
-function journeyLabel(item: ItemLine, today: string): string | undefined {
-  const departs = dayAndTime(item.on_date, item.at_time, today);
+/**
+ * A pasaje's two lines, one for each end: when, then where — «sáb 12 sep,
+ * 8:40 · AEP Buenos Aires (Aeroparque)» over «11:05 · BRC Bariloche». The
+ * moment leads because a line too long is cut at its tail, and the tail of a
+ * name is what can be spared. The arrival day is said only when it is another
+ * one, which is what keeps an overnight flight from reading as landing before
+ * it left.
+ */
+function journeyLines(item: ItemLine, today: string): string[] {
   const sameDay = item.ends_on === null || item.ends_on === item.on_date;
-  const arrives = dayAndTime(sameDay ? null : item.ends_on, item.ends_at, today);
-  const legs = [departs, arrives].filter((part) => part !== undefined);
-  return legs.length > 0 ? legs.join(' – ') : undefined;
+  const departure = joined([
+    dayAndTime(item.on_date, item.at_time, today),
+    placeLabel(item, item.origin),
+  ]);
+  const arrival = joined([
+    dayAndTime(sameDay ? null : item.ends_on, item.ends_at, today),
+    placeLabel(item, item.destination),
+  ]);
+  return [departure, arrival].filter((line) => line !== undefined);
 }
 
 /** How long an alojamiento is for: «12 → 19 sep · 7 noches». */
@@ -122,41 +155,39 @@ function stayLabel(item: ItemLine, today: string): string | undefined {
   return `${formatDayRange(item.on_date, item.ends_on)} · ${nightsLabel(daysUntil(item.on_date, item.ends_on))}`;
 }
 
-/** The line under a row of a trip: everything of it that fits on one line, and
- *  nothing at all for a lugar, which is only an idea. */
-export function itemSubtitle(item: ItemLine, today: string): string | undefined {
+/** The lines under a row of a trip: one for most classes, two for a pasaje,
+ *  and none at all for a lugar, which is only an idea. */
+export function itemLines(item: ItemLine, today: string): string[] {
   switch (item.kind) {
     case 'ticket':
-      return joined([routeLabel(item), journeyLabel(item, today)]);
+      return journeyLines(item, today);
     case 'lodging':
-      return stayLabel(item, today);
+      return [stayLabel(item, today)].filter((line) => line !== undefined);
     case 'booking':
     case 'todo':
-      return dayAndTime(item.on_date, item.at_time, today);
+      return [dayAndTime(item.on_date, item.at_time, today)].filter((line) => line !== undefined);
     case 'place':
-      return undefined;
+      return [];
   }
 }
 
-/** A staged boarding pass's line: what it is, then its flight as a pasaje's
- *  line reads. */
-export function boardingPassSubtitle(item: Omit<ItemLine, 'kind'>, today: string): string {
-  return joined([BOARDING_PASS_LABEL, itemSubtitle({ ...item, kind: 'ticket' }, today)]) ?? '';
+/** A staged boarding pass's lines: what it is, then its pasaje as one's
+ *  lines read. */
+export function boardingPassLines(item: Omit<ItemLine, 'kind'>, today: string): string[] {
+  const [first, ...rest] = itemLines({ ...item, kind: 'ticket' }, today);
+  return [first === undefined ? BOARDING_PASS_LABEL : `${BOARDING_PASS_LABEL} · ${first}`, ...rest];
 }
 
-/** The line under a staged row, whichever kind it is. */
-export function inboxItemSubtitle(
-  item: Pick<TripInboxItem, keyof ItemLine>,
-  today: string,
-): string | undefined {
-  if (item.kind === 'boarding_pass') return boardingPassSubtitle(item, today);
-  return itemSubtitle({ ...item, kind: item.kind }, today);
+/** The lines under a staged row, whichever kind it is. */
+export function inboxItemLines(item: Pick<TripInboxItem, keyof ItemLine>, today: string): string[] {
+  if (item.kind === 'boarding_pass') return boardingPassLines(item, today);
+  return itemLines({ ...item, kind: item.kind }, today);
 }
 
-/** What the home screen lists the day before a flight that has no boarding
- *  pass yet: what is missing, and for which pasaje. */
-export function boardingPassDueLabel(flightTitle: string): string {
-  return `${BOARDING_PASS_LABEL} · ${flightTitle}`;
+/** What the home screen lists ahead of a pasaje that has no boarding pass
+ *  yet: what is missing, and for which pasaje. */
+export function boardingPassDueLabel(ticketTitle: string): string {
+  return `${BOARDING_PASS_LABEL} · ${ticketTitle}`;
 }
 
 /** How many suggestions a group of them holds. */
@@ -198,22 +229,22 @@ export function createTripLabel(tripTitle: string): string {
 
 /** A pasaje as the selector offers it for a boarding pass: which, when it
  *  leaves, and on what trip. */
-export function flightChoiceLabel(
-  flight: Pick<TripItem, 'title' | 'on_date' | 'at_time'>,
+export function ticketChoiceLabel(
+  ticket: Pick<TripItem, 'title' | 'on_date' | 'at_time'>,
   tripTitle: string,
   today: string,
 ): string {
-  return `${flight.title} · ${dayAndTime(flight.on_date, flight.at_time, today) ?? 'sin fecha'} · ${tripTitle}`;
+  return `${ticket.title} · ${dayAndTime(ticket.on_date, ticket.at_time, today) ?? 'sin fecha'} · ${tripTitle}`;
 }
 
 /** The choice of making the pasaje a boarding pass is for, in a trip there is. */
-export function createFlightLabel(tripTitle: string): string {
+export function createTicketLabel(tripTitle: string): string {
   return `Crear el pasaje en «${tripTitle}»`;
 }
 
 /** The selector's last choice for a boarding pass: a trip made for it, named
  *  as the model named it, with the pasaje. */
-export function createTripWithFlightLabel(tripTitle: string): string {
+export function createTripWithTicketLabel(tripTitle: string): string {
   return `Crear viaje «${tripTitle}» con el pasaje`;
 }
 

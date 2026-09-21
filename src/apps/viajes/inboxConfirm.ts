@@ -3,7 +3,12 @@ import { openInboxFile, openInboxKey, rowBinding, type InboxKeyPair } from '../.
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { AttachmentOwner } from '../../types';
 import { CREATE_TRIP_CHOICE, type BoardingPassTarget, type InboxGroup } from './grouping';
-import { INBOX_FILES_TABLE, inboxFileIds, readInboxFiles } from './inboxFiles';
+import {
+  INBOX_FILES_TABLE,
+  inboxBoardingPassIds,
+  inboxFileIds,
+  readInboxFiles,
+} from './inboxFiles';
 import type { InboxUndo } from './inboxUndo';
 import { boardingPassAddedLabel, inboxAddedLabel } from './labels';
 import { withKindFields, type TripItemInput } from './useTripItems';
@@ -36,8 +41,9 @@ export function tripItemFrom(row: TripInboxItem, tripId: string): TripItemWrite 
       at_time: row.at_time,
       ends_on: row.ends_on,
       ends_at: row.ends_at,
-      from_code: row.from_code,
-      to_code: row.to_code,
+      transport: row.transport,
+      origin: row.origin,
+      destination: row.destination,
       comments: row.comments,
       done: false,
     }),
@@ -91,7 +97,8 @@ export async function openedFilesOf(
 /**
  * Puts a group into the chosen trip — created first, without dates, when the
  * choice is to create one — in the group's own order, each row with the
- * files it was printed in as its attachments, each staged row cleared as
+ * files it was printed in as its attachments, those a pasaje is boarded with
+ * on its boarding-pass shelf, each staged row cleared as
  * soon as its own row is written. A write that fails stops it there: what
  * was written stays, what was not stays staged to be confirmed again, and
  * closing the app mid-way leaves at most one row to be confirmed twice. The
@@ -119,10 +126,12 @@ export async function confirmInbox(
     itemIds.push(id);
     // A file printed on two rows is attached to each: an attachment is one
     // entry's, and either row is looked up on its own.
+    const passes = new Set(inboxBoardingPassIds(row));
     for (const fileId of inboxFileIds(row)) {
       const file = files.get(fileId);
       if (!file) continue;
-      const attachmentId = await writes.addAttachment({ kind: 'trip_item', id }, file);
+      const kind = passes.has(fileId) ? 'boarding_pass' : 'trip_item';
+      const attachmentId = await writes.addAttachment({ kind, id }, file);
       if (attachmentId === undefined) break rows;
       attachmentIds.push(attachmentId);
     }
@@ -168,35 +177,35 @@ export async function confirmBoardingPass(
   const attachmentIds: string[] = [];
   const staged: TripInboxItem[] = [];
   const fileIds = groupFileIds(group);
-  const undo = (flightId: string | null): InboxUndo => ({
+  const undo = (ticketId: string | null): InboxUndo => ({
     label: boardingPassAddedLabel(attachmentIds.length),
     tripCreated,
     tripId,
-    itemId: flightId,
+    itemId: ticketId,
     itemIds,
     attachmentIds,
     staged,
     fileIds,
   });
-  let flightId: string;
-  if (target.kind === 'flight') {
-    flightId = target.flightId;
+  let ticketId: string;
+  if (target.kind === 'ticket') {
+    ticketId = target.ticketId;
   } else {
     const id = await writes.addItem(tripItemFrom(row, tripId));
     if (id === undefined) return undo(null);
     itemIds.push(id);
-    flightId = id;
+    ticketId = id;
   }
   for (const fileId of inboxFileIds(row)) {
     const file = files.get(fileId);
     const attachmentId =
-      file && (await writes.addAttachment({ kind: 'boarding_pass', id: flightId }, file));
-    if (attachmentId === undefined) return undo(flightId);
+      file && (await writes.addAttachment({ kind: 'boarding_pass', id: ticketId }, file));
+    if (attachmentId === undefined) return undo(ticketId);
     attachmentIds.push(attachmentId);
   }
   await writes.removeStaged(row.id);
   staged.push(row);
-  return undo(flightId);
+  return undo(ticketId);
 }
 
 /** Clears a group, keeping nothing of it: its rows, then its files. */

@@ -190,11 +190,17 @@ before leaving, or a pasaje, an alojamiento, a reserva, a lugar. The app is for
 the weeks before a trip — what is booked and what is still missing — and,
 during it, for looking up a code or an address; it is not an agenda. A row's
 kind is asked by the + and never changed, only a pendiente is ever ticked, and
-deleting a trip takes its rows with it. A flight — a pasaje between two
-airports — keeps its boarding passes on a shelf of their own, apart from its
-other files, and from the day before it leaves the home screen asks for one
-until a file is on that shelf. A forwarded confirmation email becomes staged
-rows in `trip_inbox`, shown under Inbox to be added to a trip or discarded, and
+deleting a trip takes its rows with it. A pasaje says what it travels on
+(`transport`: a flight, a train or a bus), which is the icon its row wears, and
+where it leaves from and arrives — an airport, held as its IATA code and shown
+by name, or a station's name as the ticket prints it — and its row reads a line
+for each end: when, then where. A pasaje keeps its boarding passes — what it
+is boarded with, an airline's or a train's or a bus's ticket with its code —
+on a shelf of their own, apart from its other files, and ahead of its leaving
+the home screen asks for one until a file is on that shelf: from the day
+before a flight, whose boarding pass only exists once it is checked in for,
+and a week before a train or a bus, whose own comes with the booking. A
+forwarded confirmation email becomes staged rows in `trip_inbox`, shown under Inbox to be added to a trip or discarded, and
 a forwarded boarding pass is matched to its pasaje there (Correo a Viajes
 below).
 
@@ -268,8 +274,9 @@ leave it, so the server only ever stores ciphertext.
 
 A confirmation email forwarded to the household's address reaches the email
 worker in `worker/` (its header says what it holds and why). It lets through only mail
-from a member, has a model read the bookings out of it, and stages one row per
-booking in `trip_inbox`, always replying to the sender; an email delivered
+from a member, has a model read the bookings out of it — a pasaje with what it
+travels on, its airports by code or its stations by name — and stages one row
+per booking in `trip_inbox`, always replying to the sender; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
 and answered both times. The files the email carries — PDFs and pictures —
 are staged beside the rows in `trip_inbox_files`, sealed to the household's
@@ -281,12 +288,17 @@ is confirmed with no connection; confirming makes the rows a trip's and the
 files their attachments — each opened with the inbox key and sealed again for
 the attachment it becomes — and discarding drops both.
 
-A boarding pass email is the other thing the worker takes. The model stages
-one row of kind `boarding_pass` per flight leg, its files beside it, and the
-review asks for the pasaje rather than the trip: the flight of a trip ahead
-that matches by day and airports is preselected, the pasaje — or the trip too —
-can be made on the spot, and confirming seals each file for that pasaje's
-boarding-pass shelf. An email that is bookings and a boarding pass at once is
+A staged pasaje says which of its files it is boarded with
+(`boarding_pass_file_ids`), and confirming puts those on the pasaje's
+boarding-pass shelf and the rest among its other files: a train's or a bus's
+ticket usually comes with the booking. An email that only brings the boarding
+passes of a pasaje booked before — an airline's check-in, a ticket sent later
+— is the other thing the worker takes. The model stages one row of kind
+`boarding_pass` per leg, its files beside it, and the review asks for the
+pasaje rather than the trip: the pasaje of a trip ahead that matches by day
+and places, and travels on the same thing, is preselected, the pasaje — or the
+trip too — can be made on the spot, and confirming seals each file for that
+pasaje's boarding-pass shelf. An email that is bookings and a boarding pass at once is
 refused with a reply, and a pass that came as a link rather than a file is
 answered with what to do instead.
 

@@ -137,9 +137,11 @@ describe('an email delivered twice', () => {
           at_time: null,
           ends_on: '2026-09-19',
           ends_at: null,
-          from_code: null,
-          to_code: null,
+          transport: null,
+          origin: null,
+          destination: null,
           comments: null,
+          boarding_pass_files: [],
           files: [],
         },
       ],
@@ -241,9 +243,11 @@ describe('the files an email brings', () => {
           at_time: null,
           ends_on: '2026-09-19',
           ends_at: null,
-          from_code: null,
-          to_code: null,
+          transport: null,
+          origin: null,
+          destination: null,
           comments: null,
+          boarding_pass_files: [],
           files: [],
         },
         {
@@ -253,9 +257,11 @@ describe('the files an email brings', () => {
           at_time: '08:40',
           ends_on: null,
           ends_at: null,
-          from_code: 'AEP',
-          to_code: 'BRC',
+          transport: 'flight',
+          origin: 'AEP',
+          destination: 'BRC',
           comments: null,
+          boarding_pass_files: [],
           files: [1],
         },
       ],
@@ -281,10 +287,12 @@ describe('the files an email brings', () => {
           at_time: '08:40',
           ends_on: null,
           ends_at: null,
-          from_code: 'AEP',
-          to_code: 'BRC',
+          transport: 'flight',
+          origin: 'AEP',
+          destination: 'BRC',
           comments: 'Ana 14A',
-          files: [1],
+          boarding_pass_files: [1],
+          files: [],
         },
       ],
     });
@@ -310,7 +318,8 @@ describe('the files an email brings', () => {
     const [, , rows, files] = vi.mocked(insertRows).mock.calls[0];
     expect(rows).toMatchObject([{ kind: 'boarding_pass', title: 'AR 1420' }]);
     expect(files).toMatchObject([{ name: 'pass', mime: 'image/png', size: 40_000 }]);
-    expect(rows[0].file_ids).toEqual([files[0].id]);
+    expect(rows[0].boarding_pass_file_ids).toEqual([files[0].id]);
+    expect(rows[0].file_ids).toEqual([]);
     expect(replied(message)).toContain('un boarding pass, con 1 archivo');
   });
 });

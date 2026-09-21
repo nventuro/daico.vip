@@ -1,18 +1,24 @@
 import { useMemo } from 'react';
-import type { TripKind } from '../../lib/offline/specs';
+import { TRIP_TRANSPORTS, type TripKind } from '../../lib/offline/specs';
+import Chip from '../../components/Chip';
 import DatePicker from '../../components/DatePicker';
 import FormField from '../../components/FormField';
 import TimePicker from '../../components/TimePicker';
 import { CONTROL_CLASS } from '../../components/controlClasses';
 import AirportField from './AirportField';
+import StationField from './StationField';
 import { AIRPORT_LIST_ID, airportOptionValue, airportOptions } from './airports';
+import { TRIP_TRANSPORT_DEFAULT, TRIP_TRANSPORT_ICONS } from './kinds';
+import { TRIP_TRANSPORT_LABELS, TRIP_TRANSPORT_PLACES } from './labels';
+import { STATION_LIST_ID, stationOptions } from './stations';
 import { useTripItems } from './useTripItems';
 import type { TripItemFields } from './useTripItems';
 
-/** When a row happens and where it goes: everything of it that is not words. */
+/** When a row happens, and for a pasaje what it travels on and between where:
+ *  everything of it that is not words. */
 export type ItemDatesValue = Pick<
   TripItemFields,
-  'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'from_code' | 'to_code'
+  'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'transport' | 'origin' | 'destination'
 >;
 
 interface ItemDateFieldsProps {
@@ -22,21 +28,22 @@ interface ItemDateFieldsProps {
 }
 
 /** A control that takes its share of a row rather than the width of a field. */
-const AIRPORT_CLASS = `${CONTROL_CLASS} w-20`;
 const DAY_CLASS = `${CONTROL_CLASS} flex-1`;
 const HOUR_CLASS = `${CONTROL_CLASS} w-24`;
 
 /**
- * The day and hour controls of one class, and a pasaje's airports. Controlled:
- * every change is reported as a patch of the value. Which controls a class
- * draws is decided here and what is stored for it in `useTripItems`, so a
- * field a class does not draw is never left holding a value.
+ * The day and hour controls of one class, and what a pasaje travels on and
+ * between where. Controlled: every change is reported as a patch of the value.
+ * Which controls a class draws is decided here and what is stored for it in
+ * `useTripItems`, so a field a class does not draw is never left holding a
+ * value.
  */
 export default function ItemDateFields({ kind, fields, onChange }: ItemDateFieldsProps) {
-  // The codes the household has flown through rank first, so the list opens on
-  // the handful of airports it actually uses.
+  // What the household has already travelled through ranks first, so a list
+  // opens on the handful of places it actually uses.
   const { items } = useTripItems();
   const airports = useMemo(() => airportOptions(items), [items]);
+  const stations = useMemo(() => stationOptions(items), [items]);
 
   switch (kind) {
     case 'todo':
@@ -50,66 +57,112 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
         </FormField>
       );
 
-    case 'ticket':
-      // Each leg is one row of airport, day and hour: no caption of its own,
-      // since three controls side by side already say which is which.
+    case 'ticket': {
+      const transport = fields.transport ?? TRIP_TRANSPORT_DEFAULT;
+      const flight = transport === 'flight';
+      const place = TRIP_TRANSPORT_PLACES[transport];
+
+      // Where a leg is: an airport held as its code on a flight, a station by
+      // its name otherwise. On a line of its own, since a name needs the width.
+      const where = (end: 'origin' | 'destination', leg: string) => {
+        const label = `${place} de ${leg}`;
+        const change = (value: string | null) =>
+          onChange(end === 'origin' ? { origin: value } : { destination: value });
+        return flight ? (
+          <AirportField
+            value={fields[end]}
+            onChange={change}
+            label={label}
+            list={AIRPORT_LIST_ID}
+          />
+        ) : (
+          <StationField
+            value={fields[end]}
+            onChange={change}
+            label={label}
+            placeholder={place}
+            list={STATION_LIST_ID}
+          />
+        );
+      };
+
       return (
         <>
-          <datalist id={AIRPORT_LIST_ID}>
-            {airports.map(([code, city]) => (
-              <option key={code} value={airportOptionValue(code, city)} />
-            ))}
-          </datalist>
+          <div
+            role="group"
+            aria-label="Medio de transporte"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {TRIP_TRANSPORTS.map((option) => {
+              const Icon = TRIP_TRANSPORT_ICONS[option];
+              return (
+                <Chip
+                  key={option}
+                  selected={option === transport}
+                  onClick={() => onChange({ transport: option })}
+                >
+                  <Icon size={16} stroke={1.5} aria-hidden />
+                  {TRIP_TRANSPORT_LABELS[option]}
+                </Chip>
+              );
+            })}
+          </div>
+          {flight ? (
+            <datalist id={AIRPORT_LIST_ID}>
+              {airports.map(([code, city]) => (
+                <option key={code} value={airportOptionValue(code, city)} />
+              ))}
+            </datalist>
+          ) : (
+            <datalist id={STATION_LIST_ID}>
+              {stations.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          )}
           <FormField label="Salida" group>
-            <div className="flex gap-2">
-              <AirportField
-                value={fields.from_code}
-                onChange={(value) => onChange({ from_code: value })}
-                label="Aeropuerto de salida"
-                list={AIRPORT_LIST_ID}
-                className={AIRPORT_CLASS}
-              />
-              <DatePicker
-                value={fields.on_date}
-                onChange={(value) => onChange({ on_date: value })}
-                label="Día de salida"
-                className={DAY_CLASS}
-              />
-              <TimePicker
-                value={fields.at_time}
-                onChange={(value) => onChange({ at_time: value })}
-                label="Hora de salida"
-                className={HOUR_CLASS}
-              />
+            <div className="flex flex-col gap-2">
+              {where('origin', 'salida')}
+              <div className="flex gap-2">
+                <DatePicker
+                  value={fields.on_date}
+                  onChange={(value) => onChange({ on_date: value })}
+                  label="Día de salida"
+                  className={DAY_CLASS}
+                />
+                <TimePicker
+                  value={fields.at_time}
+                  onChange={(value) => onChange({ at_time: value })}
+                  label="Hora de salida"
+                  className={HOUR_CLASS}
+                />
+              </div>
             </div>
           </FormField>
           <FormField label="Llegada" group>
-            <div className="flex gap-2">
-              <AirportField
-                value={fields.to_code}
-                onChange={(value) => onChange({ to_code: value })}
-                label="Aeropuerto de llegada"
-                list={AIRPORT_LIST_ID}
-                className={AIRPORT_CLASS}
-              />
-              {/* The arrival day matters: without it an overnight flight reads
-                  as landing before it left. */}
-              <DatePicker
-                value={fields.ends_on}
-                onChange={(value) => onChange({ ends_on: value })}
-                label="Día de llegada"
-                className={DAY_CLASS}
-              />
-              <TimePicker
-                value={fields.ends_at}
-                onChange={(value) => onChange({ ends_at: value })}
-                label="Hora de llegada"
-                className={HOUR_CLASS}
-              />
+            <div className="flex flex-col gap-2">
+              {where('destination', 'llegada')}
+              <div className="flex gap-2">
+                {/* The arrival day matters: without it an overnight flight reads
+                    as landing before it left. */}
+                <DatePicker
+                  value={fields.ends_on}
+                  onChange={(value) => onChange({ ends_on: value })}
+                  label="Día de llegada"
+                  className={DAY_CLASS}
+                />
+                <TimePicker
+                  value={fields.ends_at}
+                  onChange={(value) => onChange({ ends_at: value })}
+                  label="Hora de llegada"
+                  className={HOUR_CLASS}
+                />
+              </div>
             </div>
           </FormField>
         </>
       );
+    }
 
     case 'lodging':
       return (

@@ -62,9 +62,11 @@ export function inboxRowInput(row: TripInboxItem): RowInput<TripInboxItem> {
     at_time: row.at_time,
     ends_on: row.ends_on,
     ends_at: row.ends_at,
-    from_code: row.from_code,
-    to_code: row.to_code,
+    transport: row.transport,
+    origin: row.origin,
+    destination: row.destination,
     comments: row.comments,
     file_ids: row.file_ids,
+    boarding_pass_file_ids: row.boarding_pass_file_ids,
   };
 }

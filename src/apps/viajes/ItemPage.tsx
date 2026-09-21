@@ -16,7 +16,7 @@ import { useTextSave } from '../../hooks/useTextSave';
 import { appPath, entryPath } from '../types';
 import ItemDateFields from './ItemDateFields';
 import type { InboxUndo } from './inboxUndo';
-import { TRIP_KIND_SHAPES, isFlight } from './kinds';
+import { TRIP_KIND_SHAPES } from './kinds';
 import {
   BOARDING_PASS_SECTION_LABEL,
   TRIP_KIND_LABELS,
@@ -28,7 +28,7 @@ import { useTripItems } from './useTripItems';
 
 /** A row of a trip, read and written on the same page: the title on blur,
  *  each control as it changes, the comments a moment after typing stops and
- *  on leaving. Its class is stated, never changed. A flight keeps its
+ *  on leaving. Its class is stated, never changed. A pasaje keeps its
  *  boarding passes on a shelf of their own, apart from its other files. The
  *  one control that leaves the page is a pendiente's tick. */
 export default function ItemPage() {
@@ -102,16 +102,16 @@ export default function ItemPage() {
               at_time: entry.at_time,
               ends_on: entry.ends_on,
               ends_at: entry.ends_at,
-              from_code: entry.from_code,
-              to_code: entry.to_code,
+              transport: entry.transport,
+              origin: entry.origin,
+              destination: entry.destination,
             }}
             onChange={(patch) => void save(entry.id, patch)}
           />
 
-          {/* What is looked for at the airport, above everything else said
-              about the pasaje; the e-ticket and the rest stay under Adjuntos.
-              A bus leg boards with its ticket, and has no shelf. */}
-          {isFlight(entry) && (
+          {/* What is shown to board, above everything else said about the
+              pasaje; the e-ticket and the rest stay under Adjuntos. */}
+          {entry.kind === 'ticket' && (
             <div>
               <SectionLabel>{BOARDING_PASS_SECTION_LABEL}</SectionLabel>
               <AttachmentGrid

@@ -24,8 +24,9 @@ function item(id: string, kind: TripKind, overrides: Partial<TripItem> = {}): Tr
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: null,
-    to_code: null,
+    transport: null,
+    origin: null,
+    destination: null,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -136,10 +137,12 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: null,
-    to_code: null,
+    transport: null,
+    origin: null,
+    destination: null,
     comments: null,
     file_ids: '[]',
+    boarding_pass_file_ids: '[]',
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
     ...overrides,
@@ -218,25 +221,33 @@ describe('boardingPassChoices', () => {
     trip('lejano', '2026-12-01', '2026-12-15'),
   ];
   const flights = [
-    item('vuelo viejo', 'ticket', { trip_id: 'pasado', on_date: '2026-08-01' }),
+    item('vuelo viejo', 'ticket', {
+      trip_id: 'pasado',
+      on_date: '2026-08-01',
+      transport: 'flight',
+    }),
     item('ida', 'ticket', {
       trip_id: 'próximo',
       on_date: '2026-09-20',
-      from_code: 'AEP',
-      to_code: 'BRC',
+      transport: 'flight',
+      origin: 'AEP',
+      destination: 'BRC',
     }),
+    item('tren', 'ticket', { trip_id: 'próximo', on_date: '2026-09-23', transport: 'train' }),
     item('vuelta', 'ticket', {
       trip_id: 'próximo',
       on_date: '2026-09-27',
-      from_code: 'BRC',
-      to_code: 'AEP',
+      transport: 'flight',
+      origin: 'BRC',
+      destination: 'AEP',
     }),
     item('hotel', 'lodging', { trip_id: 'próximo', on_date: '2026-09-20' }),
     item('lejos', 'ticket', {
       trip_id: 'lejano',
       on_date: '2026-12-01',
-      from_code: 'EZE',
-      to_code: 'MAD',
+      transport: 'flight',
+      origin: 'EZE',
+      destination: 'MAD',
     }),
   ];
   const choices = boardingPassChoices(trips, flights, 'Bariloche', TODAY);
@@ -244,6 +255,7 @@ describe('boardingPassChoices', () => {
   it('offers the pasajes of the trips ahead, trip by trip, then a new pasaje in each, then a new trip', () => {
     expect(choices.map((choice) => choice.value)).toEqual([
       'ida',
+      'tren',
       'vuelta',
       'lejos',
       'new:próximo',
@@ -251,21 +263,36 @@ describe('boardingPassChoices', () => {
       CREATE_TRIP_CHOICE,
     ]);
     expect(choices[0].label).toBe('ida · dom 20 sept · próximo');
-    expect(choices[3].label).toBe('Crear el pasaje en «próximo»');
-    expect(choices[5].label).toBe('Crear viaje «Bariloche» con el pasaje');
-    expect(choices[5].target).toEqual({ kind: 'new-trip' });
+    expect(choices[4].label).toBe('Crear el pasaje en «próximo»');
+    expect(choices[6].label).toBe('Crear viaje «Bariloche» con el pasaje');
+    expect(choices[6].target).toEqual({ kind: 'new-trip' });
   });
 
   it('suggests the pasaje leaving the same day between the same airports, over one on the day alone', () => {
     const pass = staged('AR 1425', {
       kind: 'boarding_pass',
       on_date: '2026-09-27',
-      from_code: 'BRC',
-      to_code: 'AEP',
+      origin: 'BRC',
+      destination: 'AEP',
     });
     expect(suggestedBoardingPassChoice(pass, choices, flights)).toBe('vuelta');
     const sameDay = staged('AR 1425', { kind: 'boarding_pass', on_date: '2026-09-27' });
     expect(suggestedBoardingPassChoice(sameDay, choices, flights)).toBe('vuelta');
+  });
+
+  it('never suggests a pasaje that travels on something else, whatever the day', () => {
+    const trainPass = staged('Tren 9014', {
+      kind: 'boarding_pass',
+      transport: 'train',
+      on_date: '2026-09-23',
+    });
+    expect(suggestedBoardingPassChoice(trainPass, choices, flights)).toBe('tren');
+    const flightPass = staged('LA 400', {
+      kind: 'boarding_pass',
+      transport: 'flight',
+      on_date: '2026-09-23',
+    });
+    expect(suggestedBoardingPassChoice(flightPass, choices, flights)).toBe('new:próximo');
   });
 
   it('falls back to the flight number, then to a new pasaje in the next trip, then to a new trip', () => {

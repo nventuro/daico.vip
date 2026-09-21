@@ -47,8 +47,9 @@ const tripItem = {
   at_time: null,
   ends_on: null,
   ends_at: null,
-  from_code: null,
-  to_code: null,
+  transport: null,
+  origin: null,
+  destination: null,
   done: false,
   comments: null,
 };

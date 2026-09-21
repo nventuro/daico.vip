@@ -614,6 +614,10 @@ export const IDEAS_SPEC: TableSpec<Idea> = {
 export const TRIP_KINDS = ['todo', 'ticket', 'lodging', 'booking', 'place'] as const;
 export type TripKind = (typeof TRIP_KINDS)[number];
 
+/** What a pasaje travels on, in the order its page offers them. */
+export const TRIP_TRANSPORTS = ['flight', 'train', 'bus'] as const;
+export type TripTransport = (typeof TRIP_TRANSPORTS)[number];
+
 /**
  * A trip: what is booked and what is still missing, in the weeks before it.
  * Its days are stored rather than derived from its rows — a trip exists before
@@ -656,9 +660,12 @@ export interface TripItem extends SyncedRow {
   /** The day it ends: a pasaje's arrival, an alojamiento's last day. */
   ends_on: string | null;
   ends_at: string | null;
-  /** IATA codes, a pasaje's only. */
-  from_code: string | null;
-  to_code: string | null;
+  /** What a pasaje travels on; null for every other class. */
+  transport: TripTransport | null;
+  /** Where a pasaje leaves from and where it arrives: an IATA code on a
+   *  flight, the station's or the terminal's name otherwise. */
+  origin: string | null;
+  destination: string | null;
   /** Only a `todo` is ever ticked. */
   done: boolean;
   /** Whatever else there is to say about the row: a booking code, an address. */
@@ -675,8 +682,9 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
     at_time: { ddl: 'TEXT' },
     ends_on: { ddl: 'TEXT' },
     ends_at: { ddl: 'TEXT' },
-    from_code: { ddl: 'TEXT' },
-    to_code: { ddl: 'TEXT' },
+    transport: { ddl: 'TEXT' },
+    origin: { ddl: 'TEXT' },
+    destination: { ddl: 'TEXT' },
     done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
     comments: { ddl: 'TEXT' },
   },
@@ -685,8 +693,8 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
 };
 
 /** What a forwarded email can contain: the booked classes, never a pendiente
- *  or a lugar — or a flight's boarding pass, which is no row of a trip but
- *  the files one of its pasajes boards with. */
+ *  or a lugar — or a boarding pass sent on its own, which is no row of a trip
+ *  but the files one of its pasajes is boarded with. */
 export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'> | 'boarding_pass';
 
 /**
@@ -696,7 +704,7 @@ export type TripInboxKind = Exclude<TripKind, 'todo' | 'place'> | 'boarding_pass
  * trip and the tick, which only exist once a member confirms it into a real
  * row; `trip_title` is the model's name for the trip, matched to a real one
  * or created at that point. A boarding pass is staged in the same shape, its
- * flight in the columns, and is put on a pasaje at confirm rather than made
+ * pasaje in the columns, and is put on a pasaje at confirm rather than made
  * a row. Written by the worker, never by the app — which only confirms or
  * discards, and puts a row back after an undo.
  */
@@ -712,12 +720,18 @@ export interface TripInboxItem extends SyncedRow {
   at_time: string | null;
   ends_on: string | null;
   ends_at: string | null;
-  from_code: string | null;
-  to_code: string | null;
+  transport: TripTransport | null;
+  origin: string | null;
+  destination: string | null;
   comments: string | null;
   /** The ids of the sealed PDFs this row was printed in, as a JSON list: the
    *  engine carries scalars only, and the list is written once. */
   file_ids: string;
+  /** The ids of those among its files that are boarded with, as a JSON list:
+   *  they go on the pasaje's boarding-pass shelf, the rest among its other
+   *  files. On a staged boarding pass every file is one, whichever list
+   *  names it. */
+  boarding_pass_file_ids: string;
 }
 
 export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
@@ -732,10 +746,12 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
     at_time: { ddl: 'TEXT' },
     ends_on: { ddl: 'TEXT' },
     ends_at: { ddl: 'TEXT' },
-    from_code: { ddl: 'TEXT' },
-    to_code: { ddl: 'TEXT' },
+    transport: { ddl: 'TEXT' },
+    origin: { ddl: 'TEXT' },
+    destination: { ddl: 'TEXT' },
     comments: { ddl: 'TEXT' },
     file_ids: { ddl: "TEXT NOT NULL DEFAULT '[]'" },
+    boarding_pass_file_ids: { ddl: "TEXT NOT NULL DEFAULT '[]'" },
   },
   // The groups and their order are made on display; here the rows only keep
   // the order they were staged in.

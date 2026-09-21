@@ -4,8 +4,9 @@ import ChecklistItem from '../../components/ChecklistItem';
 import EntryMarks from '../../components/EntryMarks';
 import LinkRow from '../../components/LinkRow';
 import { entryPath } from '../types';
+import ItemIcon from './ItemIcon';
 import { TRIP_KIND_SHAPES } from './kinds';
-import { itemSubtitle } from './labels';
+import { itemLines } from './labels';
 import { tripItemMarks } from './marks';
 
 interface ItemRowProps {
@@ -18,9 +19,9 @@ interface ItemRowProps {
 /** One row of a trip: a pendiente is ticked off where it stands, everything
  *  booked only opens — nothing is ticked as the trip happens. */
 export default function ItemRow({ item, today, hasAttachments, onToggle }: ItemRowProps) {
-  const { icon: Icon, ticked } = TRIP_KIND_SHAPES[item.kind];
+  const { ticked } = TRIP_KIND_SHAPES[item.kind];
   const marks = <EntryMarks marks={tripItemMarks(item, hasAttachments)} />;
-  const subtitle = itemSubtitle(item, today);
+  const [subtitle, secondLine] = itemLines(item, today);
   const to = entryPath('viajes', item.trip_id, item.id);
 
   if (ticked) {
@@ -43,7 +44,8 @@ export default function ItemRow({ item, today, hasAttachments, onToggle }: ItemR
       to={to}
       title={item.title}
       subtitle={subtitle}
-      leading={<Icon size={18} stroke={1.5} className="shrink-0 text-muted" />}
+      secondLine={secondLine}
+      leading={<ItemIcon kind={item.kind} transport={item.transport} />}
       trailing={marks}
     />
   );

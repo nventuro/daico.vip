@@ -34,10 +34,12 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     at_time: '08:40',
     ends_on: fromToday(10),
     ends_at: '11:05',
-    from_code: 'AEP',
-    to_code: 'BRC',
+    transport: 'flight',
+    origin: 'AEP',
+    destination: 'BRC',
     comments: 'Código QK7T2M',
     file_ids: '[]',
+    boarding_pass_file_ids: '[]',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -60,8 +62,9 @@ function flight(
     at_time: '08:40',
     ends_on: on_date,
     ends_at: '11:05',
-    from_code: 'AEP',
-    to_code: 'BRC',
+    transport: 'flight',
+    origin: 'AEP',
+    destination: 'BRC',
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -270,7 +273,8 @@ describe('InboxReviewPage', () => {
       expect(html).toContain('Crear el pasaje en «próximo»');
       expect(html).toContain('Crear viaje «Bariloche» con el pasaje');
       expect(html).toContain('2 boarding pass');
-      expect(html).toContain('boarding pass · AEP → BRC');
+      expect(html).toMatch(/boarding pass · [^<]*8:40 · AEP Buenos Aires \(Aeroparque\)/);
+      expect(html).toContain('11:05 · BRC Bariloche');
       expect(html).toContain('Ana 14A · Bruno 14B');
       expect(html).toContain('Agregar al pasaje');
       expect(html).not.toContain('Agregar 1 ítem');

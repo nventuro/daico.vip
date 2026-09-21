@@ -26,10 +26,12 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     at_time: '08:40',
     ends_on: '2026-09-12',
     ends_at: '11:05',
-    from_code: 'AEP',
-    to_code: 'BRC',
+    transport: 'flight',
+    origin: 'AEP',
+    destination: 'BRC',
     comments: 'Código QK7T2M',
     file_ids: '[]',
+    boarding_pass_file_ids: '[]',
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
     ...overrides,
@@ -104,7 +106,7 @@ const PASS: InboxGroup = {
       import_id: 'e2',
       kind: 'boarding_pass',
       comments: 'Ana 14A · Bruno 14B',
-      file_ids: '["f1", "f2"]',
+      boarding_pass_file_ids: '["f1", "f2"]',
     }),
   ],
 };
@@ -120,7 +122,8 @@ describe('tripItemFrom', () => {
     const flight = tripItemFrom(PASS.items[0], 'v1');
     expect(flight.kind).toBe('ticket');
     expect(flight.title).toBe('AR 1420');
-    expect(flight.from_code).toBe('AEP');
+    expect(flight.transport).toBe('flight');
+    expect(flight.origin).toBe('AEP');
     expect(flight.at_time).toBe('08:40');
     expect(flight.ends_at).toBe('11:05');
   });
@@ -136,13 +139,25 @@ describe('tripItemFrom', () => {
     expect(item.ends_on).toBe('2026-09-19');
     expect(item.at_time).toBeNull();
     expect(item.ends_at).toBeNull();
-    expect(item.from_code).toBeNull();
+    expect(item.transport).toBeNull();
+    expect(item.origin).toBeNull();
     const booking = tripItemFrom(GROUP.items[2], 'v1');
     expect(booking.at_time).toBe('08:40');
     expect(booking.ends_on).toBeNull();
     const ticket = tripItemFrom(GROUP.items[0], 'v1');
-    expect(ticket.from_code).toBe('AEP');
+    expect(ticket.origin).toBe('AEP');
     expect(ticket.ends_at).toBe('11:05');
+  });
+
+  it('keeps what a pasaje travels on, and the station it names', () => {
+    const train = tripItemFrom(
+      staged('s4', { transport: 'train', origin: 'Estación Norte', destination: 'Estación Sur' }),
+      'v1',
+    );
+    expect(train.transport).toBe('train');
+    expect(train.origin).toBe('Estación Norte');
+    // One that does not say is born as the usual one.
+    expect(tripItemFrom(staged('s5', { transport: null }), 'v1').transport).toBe('flight');
   });
 });
 
@@ -207,6 +222,32 @@ describe('confirmInbox', () => {
     expect(undo?.attachmentIds).toEqual(['a1', 'a2', 'a3']);
     expect(undo?.fileIds).toEqual(['f1', 'f2']);
     expect(w.files).toEqual([]);
+  });
+
+  it('puts what a pasaje is boarded with on its boarding-pass shelf, and the rest among its other files', async () => {
+    const group: InboxGroup = {
+      ...GROUP,
+      items: [
+        staged('s1', {
+          transport: 'train',
+          boarding_pass_file_ids: '["f1"]',
+          file_ids: '["f2"]',
+        }),
+      ],
+    };
+    expect(groupFileIds(group)).toEqual(['f1', 'f2']);
+    const w = writes();
+    const files = new Map([
+      ['f1', opened('pasaje')],
+      ['f2', opened('recibo')],
+    ]);
+    await confirmInbox(group, 'v1', w, files);
+    expect(
+      vi.mocked(w.addAttachment).mock.calls.map(([owner, file]) => [owner, file.name]),
+    ).toEqual([
+      [{ kind: 'boarding_pass', id: 'i1' }, 'pasaje'],
+      [{ kind: 'trip_item', id: 'i1' }, 'recibo'],
+    ]);
   });
 
   it('skips a file it was not given, and writes the row all the same', async () => {
@@ -278,7 +319,7 @@ describe('confirmBoardingPass', () => {
     const w = writes();
     const undo = await confirmBoardingPass(
       PASS,
-      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      { kind: 'ticket', tripId: 'v1', ticketId: 'i9' },
       w,
       PASS_FILES,
     );
@@ -309,7 +350,7 @@ describe('confirmBoardingPass', () => {
     const w = writes();
     const undo = await confirmBoardingPass(
       PASS,
-      { kind: 'new-flight', tripId: 'v1' },
+      { kind: 'new-ticket', tripId: 'v1' },
       w,
       PASS_FILES,
     );
@@ -323,6 +364,38 @@ describe('confirmBoardingPass', () => {
       ['i1', 'bruno'],
     ]);
     expect(undo).toMatchObject({ tripCreated: false, tripId: 'v1', itemId: 'i1', itemIds: ['i1'] });
+  });
+
+  it('makes the pasaje travel on what the boarding pass says, a train as much as a flight', async () => {
+    const w = writes();
+    const train: InboxGroup = {
+      ...PASS,
+      items: [{ ...PASS.items[0], transport: 'train', origin: 'Estación Norte' }],
+    };
+    await confirmBoardingPass(train, { kind: 'new-ticket', tripId: 'v1' }, w, PASS_FILES);
+    expect(vi.mocked(w.addItem).mock.calls[0][0]).toMatchObject({
+      kind: 'ticket',
+      transport: 'train',
+      origin: 'Estación Norte',
+    });
+  });
+
+  it('takes a file for a pass whichever list of the staged boarding pass names it', async () => {
+    const w = writes();
+    const mixed: InboxGroup = {
+      ...PASS,
+      items: [{ ...PASS.items[0], boarding_pass_file_ids: '["f1"]', file_ids: '["f2"]' }],
+    };
+    await confirmBoardingPass(
+      mixed,
+      { kind: 'ticket', tripId: 'v1', ticketId: 'i9' },
+      w,
+      PASS_FILES,
+    );
+    expect(vi.mocked(w.addAttachment).mock.calls.map(([owner]) => owner.kind)).toEqual([
+      'boarding_pass',
+      'boarding_pass',
+    ]);
   });
 
   it('makes the trip and the pasaje when there is neither', async () => {
@@ -343,7 +416,7 @@ describe('confirmBoardingPass', () => {
     const short = writes();
     const kept = await confirmBoardingPass(
       PASS,
-      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      { kind: 'ticket', tripId: 'v1', ticketId: 'i9' },
       short,
       new Map([['f1', opened('ana')]]),
     );
@@ -355,7 +428,7 @@ describe('confirmBoardingPass', () => {
     vi.mocked(refused.addAttachment).mockResolvedValueOnce(undefined);
     await confirmBoardingPass(
       PASS,
-      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      { kind: 'ticket', tripId: 'v1', ticketId: 'i9' },
       refused,
       PASS_FILES,
     );
@@ -369,8 +442,8 @@ describe('confirmBoardingPass', () => {
     expect(w.attached).toEqual([]);
     const one = writes();
     const undo = await confirmBoardingPass(
-      { ...PASS, items: [{ ...PASS.items[0], file_ids: '["f1"]' }] },
-      { kind: 'flight', tripId: 'v1', flightId: 'i9' },
+      { ...PASS, items: [{ ...PASS.items[0], boarding_pass_file_ids: '["f1"]' }] },
+      { kind: 'ticket', tripId: 'v1', ticketId: 'i9' },
       one,
       PASS_FILES,
     );

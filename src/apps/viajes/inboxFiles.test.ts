@@ -8,6 +8,7 @@ import {
   INBOX_FILE_ORPHAN_MIN_AGE_MS,
   deleteInboxFiles,
   heldInboxFiles,
+  inboxBoardingPassIds,
   inboxFileIds,
   readInboxFiles,
   syncInboxFiles,
@@ -32,10 +33,12 @@ async function staged(id: string, importId: string, fileIds: string[]): Promise<
     at_time: null,
     ends_on: null,
     ends_at: null,
-    from_code: null,
-    to_code: null,
+    transport: null,
+    origin: null,
+    destination: null,
     comments: null,
     file_ids: JSON.stringify(fileIds),
+    boarding_pass_file_ids: '[]',
   };
   await engine.insert(TRIP_INBOX_SPEC, row, id);
 }
@@ -73,8 +76,17 @@ afterEach(() => {
 
 describe('inboxFileIds', () => {
   it('reads the list a row carries', () => {
-    expect(inboxFileIds({ file_ids: '[]' })).toEqual([]);
-    expect(inboxFileIds({ file_ids: '["f1", "f2"]' })).toEqual(['f1', 'f2']);
+    expect(inboxFileIds({ file_ids: '[]', boarding_pass_file_ids: '[]' })).toEqual([]);
+    expect(inboxFileIds({ file_ids: '["f1", "f2"]', boarding_pass_file_ids: '[]' })).toEqual([
+      'f1',
+      'f2',
+    ]);
+  });
+
+  it('takes in what the row is boarded with, first, and each file once', () => {
+    const row = { file_ids: '["f1", "f2"]', boarding_pass_file_ids: '["f3", "f1"]' };
+    expect(inboxFileIds(row)).toEqual(['f3', 'f1', 'f2']);
+    expect(inboxBoardingPassIds(row)).toEqual(['f3', 'f1']);
   });
 });
 

@@ -10,6 +10,9 @@ interface LinkRowProps {
   title: string;
   /** The smaller line under the title: a date, what it came to. */
   subtitle?: ReactNode;
+  /** A second smaller line, for an entry with two things of a line's length
+   *  to say: where a journey starts, and where it ends. */
+  secondLine?: ReactNode;
   /** Whether the subtitle is about something already past, which is said in
    *  the error colour. */
   overdue?: boolean;
@@ -30,6 +33,7 @@ export default function LinkRow({
   onClick,
   title,
   subtitle,
+  secondLine,
   overdue = false,
   leading,
   trailing,
@@ -44,6 +48,9 @@ export default function LinkRow({
           <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
             {subtitle}
           </span>
+        )}
+        {secondLine !== undefined && (
+          <span className="mt-0.5 truncate text-xs text-muted">{secondLine}</span>
         )}
       </span>
       {trailing}

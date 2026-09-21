@@ -214,7 +214,7 @@ async function sealNamed(
   rows: InboxRow[],
   publicKey: CryptoKey,
 ): Promise<InboxFile[]> {
-  const named = new Set(rows.flatMap((row) => row.file_ids));
+  const named = new Set(rows.flatMap((row) => [...row.boarding_pass_file_ids, ...row.file_ids]));
   const sealed: InboxFile[] = [];
   for (const [index, file] of files.entries()) {
     const id = fileIds[index];
@@ -235,7 +235,7 @@ async function sealNamed(
 /** The rows as they are staged while the household has no inbox key: with
  *  nothing sealed, no row may name a file. */
 function withoutFiles(rows: InboxRow[]): InboxRow[] {
-  return rows.map((row) => ({ ...row, file_ids: [] }));
+  return rows.map((row) => ({ ...row, boarding_pass_file_ids: [], file_ids: [] }));
 }
 
 function errorMessage(error: unknown): string {

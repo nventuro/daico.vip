@@ -7,10 +7,11 @@ import { entryPath, type SearchHit } from '../types';
 import { TRIP_KIND_LABELS, tripDatesLabel } from './labels';
 
 /**
- * Trips whose title mentions `query`, then the rows of any trip whose title or
- * comments do — a booking code and an address are written there, and they
- * travel in the clear, so both can be matched — and their files by name, a
- * boarding pass among them. Each row is shown under the trip it belongs to.
+ * Trips whose title mentions `query`, then the rows of any trip whose title,
+ * comments or places do — a booking code and an address are written there, a
+ * station is what a pasaje is remembered by, and they travel in the clear, so
+ * all can be matched — and their files by name, a boarding pass among them.
+ * Each row is shown under the trip it belongs to.
  */
 export async function searchTrips(query: string): Promise<SearchHit[]> {
   const today = todayIso();
@@ -27,7 +28,7 @@ export async function searchTrips(query: string): Promise<SearchHit[]> {
     }),
   });
   const items = await searchTable(TRIP_ITEMS_SPEC, query, {
-    fields: ['title', 'comments'],
+    fields: ['title', 'comments', 'origin', 'destination'],
     attachments: TRIP_ROW_FILE_KINDS,
     hit: (item) => ({
       title: item.title,

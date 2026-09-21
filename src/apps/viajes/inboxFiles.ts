@@ -43,10 +43,24 @@ interface ServerInboxFile extends Omit<InboxFile, 'data'> {
   data: string;
 }
 
-/** The ids of the files a staged row was printed in, in the email's order. */
-export function inboxFileIds(row: Pick<TripInboxItem, 'file_ids'>): string[] {
-  const ids: unknown = JSON.parse(row.file_ids);
+/** The ids a JSON list of them holds. */
+function idsOf(list: string): string[] {
+  const ids: unknown = JSON.parse(list);
   return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+}
+
+/** What of a staged row says which files it brings. */
+type ListsFiles = Pick<TripInboxItem, 'file_ids' | 'boarding_pass_file_ids'>;
+
+/** The ids of every file a staged row brings, once each: its boarding passes,
+ *  then its other files. */
+export function inboxFileIds(row: ListsFiles): string[] {
+  return [...new Set([...idsOf(row.boarding_pass_file_ids), ...idsOf(row.file_ids)])];
+}
+
+/** The ids of those among a staged row's files that are boarded with. */
+export function inboxBoardingPassIds(row: ListsFiles): string[] {
+  return idsOf(row.boarding_pass_file_ids);
 }
 
 const placeholders = (ids: string[]) => ids.map(() => '?').join(', ');
