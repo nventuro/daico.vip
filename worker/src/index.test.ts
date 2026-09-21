@@ -28,7 +28,7 @@ vi.mock('./extract', async (importOriginal) => ({
 }));
 
 const { default: worker } = await import('./index');
-const { extractBookings } = await import('./extract');
+const { extractBookings, LINK_MARK } = await import('./extract');
 const { openDb, alreadyStaged, insertRows, AlreadyStagedError } = await import('./db');
 
 const ENV: Env = {
@@ -38,8 +38,8 @@ const ENV: Env = {
 
 /** A forwarded email as the platform hands it over, with the given
  *  Authentication-Results headers in the given order, the first on top,
- *  and any other headers after them. */
-function forwarded(verdicts: string[], headers: string[] = []) {
+ *  any other headers after them, and the given text. */
+function forwarded(verdicts: string[], headers: string[] = [], text = 'Reenviado.') {
   const raw = [
     ...verdicts.map((verdict) => `Authentication-Results: ${verdict}`),
     ...headers,
@@ -49,7 +49,7 @@ function forwarded(verdicts: string[], headers: string[] = []) {
     'Message-ID: <one@example.com>',
     'Content-Type: text/plain; charset=utf-8',
     '',
-    'Reenviado.',
+    text,
   ].join('\r\n');
   return {
     raw,
@@ -112,6 +112,34 @@ describe('the gate on a forwarded email', () => {
     expect(message.setReject).not.toHaveBeenCalled();
     expect(message.reply).not.toHaveBeenCalled();
     expect(extractBookings).not.toHaveBeenCalled();
+  });
+});
+
+describe("the email's text", () => {
+  it('reaches the model with the mark in place of every address, bare or in angle brackets', async () => {
+    const message = forwarded(
+      [OWN_PASS],
+      [],
+      [
+        'Tu reserva <https://click.example.com/ls/click?upn=u001.Kq0khUdk-2BSZmtN> esta lista.',
+        'Check-in: http://example.com/checkin?pnr=QK7T2M',
+        'Reserva QK7T2M',
+      ].join('\r\n'),
+    );
+    await handle(message);
+    const [, content] = vi.mocked(extractBookings).mock.calls[0];
+    expect(content.text).toContain(`Tu reserva ${LINK_MARK} esta lista.`);
+    expect(content.text).toContain(`Check-in: ${LINK_MARK}\n`);
+    expect(content.text).toContain('Reserva QK7T2M');
+    expect(content.text).not.toContain('http');
+  });
+
+  it('is cut to length after its addresses are taken out, not before', async () => {
+    const link = `<https://click.example.com/${'a'.repeat(990)}>`;
+    const message = forwarded([OWN_PASS], [], `${`${link}\r\n`.repeat(70)}Reserva QK7T2M`);
+    await handle(message);
+    const [, content] = vi.mocked(extractBookings).mock.calls[0];
+    expect(content.text).toContain('Reserva QK7T2M');
   });
 });
 

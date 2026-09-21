@@ -28,6 +28,7 @@ import type pg from 'pg';
 import { memberRejection, verdictRejection, type SenderRejection } from './gate';
 import {
   FILE_TYPES,
+  LINK_MARK,
   decide,
   extractBookings,
   type EmailContent,
@@ -114,11 +115,16 @@ function normalizedMessageId(messageId: string | null): string | null {
   return value === '' ? null : value.slice(0, MESSAGE_ID_MAX_CHARS);
 }
 
+// An address as a mail program writes it out in text: bare, or between
+// angle brackets.
+const LINK = /<?https?:\/\/[^\s<>]+>?/gi;
+
 /** The text the model reads: the plain part, or the HTML with its tags
- *  taken out when there is no plain part. */
+ *  taken out when there is no plain part, and either way with the mark in
+ *  place of every address. */
 function bodyText(email: Email): string {
-  if (email.text) return email.text;
-  return (email.html ?? '').replace(/<[^>]+>/g, ' ');
+  const text = email.text || (email.html ?? '').replace(/<[^>]+>/g, ' ');
+  return text.replace(LINK, LINK_MARK);
 }
 
 /** An attachment's name as the app will show it: the extension off, since
