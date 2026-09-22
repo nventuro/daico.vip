@@ -79,10 +79,17 @@ async function removeAttachment(id: string): Promise<void> {
  * entry's otherwise. Adding (to `owner`) encrypts the file under
  * `masterKey` and keeps it here until the next sync uploads it; removing
  * takes the row and the local file, and leaves the bucket's object to the
- * sweep.
+ * sweep; renaming writes the row alone, the file being sealed to the row's
+ * id and not to its name.
  */
 export function useAttachments(owner?: AttachmentOwner) {
-  const { items: all, loading, error, mutate } = useOfflineTable<Attachment>(ATTACHMENTS_SPEC);
+  const {
+    items: all,
+    loading,
+    error,
+    mutate,
+    update,
+  } = useOfflineTable<Attachment>(ATTACHMENTS_SPEC);
   const kind = owner?.kind;
   const ownerId = owner?.id;
 
@@ -127,6 +134,14 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate],
   );
 
+  /** Call the attachment `name`, kept as every name is — lowercased and
+   *  trimmed, empty for one left unnamed. */
+  const rename = useCallback(
+    (attachment: Attachment, name: string) =>
+      update(attachment.id, { name: lowercaseTrimmed(name) }),
+    [update],
+  );
+
   /** Take every attachment of this entry at once, for an entry being deleted:
    *  nothing else would ever list them. */
   const removeAll = useCallback(
@@ -148,5 +163,5 @@ export function useAttachments(owner?: AttachmentOwner) {
     [mutate],
   );
 
-  return { items, loading, error, add, addOpened, remove, removeAll, removeByIds };
+  return { items, loading, error, add, addOpened, remove, rename, removeAll, removeByIds };
 }

@@ -266,8 +266,9 @@ leave it, so the server only ever stores ciphertext.
   before the home screen, and asks for the phrase. The very first time (no
   `household_key` row yet) the app generates the phrase and asks for it to be
   written down. Signing out forgets the key.
-- **In the app**: an entry's page shows its attachments as a grid, and a PDF is
-  drawn in the app, never handed to the system.
+- **In the app**: an entry's page shows its attachments as a grid, a tile
+  opens the file with its name written in place under it, and a PDF is drawn
+  in the app, never handed to the system.
 - **Sync**: files follow every table sync — uploads go out once their rows are
   on the server, files of deleted rows are dropped, and the files every device
   keeps — every document's, and a trip's, boarding passes included, until a

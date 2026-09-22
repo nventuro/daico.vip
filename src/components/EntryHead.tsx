@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { lowercaseTrimmed } from '../utils/textUtils';
+import { IN_PLACE_CLASS } from './controlClasses';
 import IconButton from './IconButton';
 
 interface EntryHeadProps {
@@ -30,8 +31,7 @@ interface EntryHeadProps {
 }
 
 /** The title, styled as the page's heading and drawn as nothing else. */
-const TITLE_CLASS =
-  'w-full min-w-0 border-0 bg-transparent p-0 font-display text-2xl font-black tracking-tight text-on-surface outline-none placeholder:text-muted';
+const TITLE_CLASS = `${IN_PLACE_CLASS} font-display text-2xl font-black tracking-tight`;
 
 /**
  * The head of an entry's page: its title as the heading, written in place,

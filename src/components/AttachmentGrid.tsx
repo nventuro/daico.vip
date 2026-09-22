@@ -25,7 +25,7 @@ interface AttachmentGridProps {
  * `:attachmentId`, read here.
  */
 export default function AttachmentGrid({ owner, ownerPath }: AttachmentGridProps) {
-  const { items, error, add, remove } = useAttachments(owner);
+  const { items, error, add, remove, rename } = useAttachments(owner);
   const masterKey = useMasterKey();
   const { attachmentId } = useParams();
   const [asking, setAsking] = useState(false);
@@ -77,6 +77,7 @@ export default function AttachmentGrid({ owner, ownerPath }: AttachmentGridProps
           index={open}
           ownerPath={ownerPath}
           onRemove={remove}
+          onRename={rename}
         />
       )}
     </>

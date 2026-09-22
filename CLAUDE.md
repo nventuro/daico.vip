@@ -217,7 +217,9 @@ gate, what a sync does with the files. These are the rules on top of it.
   gone or replaced, every attachment is unreadable.
 - **Files travel outside the tables, through `src/lib/attachmentFiles.ts`
   only.** Attachments are pictures and PDFs (`ATTACHMENT_FILE_TYPES`) and
-  their blobs are immutable: replacing one is a new attachment. The
+  their blobs are immutable: replacing one is a new attachment, and the one
+  thing written afterwards is the row's `name`, in place from the lightbox,
+  which the seal does not cover. The
   `attachments` row is an ordinary synced table shared by every app whose
   entries take attachments (`owner_kind`), so it lives in `SHELL_SPECS` and is
   drawn by the shared `src/components/Attachment*`, parametrized by the owner.

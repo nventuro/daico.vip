@@ -16,6 +16,12 @@ export const CONTROL_CLASS =
  *  chip — which takes no look of its own. */
 export const INSET_CONTROL_CLASS = 'min-w-0 flex-1 bg-transparent outline-none';
 
+/** A text written in place — a page's title, an attachment's name — drawn as
+ *  the text it is and nothing else: only its placeholder says it is a field.
+ *  Pair with the text's own size and weight. */
+export const IN_PLACE_CLASS =
+  'w-full min-w-0 border-0 bg-transparent p-0 text-on-surface outline-none placeholder:text-muted';
+
 /** The shape of a chip; pair with one of the two colour sets below. */
 export const CHIP_BASE_CLASS = 'inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm';
 

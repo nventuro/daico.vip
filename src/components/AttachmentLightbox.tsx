@@ -18,13 +18,14 @@ import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useAttachmentFile } from '../hooks/useAttachmentFile';
 import { useAttachmentUploadState } from '../hooks/useAttachmentUploadState';
 import { usePdf } from '../hooks/usePdf';
-import { countLabel } from '../utils/textUtils';
+import { countLabel, lowercaseTrimmed } from '../utils/textUtils';
 import Button from './Button';
 import DeleteDialog from './DeleteDialog';
 import IconButton from './IconButton';
 import ModalDialog from './ModalDialog';
 import LoadingLine from './LoadingLine';
 import PdfPage from './PdfPage';
+import { IN_PLACE_CLASS } from './controlClasses';
 
 /** How far a finger must travel across the lightbox to change picture, in pixels. */
 const LIGHTBOX_SWIPE_MIN_PX = 50;
@@ -44,11 +45,16 @@ function isFromEntryPage(state: unknown): boolean {
 interface AttachmentLightboxProps {
   /** The entry's attachments in the grid's order; the lightbox moves along them. */
   attachments: Attachment[];
-  /** Which one is open. */
+  /** Which one is open. A lightbox is mounted for that one attachment, and
+   *  moving to another mounts a new one, so what is typed under one never
+   *  carries over. */
   index: number;
   /** The entry's own page: the attachments' URLs hang under it, and closing returns to it. */
   ownerPath: string;
   onRemove: (attachment: Attachment) => Promise<unknown>;
+  /** Writes the attachment's name as it is left: lowercased and trimmed,
+   *  empty for one left unnamed. */
+  onRename: (attachment: Attachment, name: string) => Promise<unknown>;
 }
 
 /**
@@ -56,14 +62,16 @@ interface AttachmentLightboxProps {
  * other — with the entry's others a swipe (or an arrow key) away. Which one
  * is open is the `:attachmentId` ending the URL, so an attachment can be
  * linked to and the phone's back gesture closes it. Under it: its name,
- * where its file stands, a way to get it out of the app, and its deletion
- * behind the usual confirm.
+ * written in place like a page's title and kept on blur, where its file
+ * stands, a way to get it out of the app, and its deletion behind the usual
+ * confirm.
  */
 export default function AttachmentLightbox({
   attachments,
   index,
   ownerPath,
   onRemove,
+  onRename,
 }: AttachmentLightboxProps) {
   const attachment = attachments[index];
   const navigate = useNavigate();
@@ -78,20 +86,36 @@ export default function AttachmentLightbox({
   const online = useOnline();
   const touchStartX = useRef<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [name, setName] = useState(attachment.name);
+  const committed = useRef(attachment.name);
+
+  // The name as it is left is the name: empty is one too, since an attachment
+  // may have none. Nothing blurs the field when the dialog is put away by
+  // Escape or the back gesture, nor when a swipe moves on, so those commit it
+  // themselves.
+  const commitName = useCallback(() => {
+    const kept = lowercaseTrimmed(name);
+    setName(kept);
+    if (kept === committed.current) return;
+    committed.current = kept;
+    void onRename(attachment, kept);
+  }, [name, attachment, onRename]);
 
   const close = useCallback(() => {
+    commitName();
     // Opened from the entry's page, that page is the previous history entry;
     // reached by a link from elsewhere, it is not, and takes this one's place.
     if (isFromEntryPage(location.state)) void navigate(-1);
     else void navigate(ownerPath, { replace: true });
-  }, [location.state, navigate, ownerPath]);
+  }, [commitName, location.state, navigate, ownerPath]);
 
   const show = useCallback(
     (i: number) => {
+      commitName();
       const state: unknown = location.state;
       void navigate(`${ownerPath}/${attachments[i].id}`, { replace: true, state });
     },
-    [attachments, location.state, navigate, ownerPath],
+    [attachments, commitName, location.state, navigate, ownerPath],
   );
   const hasPrev = index > 0;
   const hasNext = index < attachments.length - 1;
@@ -100,6 +124,8 @@ export default function AttachmentLightbox({
     // Not while the delete question is up: the keys are its then.
     if (deleting) return;
     function onKey(e: KeyboardEvent) {
+      // While the name is being written, the arrows are the caret's.
+      if (e.target instanceof HTMLInputElement) return;
       if (e.key === 'ArrowLeft' && hasPrev) show(index - 1);
       if (e.key === 'ArrowRight' && hasNext) show(index + 1);
     }
@@ -242,16 +268,25 @@ export default function AttachmentLightbox({
         </div>
 
         <div className="flex shrink-0 flex-col gap-3 bg-surface px-4 py-3 text-on-surface">
-          {(attachment.name || hint) && (
-            <div className="flex flex-col">
-              {attachment.name && <span className="font-medium">{attachment.name}</span>}
-              {hint && (
-                <span className={`text-sm text-muted ${attachment.name ? 'mt-1' : ''}`}>
-                  {hint}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-col">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                e.currentTarget.blur();
+              }}
+              aria-label="Nombre"
+              placeholder="Nombre"
+              enterKeyHint="done"
+              autoCapitalize="none"
+              className={`${IN_PLACE_CLASS} font-medium`}
+            />
+            {hint && <span className="mt-1 text-sm text-muted">{hint}</span>}
+          </div>
           <div className="flex items-center justify-between gap-3">
             <IconButton
               label={pdf ? 'Eliminar PDF' : 'Eliminar foto'}
