@@ -187,7 +187,7 @@ export function inboxItemLines(item: Pick<TripInboxItem, keyof ItemLine>, today:
 /** What the home screen lists ahead of a pasaje that has no boarding pass
  *  yet: what is missing, and for which pasaje. */
 export function boardingPassDueLabel(ticketTitle: string): string {
-  return `${BOARDING_PASS_LABEL} · ${ticketTitle}`;
+  return `subir ${BOARDING_PASS_LABEL} · ${ticketTitle}`;
 }
 
 /** How many suggestions a group of them holds. */

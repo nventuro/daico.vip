@@ -30,7 +30,7 @@ export function useStatementsUpcoming(): Upcoming[] | undefined {
     const missing = cardCloses(items, today)
       .filter((card) => card.late)
       .map((card) => ({
-        title: `Subir resumen de ${FORMAT_LABELS[card.format]}`,
+        title: `subir resumen de ${FORMAT_LABELS[card.format]}`,
         on: addDays(card.lastClosedOn, CARD_LATE_DAYS),
         to: STATEMENTS_PATH,
         appId: 'gastos' as const,

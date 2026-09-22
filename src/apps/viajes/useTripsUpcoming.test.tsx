@@ -119,9 +119,9 @@ describe('useTripsUpcoming', () => {
       flight('sin día', 1, { on_date: null }),
     ];
     expect(upcoming()).toEqual([
-      'boarding pass · mañana /viajes/v1/mañana',
-      'boarding pass · hoy /viajes/v1/hoy',
-      'boarding pass · sin aeropuertos /viajes/v1/sin aeropuertos',
+      'subir boarding pass · mañana /viajes/v1/mañana',
+      'subir boarding pass · hoy /viajes/v1/hoy',
+      'subir boarding pass · sin aeropuertos /viajes/v1/sin aeropuertos',
     ]);
   });
 
@@ -135,15 +135,15 @@ describe('useTripsUpcoming', () => {
       flight('micro que salió', -1, { transport: 'bus' }),
     ];
     expect(upcoming()).toEqual([
-      'boarding pass · tren /viajes/v1/tren',
-      'boarding pass · micro /viajes/v1/micro',
+      'subir boarding pass · tren /viajes/v1/tren',
+      'subir boarding pass · micro /viajes/v1/micro',
     ]);
   });
 
   it('stops asking with the first boarding pass on the pasaje, and only a boarding pass', () => {
     state.items = [flight('con pase', 1), flight('con e-ticket', 1)];
     state.attachments = [file('boarding_pass', 'con pase'), file('trip_item', 'con e-ticket')];
-    expect(upcoming()).toEqual(['boarding pass · con e-ticket /viajes/v1/con e-ticket']);
+    expect(upcoming()).toEqual(['subir boarding pass · con e-ticket /viajes/v1/con e-ticket']);
   });
 
   it("marks a pendiente that has files of either kind, as the trip's list does", () => {

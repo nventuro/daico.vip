@@ -158,7 +158,7 @@ describe('a boarding pass', () => {
   });
 
   it('is asked for by name on the home screen, and counted in a word that does not change', () => {
-    expect(boardingPassDueLabel('AR 1420 · ida')).toBe('boarding pass · AR 1420 · ida');
+    expect(boardingPassDueLabel('AR 1420 · ida')).toBe('subir boarding pass · AR 1420 · ida');
     expect(inboxSubtitle(2, '2026-09-01T12:00:00Z', TODAY, true)).toContain('2 boarding pass ·');
     expect(inboxSubtitle(2, '2026-09-01T12:00:00Z', TODAY)).toContain('2 ítems ·');
     expect(boardingPassAddedLabel(1)).toBe('Se agregó 1 boarding pass');

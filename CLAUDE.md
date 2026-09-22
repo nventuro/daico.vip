@@ -465,7 +465,7 @@ and what becomes of a forwarded email. These are the rules on top of it.
   rule. The word is «boarding pass», lowercase in a row and invariable in
   number (`BOARDING_PASS_LABEL`).
 - **The boarding pass Próximo asks for is deduced, never stored.**
-  `useTripsUpcoming` lists «boarding pass · {pasaje}» for every pasaje that
+  `useTripsUpcoming` lists «subir boarding pass · {pasaje}» for every pasaje that
   is dated, has not left, is within its transport's
   `BOARDING_PASS_NOTICE_DAYS` and has no attachment of that kind. A flight's
   is asked for from the day before, since it does not exist until the
