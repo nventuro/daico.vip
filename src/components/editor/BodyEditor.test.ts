@@ -1,4 +1,6 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
+import { Editor } from '@tiptap/core';
 import { MarkdownManager } from '@tiptap/markdown';
 import { bodyExtensions } from './extensions';
 
@@ -114,5 +116,46 @@ describe('the body round trip', () => {
     expect(manager.parse(manager.serialize(paragraphOf('    cuatro espacios')))).toEqual(
       paragraphOf('cuatro espacios'),
     );
+  });
+});
+
+describe('the editor', () => {
+  /** The blocks a body is made of, in order. */
+  const blocksOf = (editor: Editor): string[] => {
+    const names: string[] = [];
+    editor.state.doc.forEach((node) => names.push(node.type.name));
+    return names;
+  };
+
+  /** A body opened in the editor, then written on. */
+  function edited(markdown: string): Editor {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: bodyExtensions(''),
+      content: markdown,
+      contentType: 'markdown',
+    });
+    editor.commands.setTextSelection(1);
+    editor.commands.insertContent('x');
+    return editor;
+  }
+
+  it.each([
+    ['- [ ] por hacer', 'taskList'],
+    ['- uno\n- dos', 'bulletList'],
+    ['# Título', 'heading'],
+    ['> cita', 'blockquote'],
+  ])('holds no block after the last one of %j', (markdown, block) => {
+    const editor = edited(markdown);
+    expect(blocksOf(editor)).toEqual([block]);
+    expect(editor.getMarkdown()).not.toMatch(/\n$/);
+    editor.destroy();
+  });
+
+  it('makes a task list of a paragraph and nothing more', () => {
+    const editor = edited('por hacer');
+    editor.commands.toggleTaskList();
+    expect(editor.getMarkdown()).toBe('- [ ] xpor hacer');
+    editor.destroy();
   });
 });

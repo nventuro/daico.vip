@@ -226,6 +226,10 @@ export function bodyExtensions(placeholder: string): AnyExtension[] {
       paragraph: false,
       // Has no form in the dialect: the renderer would show its marks.
       underline: false,
+      // The renderer draws nothing after a body's last block, so neither does
+      // the editor: the empty paragraph it would keep after a closing list or
+      // heading is a line the renderer does not show.
+      trailingNode: false,
       link: {
         autolink: true,
         linkOnPaste: true,
