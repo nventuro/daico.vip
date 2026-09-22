@@ -80,7 +80,7 @@ export default function IdeaPage() {
           <Body
             value={idea.body}
             onChange={bodySave.onChange}
-            placeholder="Contenido"
+            placeholder="Escribir algo"
             ariaLabel="Contenido"
           />
 

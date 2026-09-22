@@ -69,7 +69,7 @@ export default function NotePage() {
               ref={body}
               value={text}
               onChange={textSave.onChange}
-              placeholder="Contenido"
+              placeholder="Escribir algo"
               ariaLabel="Contenido"
             />
           )}

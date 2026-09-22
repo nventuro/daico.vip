@@ -18,7 +18,7 @@ export interface BodyProps {
    *  body is work worth doing when it is saved, not on every keystroke.
    *  Saving it, and when, is the caller's. */
   onChange: (markdown: () => string) => void;
-  /** The text's own name, shown while it is empty. */
+  /** What the box says while it is empty. */
   placeholder: string;
   autoFocus?: boolean;
   ariaLabel: string;

@@ -83,6 +83,7 @@ export default function RecipeForm({ recipe, onSave }: RecipeFormProps) {
           value={body}
           onChange={(e) => setBody(e.target.value)}
           aria-label="Receta (Markdown)"
+          placeholder="Escribir algo"
           rows={14}
           className={`${CONTROL_CLASS} font-mono`}
         />

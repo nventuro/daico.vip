@@ -12,7 +12,7 @@ const BodyEditor = lazy(() => import('./BodyEditor'));
 export type { BodyHandle, BodyProps };
 
 /** The one control for a free text: what it says, drawn as it reads and
- *  written in place. Its placeholder is the text's own name. */
+ *  written in place, and saying while it is empty that it is written in. */
 export default function Body(props: BodyProps) {
   return (
     <Suspense

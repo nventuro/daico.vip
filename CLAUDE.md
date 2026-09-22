@@ -665,10 +665,11 @@ the rules on top of it.
   opened from (`useLeaveBack`), so the page never shows the after-state.
 - **Every free text is `Body`** (`src/components/editor/`), never a
   `TextArea`, never a second markdown renderer; the one box that is not a
-  text but a paste — Gastos' rules import — is a `TextArea` on purpose. A text that is the entry
-  itself takes the field's name as its placeholder («Contenido»); what is
-  written _about_ an entry is drawn by `Comments`, headed like the sections
-  around it, and a page that takes comments never draws a `Body` of its own.
+  text but a paste — Gastos' rules import — is a `TextArea` on purpose. Every
+  free text says «Escribir algo» while it is empty, the one that is the entry
+  itself included; what is written _about_ an entry is drawn by `Comments`,
+  headed like the sections around it, and a page that takes comments never
+  draws a `Body` of its own.
   **The editor draws exactly what `Markdown` draws**: `Body` shows the
   reader until the editor's chunk arrives, so any block the two draw
   differently jumps on screen. They share
