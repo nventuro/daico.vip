@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { SpendingCategory } from '../../lib/offline/specs';
 import SectionLabel from '../../components/SectionLabel';
-import { byCategory, spendParts, type CategoryShare, type Movement } from './breakdown';
+import { useOpenedHere } from '../../hooks/useOpenedHere';
+import { byCategory, spendParts, type Movement } from './breakdown';
 import type { Rule } from './rules';
 import { CATEGORY_LABELS, UNCATEGORIZED_LABEL, formatArsCompact, formatDelta } from './labels';
 import Delta from './Delta';
@@ -40,21 +40,11 @@ export default function Breakdown({
   markOf,
   onSelect,
 }: BreakdownProps) {
-  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const { isOpen, toggle } = useOpenedHere('breakdown');
 
   const { usual, oneOff, installments } = spendParts(movements, rules);
   const shares = byCategory(movements, rules);
   const largest = Math.max(...shares.map((share) => share.cents), 1);
-
-  function toggle(share: CategoryShare) {
-    setOpened((prev) => {
-      const next = new Set(prev);
-      const key = shareKey(share.category);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
 
   return (
     <>
@@ -79,14 +69,14 @@ export default function Breakdown({
         <ul>
           {shares.map((share) => {
             const key = shareKey(share.category);
-            const open = opened.has(key);
+            const open = isOpen(key);
             const change = share.cents - (previousByCategory?.get(share.category) ?? 0);
             const Chevron = open ? IconChevronDown : IconChevronRight;
             return (
               <li key={key} className="border-b border-border">
                 <button
                   type="button"
-                  onClick={() => toggle(share)}
+                  onClick={() => toggle(key)}
                   aria-expanded={open}
                   className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-border-subtle"
                 >

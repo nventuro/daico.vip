@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { IconChevronRight } from '@tabler/icons-react';
+import { useOpenedHere } from '../hooks/useOpenedHere';
 
 interface CompletedSectionProps {
   /** Section heading, e.g. "Compradas" / "Hechas". */
@@ -12,9 +13,12 @@ interface CompletedSectionProps {
 /** Collapsible bottom section that holds completed items so they stay out of the
  *  way without being deleted. Collapsed by default; the heading names the section
  *  without counting it, since how many are done changes nothing. What it holds
- *  is the caller's: a list of rows, or the same sections as above it. */
+ *  is the caller's: a list of rows, or the same sections as above it. Opened,
+ *  it stays open when its screen is come back to, and a screen reached anew
+ *  finds it collapsed. */
 export default function CompletedSection({ label, count, children }: CompletedSectionProps) {
-  const [open, setOpen] = useState(false);
+  const { isOpen, toggle } = useOpenedHere('completed');
+  const open = isOpen(label);
 
   if (count === 0) return null;
 
@@ -22,7 +26,7 @@ export default function CompletedSection({ label, count, children }: CompletedSe
     <div className="mt-6">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => toggle(label)}
         aria-expanded={open}
         className="flex w-full items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:text-muted-strong"
       >
