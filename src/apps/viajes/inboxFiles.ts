@@ -148,10 +148,16 @@ export async function readInboxFiles(ids: string[]): Promise<InboxFile[]> {
 }
 
 /**
- * Let go of these staged files: the copies here at once, the server's as far
- * as it will take now. What it does not, the sweep takes later.
+ * Let go of those of these staged files no staged row still lists: the
+ * copies here at once, the server's as far as it will take now. What it
+ * does not, the sweep takes later. A file one email printed for several
+ * rows — two legs' boarding passes in one PDF — stays for the rows still
+ * waiting on it.
  */
-export async function deleteInboxFiles(ids: string[]): Promise<void> {
+export async function deleteInboxFiles(fileIds: string[]): Promise<void> {
+  const rows = await engine.listVisible<TripInboxItem>(TRIP_INBOX_SPEC);
+  const listed = new Set(rows.flatMap(inboxFileIds));
+  const ids = fileIds.filter((id) => !listed.has(id));
   if (ids.length === 0) return;
   await engine.localWrite(
     INBOX_FILES.table,

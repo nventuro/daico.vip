@@ -175,6 +175,7 @@ describe('deleteInboxFiles', () => {
     server.seed(FILES, [serverFile('f1', 'e1'), serverFile('f2', 'e1')]);
     await staged('s1', 'e1', ['f1', 'f2']);
     await syncInboxFiles(pulled);
+    await engine.remove(TRIP_INBOX_SPEC, 's1');
     await deleteInboxFiles(['f1']);
     expect(await heldInboxFiles(['f1', 'f2'])).toEqual(new Set(['f2']));
     expect(serverIds()).toEqual(['f2']);
@@ -182,5 +183,20 @@ describe('deleteInboxFiles', () => {
     await deleteInboxFiles(['f2']);
     expect(await heldInboxFiles(['f2'])).toEqual(new Set());
     expect(serverIds()).toEqual(['f2']);
+  });
+
+  it('keeps a file another staged row still lists, until that row is gone too', async () => {
+    server.seed(FILES, [serverFile('f1', 'e1')]);
+    await staged('s1', 'e1', ['f1']);
+    await staged('s2', 'e1', ['f1']);
+    await syncInboxFiles(pulled);
+    await engine.remove(TRIP_INBOX_SPEC, 's1');
+    await deleteInboxFiles(['f1']);
+    expect(await heldInboxFiles(['f1'])).toEqual(new Set(['f1']));
+    expect(serverIds()).toEqual(['f1']);
+    await engine.remove(TRIP_INBOX_SPEC, 's2');
+    await deleteInboxFiles(['f1']);
+    expect(await heldInboxFiles(['f1'])).toEqual(new Set());
+    expect(serverIds()).toEqual([]);
   });
 });

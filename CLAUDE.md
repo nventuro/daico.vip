@@ -522,9 +522,10 @@ and what becomes of a forwarded email. These are the rules on top of it.
   every listed file into the local `INBOX_FILES`, one file per request, the
   one other table fetched whole, few and short-lived. A confirm clears each
   staged row as soon as its own row is written, and stops at a write that
-  fails, so what is left staged is what is still to confirm. The staged files
-  are deleted only once the confirm can no longer be undone
-  (`settleInboxUndo`), at discard, or by the sweep a month on.
+  fails, so what is left staged is what is still to confirm. A staged file
+  is deleted only once no staged row lists it — once the confirm can no
+  longer be undone (`settleInboxUndo`), or at discard — or by the sweep a
+  month on.
 
 ## Salud — read before touching them
 
