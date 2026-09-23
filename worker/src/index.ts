@@ -54,6 +54,7 @@ import {
   type InboxFile,
 } from './db';
 import { importInboxPublicKey, inboxFileBinding, sealFile } from './seal';
+import { splitSharedPasses } from './split';
 import { toBase64 } from './base64';
 
 export interface Env {
@@ -319,14 +320,16 @@ export default {
           return;
         }
         const { content, skipped } = contentOf(email);
-        // Each file gets the id it would be staged under before the model
-        // names any, so the rows are built with the ids in hand.
-        const fileIds = content.files.map(() => crypto.randomUUID());
         const output = await extractBookings(env.ANTHROPIC_API_KEY, content);
+        const split = output === null ? null : await splitSharedPasses(output, content.files);
+        const emailFiles = split?.files ?? content.files;
+        // Each file gets the id it would be staged under before the rows are
+        // made, so they are built with the ids in hand.
+        const fileIds = emailFiles.map(() => crypto.randomUUID());
         const decision =
-          output === null
+          split === null
             ? { ok: false as const, problem: null }
-            : decide(output, email.subject ?? null, fileIds);
+            : decide(split.extraction, email.subject ?? null, fileIds);
         if (!decision.ok) {
           await reply(failureBody(decision.problem, decision.advice));
           return;
@@ -338,7 +341,7 @@ export default {
             : {
                 rows: decision.rows,
                 files: await sealNamed(
-                  content.files,
+                  emailFiles,
                   fileIds,
                   decision.rows,
                   await importInboxPublicKey(publicKey),

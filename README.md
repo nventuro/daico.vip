@@ -299,9 +299,12 @@ boarding-pass shelf and the rest among its other files: a train's or a bus's
 ticket usually comes with the booking. An email that only brings the boarding
 passes of a pasaje booked before — an airline's check-in, a ticket sent later
 — is the other thing the worker takes. The model stages one row of kind
-`boarding_pass` per leg, its files beside it, and the review asks for the
-pasaje rather than the trip: the pasaje of a trip ahead that matches by day
-and places, and travels on the same thing, is preselected, the pasaje — or the
+`boarding_pass` per leg, its files beside it; a PDF that holds several
+passes — one per passenger, one per leg — is cut into one per pass, by the
+pages the model names, and stays whole on every leg that lists it when those
+pages do not account for it exactly.
+The review asks for the pasaje rather than the trip: the pasaje of a trip
+ahead that matches by day and places, and travels on the same thing, is preselected, the pasaje — or the
 trip too — can be made on the spot, and confirming seals each file for that
 pasaje's boarding-pass shelf. An email that is bookings and a boarding pass at once is
 refused with a reply, and a pass that came as a link rather than a file is

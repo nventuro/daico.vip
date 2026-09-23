@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 import { RECEIVING_SERVER } from './gate';
 import type { Env } from './index';
 
@@ -29,7 +30,8 @@ vi.mock('./extract', async (importOriginal) => ({
 
 const { default: worker } = await import('./index');
 const { extractBookings, LINK_MARK } = await import('./extract');
-const { openDb, alreadyStaged, insertRows, AlreadyStagedError } = await import('./db');
+const { openDb, alreadyStaged, inboxPublicKey, insertRows, AlreadyStagedError } =
+  await import('./db');
 
 const ENV: Env = {
   ANTHROPIC_API_KEY: 'key',
@@ -233,6 +235,25 @@ function fileBytes(magic: number[] | string, size: number): Uint8Array {
   return bytes;
 }
 
+/** Gives the household an inbox key for the next email, so its files are
+ *  sealed and staged. */
+async function withInboxKey(): Promise<void> {
+  const pair = (await crypto.subtle.generateKey(
+    {
+      name: 'RSA-OAEP',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256',
+    },
+    true,
+    ['wrapKey', 'unwrapKey'],
+  )) as CryptoKeyPair;
+  const spki = Buffer.from(await crypto.subtle.exportKey('spki', pair.publicKey)).toString(
+    'base64',
+  );
+  vi.mocked(inboxPublicKey).mockResolvedValueOnce(spki);
+}
+
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG = [0xff, 0xd8, 0xff, 0xe0];
 
@@ -319,26 +340,12 @@ describe('the files an email brings', () => {
           origin: 'AEP',
           destination: 'BRC',
           comments: 'Ana 14A',
-          boarding_pass_files: [1],
+          boarding_pass_files: [{ file: 1, pages: [] }],
           files: [],
         },
       ],
     });
-    const { inboxPublicKey } = await import('./db');
-    const pair = (await crypto.subtle.generateKey(
-      {
-        name: 'RSA-OAEP',
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: 'SHA-256',
-      },
-      true,
-      ['wrapKey', 'unwrapKey'],
-    )) as CryptoKeyPair;
-    const spki = Buffer.from(await crypto.subtle.exportKey('spki', pair.publicKey)).toString(
-      'base64',
-    );
-    vi.mocked(inboxPublicKey).mockResolvedValueOnce(spki);
+    await withInboxKey();
     const message = withAttachments([
       { name: 'pass.png', type: 'image/png', bytes: fileBytes(PNG, 40_000) },
     ]);
@@ -349,5 +356,38 @@ describe('the files an email brings', () => {
     expect(rows[0].boarding_pass_file_ids).toEqual([files[0].id]);
     expect(rows[0].file_ids).toEqual([]);
     expect(replied(message)).toContain('un boarding pass, con 1 archivo');
+  });
+
+  it('stages each leg of a connection with its own page of the one PDF, and not the whole', async () => {
+    const leg = (title: string, page: number) => ({
+      kind: 'boarding_pass' as const,
+      title,
+      on_date: '2026-09-12',
+      at_time: null,
+      ends_on: null,
+      ends_at: null,
+      transport: 'flight' as const,
+      origin: null,
+      destination: null,
+      comments: null,
+      boarding_pass_files: [{ file: 1, pages: [page] }],
+      files: [],
+    });
+    vi.mocked(extractBookings).mockResolvedValueOnce({
+      trip_title: 'Bariloche',
+      problem: null,
+      items: [leg('AR 1502', 1), leg('AR 1564', 2)],
+    });
+    await withInboxKey();
+    const doc = await PDFDocument.create();
+    doc.addPage();
+    doc.addPage();
+    const message = withAttachments([
+      { name: 'pases.pdf', type: 'application/pdf', bytes: await doc.save() },
+    ]);
+    await handle(message);
+    const [, , rows, files] = vi.mocked(insertRows).mock.calls[0];
+    expect(files).toHaveLength(2);
+    expect(rows.map((row) => row.boarding_pass_file_ids)).toEqual(files.map((file) => [file.id]));
   });
 });

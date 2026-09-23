@@ -4,8 +4,9 @@
 // `trip_inbox`. The model never learns which trips exist and never picks one:
 // `trip_title` is only the name a new trip would get. It does say which of the
 // email's files each item is printed in, by number, which is how a file finds
-// the rows it belongs to, and which of them a pasaje is boarded with. An email
-// is one thing: bookings to stage, or the boarding pass of a pasaje booked
+// the rows it belongs to, and which of them a pasaje is boarded with — pass
+// by pass, down to the pages of a PDF that holds several. An email is one
+// thing: bookings to stage, or the boarding pass of a pasaje booked
 // before — both at once is an error, not a staging.
 // =============================================================================
 import Anthropic from '@anthropic-ai/sdk';
@@ -89,7 +90,9 @@ const ITEM = z.object({
   origin: z.string().nullable(),
   destination: z.string().nullable(),
   comments: z.string().nullable(),
-  boarding_pass_files: z.array(z.number().int()),
+  boarding_pass_files: z.array(
+    z.object({ file: z.number().int(), pages: z.array(z.number().int()) }),
+  ),
   files: z.array(z.number().int()),
 });
 
@@ -202,12 +205,20 @@ fields.
   each name with their own seat or code. For a boarding_pass: each
   passenger with their seat, then gate and boarding time if printed.
   null if there is nothing to add.
-- boarding_pass_files: the numbers of the attached files that are
-  shown to board this leg — a flight's boarding passes, a train or bus
-  ticket with its QR code or barcode — one per passenger or one for
-  everyone. A flight's e-ticket or itinerary receipt is not one: you
-  cannot board with it. Use [] for lodging and booking, and when the
-  pass is only a link or is embedded in the body.
+- boarding_pass_files: the passes shown to board this leg — a flight's
+  boarding pass, a train or bus ticket with its QR code or barcode —
+  one entry per pass, { "file": its number, "pages": its pages }. A
+  pass is one passenger's, or everyone's when one code boards them all.
+  For a PDF, pages are the pass's pages, numbered from 1; for a
+  picture, pages is []. A PDF that holds several passes — one per
+  passenger, one per leg, or both — has an entry for each of them, on
+  the leg each boards, and every page of it goes with exactly one pass:
+  a page that is no one's pass (instructions, ads) goes with the pass
+  it follows, or with the first when it comes before them all. A pass
+  printed for two legs at once is listed on both, with the same pages.
+  A flight's e-ticket or itinerary receipt is not a pass: you cannot
+  board with it. Use [] for lodging and booking, and when the pass is
+  only a link or is embedded in the body.
 - files: the numbers of the other attached files that contain this
   item — e-ticket, receipt, invoice, voucher. Use [] for an item found
   only in the body, and always for a boarding_pass.
@@ -236,7 +247,8 @@ These show the shape of the output for an email with two attached
 files. Do not reuse their wording.
 
 A whole answer — a train leg for two, from an email in English, with
-the tickets in the first file and the receipt in the second. The labels
+the tickets in the first file, a page each, and the receipt in the
+second. The labels
 were translated ("Booking reference", "Coach", "Seat"); the station
 names were not:
   { "trip_title": "París", "problem": null,
@@ -248,7 +260,8 @@ names were not:
         "origin": "London St Pancras International",
         "destination": "Paris Gare du Nord",
         "comments": "Código QK7T2M · Coche 11 · Ana asiento 45 · Bruno asiento 46",
-        "boarding_pass_files": [1], "files": [2] } ] }
+        "boarding_pass_files": [{ "file": 1, "pages": [1] }, { "file": 1, "pages": [2] }],
+        "files": [2] } ] }
 
 A round trip by plane — two tickets, both in the same e-ticket, which
 is not a boarding pass:
@@ -270,7 +283,7 @@ details, with the ticket in the second file:
     "transport": "bus",
     "origin": "Terminal de Ómnibus de Bariloche", "destination": null,
     "comments": "Butaca 12",
-    "boarding_pass_files": [2], "files": [] }
+    "boarding_pass_files": [{ "file": 2, "pages": [1] }], "files": [] }
 
 A stay — dates only:
   { "kind": "lodging", "title": "Hotel Cormorán",
@@ -292,13 +305,25 @@ with nothing to add:
     "comments": null, "boarding_pass_files": [], "files": [] }
 
 A check-in email — the boarding passes of one flight for two
-passengers, one file each:
+passengers, one PDF each:
   { "kind": "boarding_pass", "title": "AR 1420",
     "on_date": "2026-09-12", "at_time": "08:40",
     "ends_on": "2026-09-12", "ends_at": "11:05",
     "transport": "flight", "origin": "AEP", "destination": "BRC",
     "comments": "Ana 14A · Bruno 14B · Puerta 7 · Embarque 08:05",
-    "boarding_pass_files": [1, 2], "files": [] }
+    "boarding_pass_files": [{ "file": 1, "pages": [1] }, { "file": 2, "pages": [1] }],
+    "files": [] }
+
+A check-in email for one passenger on a flight with a connection — one
+PDF holding both legs' passes, a page each:
+  { "kind": "boarding_pass", "title": "AR 1502",
+    "on_date": "2026-09-12", "at_time": "07:10", …,
+    "transport": "flight", "origin": "AEP", "destination": "COR",
+    "boarding_pass_files": [{ "file": 1, "pages": [1] }], "files": [] }
+  { "kind": "boarding_pass", "title": "AR 1564",
+    "on_date": "2026-09-12", "at_time": "10:45", …,
+    "transport": "flight", "origin": "COR", "destination": "BRC",
+    "boarding_pass_files": [{ "file": 1, "pages": [2] }], "files": [] }
 
 An email with nothing to extract:
   { "trip_title": null, "items": [],
@@ -463,6 +488,29 @@ function problemOrNull(value: string | null): string | null {
   return textOrNull(value?.replace(/\bhttps?:\/\/\S+/gi, '') ?? null, PROBLEM_MAX_CHARS);
 }
 
+/** An item's title as its row is staged with; null for one that is not
+ *  staged at all, for want of one. */
+export function stagedTitle(item: ExtractedItem): string | null {
+  return textOrNull(item.title, TITLE_MAX_CHARS);
+}
+
+/** The numbers of the files an item's row is boarded with. Only what
+ *  travels is boarded, and a boarding pass brings nothing else: a file the
+ *  model listed on the wrong side is kept on the right one. */
+export function passNumbers(item: ExtractedItem): number[] {
+  if (!SHAPES[item.kind].route) return [];
+  const passes = item.boarding_pass_files.map((pass) => pass.file);
+  return item.kind === 'boarding_pass' ? [...passes, ...item.files] : passes;
+}
+
+/** The numbers of the other files an item's row is printed in. */
+export function otherNumbers(item: ExtractedItem): number[] {
+  const passes = passNumbers(item);
+  return [...item.files, ...item.boarding_pass_files.map((pass) => pass.file)].filter(
+    (number) => !passes.includes(number),
+  );
+}
+
 /** The ids of the files an item names, in the email's order: a number that
  *  names no file is dropped, one named twice counts once. */
 function fileIdsOf(numbers: number[], fileIds: string[]): string[] {
@@ -485,21 +533,12 @@ export function rowsFromExtraction(
   fileIds: string[],
 ): InboxRow[] {
   return items.flatMap((item): InboxRow[] => {
-    const title = textOrNull(item.title, TITLE_MAX_CHARS);
+    const title = stagedTitle(item);
     if (title === null) return [];
     const shape = SHAPES[item.kind];
     const transport = transportOf(item.kind, item.transport);
-    // Only what travels is boarded, and a boarding pass brings nothing else:
-    // a file the model listed on the wrong side is kept on the right one.
-    const passNumbers = !shape.route
-      ? []
-      : item.kind === 'boarding_pass'
-        ? [...item.boarding_pass_files, ...item.files]
-        : item.boarding_pass_files;
-    const passIds = fileIdsOf(passNumbers, fileIds);
-    const otherIds = fileIdsOf([...item.files, ...item.boarding_pass_files], fileIds).filter(
-      (id) => !passIds.includes(id),
-    );
+    const passIds = fileIdsOf(passNumbers(item), fileIds);
+    const otherIds = fileIdsOf(otherNumbers(item), fileIds).filter((id) => !passIds.includes(id));
     return [
       {
         email_subject: subject ?? '',

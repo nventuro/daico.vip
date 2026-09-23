@@ -29,6 +29,9 @@ function item(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
   };
 }
 
+/** A file an item is boarded with, by its number in the email. */
+const boardedWith = (file: number) => ({ file, pages: [] });
+
 /** The ids the email's files would be staged under, one per file, in order. */
 const FILE_IDS = ['file-1', 'file-2', 'file-3'];
 
@@ -180,7 +183,13 @@ describe('rowsFromExtraction', () => {
 
   it('keeps apart the files a pasaje is boarded with and its other files, no file in both', () => {
     const [train] = rowsFromExtraction(
-      [item({ transport: 'train', boarding_pass_files: [2, 1], files: [3, 2] })],
+      [
+        item({
+          transport: 'train',
+          boarding_pass_files: [boardedWith(2), boardedWith(1)],
+          files: [3, 2],
+        }),
+      ],
       'Bariloche',
       null,
       FILE_IDS,
@@ -191,7 +200,14 @@ describe('rowsFromExtraction', () => {
 
   it('boards nothing that does not travel, and keeps a file listed so among the others', () => {
     const [stay] = rowsFromExtraction(
-      [item({ kind: 'lodging', title: 'Hotel Cormorán', boarding_pass_files: [1], files: [2] })],
+      [
+        item({
+          kind: 'lodging',
+          title: 'Hotel Cormorán',
+          boarding_pass_files: [boardedWith(1)],
+          files: [2],
+        }),
+      ],
       'Bariloche',
       null,
       FILE_IDS,
@@ -202,7 +218,7 @@ describe('rowsFromExtraction', () => {
 
   it('takes every file of a boarding pass for a pass, whichever list names it', () => {
     const [pass] = rowsFromExtraction(
-      [item({ kind: 'boarding_pass', boarding_pass_files: [1], files: [2] })],
+      [item({ kind: 'boarding_pass', boarding_pass_files: [boardedWith(1)], files: [2] })],
       'Bariloche',
       null,
       FILE_IDS,
@@ -295,7 +311,7 @@ describe('decide', () => {
   it('stages a boarding pass with its files, as its pasaje, and drops one that came with no file', () => {
     const pass = item({
       kind: 'boarding_pass',
-      boarding_pass_files: [1, 2],
+      boarding_pass_files: [boardedWith(1), boardedWith(2)],
       comments: 'Ana 14A · Bruno 14B',
     });
     const decision = decide(
@@ -330,7 +346,10 @@ describe('decide', () => {
 
   it('refuses an email that is bookings and a boarding pass at once', () => {
     const decision = decide(
-      { ...found, items: [item(), item({ kind: 'boarding_pass', boarding_pass_files: [1] })] },
+      {
+        ...found,
+        items: [item(), item({ kind: 'boarding_pass', boarding_pass_files: [boardedWith(1)] })],
+      },
       null,
       FILE_IDS,
     );
