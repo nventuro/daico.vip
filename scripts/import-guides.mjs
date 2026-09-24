@@ -3,6 +3,12 @@
 //
 //   npm run guides:import -- --dump <dir> [--group <name>] [--dry-run] [--preview <dir>]
 //
+// Written for one source and one subject: the household's export of the Magic
+// guides it reads on metafy.gg. The site's dialect, its documents' shapes and
+// the game's own forms — decklists, sideboards, a cheat sheet's matchups — are
+// known here and in import-guides/, never in the app: a guide it holds is a
+// title, sections and chapters of markdown, whatever they are about.
+//
 // The dump directory (private content, kept outside the repo) holds:
 //
 //   guides/<slug>.json   metadata, sections and chapters in the source site's
@@ -14,6 +20,8 @@
 // Each guide's body is converted to the app's dialect (normalize.mjs), its
 // linked documents and decklists become chapters in an "Adjuntos" section with
 // the links to them rewritten in-app, and its images are recompressed to WebP.
+// A linked document that is a cheat sheet (sheet.mjs) becomes a guide of its
+// own instead, a chapter per matchup, and the links to it lead there.
 // A missing attachment file is reported and its link left external. `--dry-run`
 // skips the database; `--preview <dir>` writes each chapter's normalized
 // markdown as a file to inspect.
@@ -26,10 +34,13 @@ import { stableId } from './import-guides/ids.mjs';
 import { normalizeBody, rewriteLinks } from './import-guides/normalize.mjs';
 import { gdocHtmlToMarkdown } from './import-guides/gdoc.mjs';
 import { decklistToMarkdown } from './import-guides/decklist.mjs';
+import { splitSheet } from './import-guides/sheet.mjs';
 
 const sharp = createRequire(path.join(root, 'node_modules/'))('sharp');
 
 const ATTACHMENTS_SECTION = 'Adjuntos';
+// A cheat sheet's first chapter: the list its sideboarding is written for.
+const SHEET_LIST_CHAPTER = 'Lista';
 // The source names its sections in English; the app is in Spanish.
 const SECTION_TITLES = { 'Main Section': 'Principal', Outdated: 'Desactualizado' };
 const IMAGE_MAX_WIDTH = 1600;
@@ -122,22 +133,54 @@ const decklistByUrl = new Map(
   Object.entries(decklistsIndex).map(([file, d]) => [canonicalUrl(d.url), { file, ...d }]),
 );
 
+// Google Docs wrap outbound links in a redirector; the real target is its `q` parameter.
+const unwrap = (url) =>
+  url.includes('google.com/url?') ? (new URL(url).searchParams.get('q') ?? url) : url;
+const urlsIn = (text) => [...text.matchAll(/https?:\/\/[^\s)"\]]+/g)].map((m) => unwrap(m[0]));
+
+// The cheat sheets among the linked documents, each a guide of its own, shelved
+// where the guide that links it is. A sheet nothing links is not imported, as
+// no document is.
+const sheets = new Map(); // doc id → { id, title, group, intro, matchups }
+for (const [docId, doc] of Object.entries(docsIndex)) {
+  const file = path.join(dumpDir, 'docs', doc.files.html);
+  if (!(await exists(file))) continue;
+  const split = splitSheet(gdocHtmlToMarkdown(await fs.readFile(file, 'utf8')));
+  const linkedBy = [...guideRecords.values()].find((rec) =>
+    rec.dump.sections.some((s) => s.chapters.some((c) => (c.content ?? '').includes(docId))),
+  );
+  if (split && linkedBy)
+    sheets.set(docId, {
+      id: stableId(`sheet:${docId}`),
+      title: doc.title,
+      group: linkedBy.group,
+      ...split,
+    });
+}
+
+const sheetRoute = (url) => {
+  const sheet = sheets.get(docIdOf(url));
+  return sheet ? { path: `/guias/${sheet.id}`, title: sheet.title } : null;
+};
+const metafyGuideRoute = (url) => {
+  const m = url.match(/metafy\.gg\/guides\/view\/([^/?#]+)/);
+  const target = m ? guideRecords.get(idSuffix(m[1])) : null;
+  return target ? { path: `/guias/${target.id}`, title: target.title } : null;
+};
+
 // The attachments a guide's chapters point at, in first-reference order, plus
-// any decklist a linked document itself points at (a cheat sheet links its list).
+// any decklist a linked document itself points at (a sheet's list is its own,
+// so a sheet is not followed).
 async function collectAttachments(dump) {
   const seen = new Map(); // attachment key → { kind, ref, title }
   const consider = (url) => {
     const docId = docIdOf(url);
-    if (docId && docsIndex[docId] && !seen.has(`doc:${docId}`))
+    if (docId && docsIndex[docId] && !sheets.has(docId) && !seen.has(`doc:${docId}`))
       seen.set(`doc:${docId}`, { kind: 'doc', ref: docId, title: docsIndex[docId].title });
     const deck = decklistByUrl.get(canonicalUrl(url));
     if (deck && !seen.has(`deck:${deck.file}`))
       seen.set(`deck:${deck.file}`, { kind: 'deck', ref: deck.file, title: deck.title });
   };
-  // Google Docs wrap outbound links in a redirector; the real target is its `q` parameter.
-  const unwrap = (url) =>
-    url.includes('google.com/url?') ? (new URL(url).searchParams.get('q') ?? url) : url;
-  const urlsIn = (text) => [...text.matchAll(/https?:\/\/[^\s)"\]]+/g)].map((m) => unwrap(m[0]));
   for (const s of dump.sections)
     for (const c of s.chapters) urlsIn(c.content ?? '').forEach(consider);
   for (const a of [...seen.values()].filter((x) => x.kind === 'doc')) {
@@ -200,16 +243,12 @@ for (const rec of guideRecords.values()) {
       const deck = decklistByUrl.get(canonicalUrl(url));
       if (deck && attachmentRoute.has(`deck:${deck.file}`))
         return attachmentRoute.get(`deck:${deck.file}`);
-      const m = url.match(/metafy\.gg\/guides\/view\/([^/?#]+)(?:\/([^/?#]+))?/);
-      if (m) {
-        const target = guideRecords.get(idSuffix(m[1]));
-        if (!target) return null;
-        if (m[2] && target === rec && chapterTitles.has(m[2])) {
-          return { path: `/guias/${rec.id}/${chapterIdOf(m[2])}`, title: chapterTitles.get(m[2]) };
-        }
-        return { path: `/guias/${target.id}`, title: target.title };
-      }
-      return null;
+      const sheet = sheetRoute(url);
+      if (sheet) return sheet;
+      const m = url.match(/metafy\.gg\/guides\/view\/([^/?#]+)\/([^/?#]+)/);
+      if (m && guideRecords.get(idSuffix(m[1])) === rec && chapterTitles.has(m[2]))
+        return { path: `/guias/${rec.id}/${chapterIdOf(m[2])}`, title: chapterTitles.get(m[2]) };
+      return metafyGuideRoute(url);
     },
     warn: (m) => warn(`${rec.title}: ${m}`),
   };
@@ -266,6 +305,61 @@ for (const rec of guideRecords.values()) {
     });
   }
   summary.push(`${rec.title}: ${count} chapters, ${attachments.length} attachments`);
+}
+
+// Every cheat sheet as a guide of its own: the list it is for, then its
+// matchups in the order the sheet gives them.
+for (const [docId, sheet] of sheets) {
+  const ctx = {
+    imageKey: () => null,
+    guideRoute: () => null,
+    linkRoute: (url) => sheetRoute(url) ?? metafyGuideRoute(url),
+    warn: (m) => warn(`${sheet.title}: ${m}`),
+  };
+  guides.push({
+    id: sheet.id,
+    title: sheet.title,
+    description: null,
+    group_name: sheet.group,
+    archived: false,
+    created_at: now,
+    updated_at: now,
+  });
+  const chapter = (title, body, position) => ({
+    id: stableId(`sheet:${docId}:${title}`),
+    guide_id: sheet.id,
+    section_title: SECTION_TITLES['Main Section'],
+    section_position: 1,
+    position,
+    title,
+    body,
+    created_at: now,
+    updated_at: now,
+  });
+
+  // The sheet opens with a link to the list it sideboards from; the list
+  // itself is in the dump, unless it is kept somewhere the export could not
+  // read, in which case the link is all there is.
+  const deck = decklistByUrl.get(canonicalUrl(urlsIn(sheet.intro)[0] ?? ''));
+  const listFile = deck ? path.join(dumpDir, 'decklists', deck.file) : null;
+  const hasList = listFile !== null && (await exists(listFile));
+  if (deck && !hasList) warn(`${sheet.title}: its list is not in the dump, kept as a link`);
+  if (sheet.intro)
+    chapters.push(
+      chapter(
+        SHEET_LIST_CHAPTER,
+        hasList
+          ? decklistToMarkdown(await fs.readFile(listFile, 'utf8'))
+          : rewriteLinks(sheet.intro, ctx),
+        1,
+      ),
+    );
+  sheet.matchups.forEach((matchup, n) =>
+    chapters.push(
+      chapter(matchup.title, rewriteLinks(matchup.body, ctx), n + (sheet.intro ? 2 : 1)),
+    ),
+  );
+  summary.push(`${sheet.title}: ${sheet.matchups.length} matchups, split from a document`);
 }
 
 // ---- images -------------------------------------------------------------------------------

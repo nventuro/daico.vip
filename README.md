@@ -355,6 +355,12 @@ keep working — and keeps the title, group and archived flag a guide already
 has, since those are the household's. A guide is shelved under the author the
 dump names, or under `--group` for the whole dump.
 
+A linked document becomes a chapter under «Adjuntos», except one that is a long
+run of short headed sections: that becomes a guide of its own, a chapter per
+section, so the section being looked for is a row on the guide's page instead
+of a scroll down one very long chapter. A document's shape is what decides,
+never its title, and the import's summary says which were split.
+
 ## Local development
 
 ```bash
