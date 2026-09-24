@@ -39,7 +39,8 @@ export type AttachmentOwnerKind =
   | 'idea'
   | 'checkup'
   | 'health_record'
-  | 'boarding_pass';
+  | 'boarding_pass'
+  | 'pantry_item';
 
 /** The entry an attachment belongs to. */
 export interface AttachmentOwner {

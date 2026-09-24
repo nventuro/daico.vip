@@ -1,28 +1,29 @@
 import type { AppModule } from './types';
 import tareas from './tareas';
 import compras from './compras';
-import fechas from './fechas';
-import notas from './notas';
 import ideas from './ideas';
+import notas from './notas';
 import viajes from './viajes';
-import documentos from './documentos';
-import gastos from './gastos';
 import salud from './salud';
-import recetas from './recetas';
+import gastos from './gastos';
+import despensa from './despensa';
+import documentos from './documentos';
 import guias from './guias';
+import recetas from './recetas';
+import fechas from './fechas';
 
-/** Every app, in the order they appear on the home screen: what the household
- *  has to do, then what it keeps, then what it reads. */
+/** Every app, in the order they appear on the home screen. */
 export const apps: readonly AppModule[] = [
   tareas,
   compras,
-  fechas,
-  notas,
   ideas,
+  notas,
   viajes,
-  documentos,
-  gastos,
   salud,
-  recetas,
+  gastos,
+  despensa,
+  documentos,
   guias,
+  recetas,
+  fechas,
 ];

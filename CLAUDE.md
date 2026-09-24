@@ -574,6 +574,30 @@ the rules on top of it.
   `/salud/:id/:attachmentId?`, the id looked up in both tables, because
   `entryPath` is all Próximo and Buscar know how to write.
 
+## Despensa — read before touching it
+
+The README's «Despensa» says what an item is. These are the rules on top of it.
+
+- **An item is one thing bought once**, not stock: no quantity, no count, no
+  restocking — what is bought again and again belongs in Compras, and
+  Despensa is for what would otherwise be forgotten at the back of a shelf.
+- **The expiry is the package's.** `expires_on` is the day it is good
+  through; a package that prints only the month is kept as that month's last
+  day with `expires_month_only` set, which is never set without a date (the
+  schema refuses it). What a date change writes is `expiryPatch` and
+  `monthOnlyPatch` in `pantry.ts`, never worked out on a page.
+- **One window, `PANTRY_NOTICE_DAYS`**, decides both what heads the list and
+  what reaches Próximo, and an item gone off stays in both until it is marked.
+- **A used item is marked, never deleted** (`used_on`): it goes to «Usados»
+  at the foot of the list, and Buscar finds it after the rest, by the spec's
+  order. The trash is for an item entered by mistake.
+- **The places are fixed** (`PANTRY_PLACES`); a new one is a new member plus
+  its label in `labels.ts`. Unlike a kind, an item's place changes whenever
+  it is moved.
+- **Everything travels in the clear**, like a chore's comments, so Buscar
+  matches an item's title and comments; its pictures are fetched on demand,
+  never kept on every device.
+
 ## Privacy — the code is public, the data is private
 
 - This repository is public; the database is private. **Never reference any real

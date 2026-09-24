@@ -18,6 +18,7 @@ export const APP_IDS = [
   'notas',
   'ideas',
   'viajes',
+  'despensa',
 ] as const;
 
 export type AppId = (typeof APP_IDS)[number];

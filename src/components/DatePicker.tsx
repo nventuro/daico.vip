@@ -11,6 +11,8 @@ interface DatePickerProps {
   label: string;
   /** When set the date can be changed but never removed. */
   required?: boolean;
+  /** How the chosen day reads, when not as dd/mm/yyyy: only its month, say. */
+  format?: (value: string) => string;
   /** The look of the control; a form control unless given. */
   className?: string;
 }
@@ -22,6 +24,7 @@ export default function DatePicker({
   onChange,
   label,
   required = false,
+  format = formatDateShort,
   className = CONTROL_CLASS,
 }: DatePickerProps) {
   return (
@@ -34,7 +37,7 @@ export default function DatePicker({
             aria-label={label}
             className="flex-1 text-left outline-none"
           >
-            {value ? formatDateShort(value) : <span className="text-muted">Sin fecha</span>}
+            {value ? format(value) : <span className="text-muted">Sin fecha</span>}
           </button>
           {!required && value && (
             <button

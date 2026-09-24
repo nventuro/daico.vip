@@ -101,6 +101,10 @@ const MOTIFS: Record<AppHue, MotifShapes> = {
       diamond(33, 67, 4.5),
     ],
   },
+  'app-despensa': {
+    center: ['M22 28 H78 V35 H22 Z', 'M22 46.5 H78 V53.5 H22 Z', 'M22 65 H78 V72 H22 Z'],
+    accent: [diamond(50, 50, 9)],
+  },
   'app-recetas': {
     center: [
       'M34 36 A16 16 0 0 1 66 36 Z',

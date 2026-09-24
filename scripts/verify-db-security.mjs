@@ -46,6 +46,7 @@ const TABLE_PRIVILEGES = {
   health_records: CRUD,
   notes: CRUD,
   ideas: CRUD,
+  pantry_items: CRUD,
   trips: CRUD,
   trip_items: CRUD,
   trip_inbox: CRUD,

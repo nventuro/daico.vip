@@ -53,6 +53,19 @@ export function formatDayMonth(dateStr: string): string {
   return `${day}/${month}`;
 }
 
+/** Formats the month an ISO date string (yyyy-mm-dd) falls in as mm/yyyy, the
+ *  way a package prints an expiry that gives no day. */
+export function formatMonthYear(dateStr: string): string {
+  const [year, month] = dateStr.split('-');
+  return `${month}/${year}`;
+}
+
+/** The last day (yyyy-mm-dd) of the month `date` falls in. */
+export function monthEnd(date: string): string {
+  const [year, month] = parseIso(date);
+  return toIso(year, month, new Date(year, month, 0).getDate());
+}
+
 /** Formats an hour of the day (HH:MM, or the HH:MM:SS the server writes back)
  *  the way it is read here, on a 24-hour clock: "8:40", "21:15". */
 export function formatTime(time: string): string {

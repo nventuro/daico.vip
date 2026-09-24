@@ -7,7 +7,9 @@ import {
   formatDayRange,
   formatTime,
   formatDayMonth,
+  formatMonthYear,
   formatWeekdayDay,
+  monthEnd,
   monthLabel,
   relativeDay,
   todayIso,
@@ -113,6 +115,24 @@ describe('formatWeekdayDay', () => {
 describe('formatDayMonth', () => {
   it('formats as dd/mm', () => {
     expect(formatDayMonth('2026-03-05')).toBe('05/03');
+  });
+});
+
+describe('formatMonthYear', () => {
+  it('formats as mm/yyyy', () => {
+    expect(formatMonthYear('2027-03-31')).toBe('03/2027');
+  });
+});
+
+describe('monthEnd', () => {
+  it('is the last day of the month', () => {
+    expect(monthEnd('2027-03-05')).toBe('2027-03-31');
+    expect(monthEnd('2026-11-30')).toBe('2026-11-30');
+  });
+
+  it('knows a leap year', () => {
+    expect(monthEnd('2028-02-10')).toBe('2028-02-29');
+    expect(monthEnd('2027-02-10')).toBe('2027-02-28');
   });
 });
 

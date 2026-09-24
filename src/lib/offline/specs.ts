@@ -385,6 +385,47 @@ export const DOCUMENTS_SPEC: TableSpec<DocumentEntry> = {
   compare: byTitle,
 };
 
+// ─── Despensa ────────────────────────────────────────────────────────────────
+
+/** Where in the house a pantry item is kept, in the order its page offers them. */
+export const PANTRY_PLACES = ['cupboard', 'fridge', 'freezer'] as const;
+export type PantryPlace = (typeof PANTRY_PLACES)[number];
+
+/**
+ * Something rare bought once — the jar for one recipe, not the day-to-day
+ * stock — kept by when it expires so it is used before it goes off. Used up,
+ * it is marked rather than deleted, and kept under «Usados».
+ */
+export interface PantryItem extends SyncedRow {
+  title: string;
+  /** The day it is good through (yyyy-mm-dd); null for a package that gives
+   *  none. */
+  expires_on: string | null;
+  /** Whether the package printed only the month: `expires_on` is then that
+   *  month's last day, and only the month is shown. Never set without a date. */
+  expires_month_only: boolean;
+  place: PantryPlace;
+  /** Whatever else there is to say about it: what to make with it. */
+  comments: string | null;
+  /** The day it was used up (yyyy-mm-dd); null while it is still in the house. */
+  used_on: string | null;
+}
+
+export const PANTRY_SPEC: TableSpec<PantryItem> = {
+  table: 'pantry_items',
+  columns: {
+    title: { ddl: 'TEXT NOT NULL' },
+    expires_on: { ddl: 'TEXT' },
+    expires_month_only: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
+    place: { ddl: 'TEXT NOT NULL' },
+    comments: { ddl: 'TEXT' },
+    used_on: { ddl: 'TEXT' },
+  },
+  // What is still in the house first, by when it expires, the undated after;
+  // what was used last, so whatever reads the list in order meets it last.
+  orderBy: '(used_on IS NOT NULL) ASC, expires_on ASC NULLS LAST, created_at ASC',
+};
+
 // ─── Gastos ──────────────────────────────────────────────────────────────────
 
 /** The credit-card statement layouts the app can read. */
@@ -815,18 +856,19 @@ export const ALL_SPECS: TableSpec[] = [
   ...SHELL_SPECS,
   CHORES_SPEC,
   SHOPPING_SPEC,
-  DATES_SPEC,
-  NOTES_SPEC,
   IDEAS_SPEC,
+  NOTES_SPEC,
   TRIPS_SPEC,
   TRIP_ITEMS_SPEC,
   TRIP_INBOX_SPEC,
-  DOCUMENTS_SPEC,
-  STATEMENTS_SPEC,
-  MERCHANT_RULES_SPEC,
   CHECKUPS_SPEC,
   HEALTH_RECORDS_SPEC,
-  RECIPES_SPEC,
+  STATEMENTS_SPEC,
+  MERCHANT_RULES_SPEC,
+  PANTRY_SPEC,
+  DOCUMENTS_SPEC,
   GUIDES_SPEC,
   GUIDE_CHAPTERS_SPEC,
+  RECIPES_SPEC,
+  DATES_SPEC,
 ];

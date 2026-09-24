@@ -145,6 +145,16 @@ document is its files — pictures, PDFs — encrypted on the device; nothing el
 is typed in, so a number or a date of birth never reaches the server in the
 clear. Every document's files are kept on every device.
 
+**Despensa** — `pantry_items`: the rare things bought once — the jar for one
+recipe, not the day-to-day stock — kept so they are used before they go off:
+a title, when it expires, where it is kept (`place`: the alacena, the heladera
+or the freezer), comments and pictures. The expiry is the package's, and one
+that prints only the month is kept as that month's last day, with
+`expires_month_only` saying to show only the month. The list puts first what
+expires within two weeks or already did, which is also what Próximo shows; an
+item used up is marked (`used_on`) and kept under «Usados» at the foot, where
+Buscar still finds it, after the rest. Born undated, in the alacena.
+
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
 parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
 row keeps in the clear only what lists it — the layout, its closing and due
@@ -242,8 +252,8 @@ the reader's own classes, so a body looks the same read or written.
 
 ## Adjuntos
 
-A chore, a document, a note, an idea, a checkup, a study or a row of a trip
-can carry
+A chore, a document, a note, an idea, a checkup, a study, a row of a trip or
+an item in the pantry can carry
 attachments — pictures and PDFs — that are encrypted on the device before they
 leave it, so the server only ever stores ciphertext.
 
