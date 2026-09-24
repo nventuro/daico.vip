@@ -93,6 +93,7 @@ const BODIES = [
   '~~tachado~~',
   '![foto](https://ejemplo.test/a.png)',
   '- uno\n\n- dos suelto',
+  'De 16:00hs a 18:00hs, nota:importante',
 ];
 
 describe('the reader and the editor', () => {

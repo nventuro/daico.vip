@@ -40,6 +40,15 @@ describe('directivesToElements', () => {
     );
   });
 
+  it('draws a directive the dialect does not have as the text it was written as', () => {
+    expect(render('De 16:00hs a 18:00hs, nota:importante :x[y]{z=1}')).toBe(
+      '<p>De 16:00hs a 18:00hs, nota:importante :x[y]{z=1}</p>',
+    );
+    expect(render('::00hs\n\n:::otro\ntexto\n:::')).toBe(
+      '<p>::00hs</p>\n<p>:::otro\ntexto\n:::</p>',
+    );
+  });
+
   it('keeps GFM tables and relative links intact', () => {
     expect(render('| a | b |\n| --- | --- |\n| 1 | 2 |')).toContain('<table>');
     expect(render('[x](/guias/1/2)')).toBe('<p><a href="/guias/1/2">x</a></p>');
