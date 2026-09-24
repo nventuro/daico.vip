@@ -5,11 +5,13 @@ import remarkDirective from 'remark-directive';
 import { Link } from 'react-router-dom';
 import { MARKDOWN_CLASS } from './classes';
 import { directivesToElements } from './directives';
+import { withoutMarkupNewlines } from './markupNewlines';
 import { softBreaksAsSpaces } from './softBreaks';
 import Video from './Video';
 import Spoiler from './Spoiler';
 
 const remarkPlugins = [remarkGfm, remarkDirective, directivesToElements, softBreaksAsSpaces];
+const rehypePlugins = [withoutMarkupNewlines];
 
 // The editor draws the same text once it takes over from this renderer, so
 // wherever the two would draw a block differently, this side draws it the
@@ -197,6 +199,7 @@ export default function Markdown({ body, components }: MarkdownProps) {
     <div className={MARKDOWN_CLASS.body}>
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={components ? { ...baseComponents, ...components } : baseComponents}
       >
         {body}

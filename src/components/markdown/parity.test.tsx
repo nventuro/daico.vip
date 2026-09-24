@@ -21,15 +21,18 @@ type Drawn = string;
 const drawn = (tag: string, className: string | undefined): Drawn =>
   className ? `${tag}.${className.split(/\s+/).sort().join('.')}` : tag;
 
-/** The elements of a rendering, in document order, the wrapper left out. */
-function readerElements(markdown: string): Drawn[] {
-  const html = renderToStaticMarkup(
+function readerHtml(markdown: string): string {
+  return renderToStaticMarkup(
     <MemoryRouter>
       <Markdown body={markdown} />
     </MemoryRouter>,
   );
+}
+
+/** The elements of a rendering, in document order, the wrapper left out. */
+function readerElements(markdown: string): Drawn[] {
   const elements: Drawn[] = [];
-  for (const match of html.matchAll(/<([a-z0-9]+)((?:\s[^>]*?)?)\/?>/g)) {
+  for (const match of readerHtml(markdown).matchAll(/<([a-z0-9]+)((?:\s[^>]*?)?)\/?>/g)) {
     // As the attribute is written into HTML; the editor's spec has it raw.
     const className = /\sclass="([^"]*)"/.exec(match[2])?.[1]?.replace(/&amp;/g, '&');
     elements.push(drawn(match[1], className));
@@ -99,5 +102,11 @@ const BODIES = [
 describe('the reader and the editor', () => {
   it.each(BODIES)('draw %j as the same elements', (markdown) => {
     expect(readerElements(markdown)).toEqual(editorElements(markdown));
+  });
+
+  // The reader keeps every space it is given, so a newline right after an
+  // element would be a line on screen, and the editor draws none.
+  it.each(BODIES)('draw %j with no line after an element', (markdown) => {
+    expect(readerHtml(markdown)).not.toMatch(/>\n/);
   });
 });
