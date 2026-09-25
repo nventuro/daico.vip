@@ -581,13 +581,14 @@ The README's «Despensa» says what an item is. These are the rules on top of it
 - **An item is one thing bought once**, not stock: no quantity, no count, no
   restocking — what is bought again and again belongs in Compras, and
   Despensa is for what would otherwise be forgotten at the back of a shelf.
-- **The expiry is the package's.** `expires_on` is the day it is good
-  through; a package that prints only the month is kept as that month's last
-  day with `expires_month_only` set, which is never set without a date (the
-  schema refuses it). What a date change writes is `expiryPatch` and
-  `monthOnlyPatch` in `pantry.ts`, never worked out on a page.
-- **One window, `PANTRY_NOTICE_DAYS`**, decides both what heads the list and
-  what reaches Próximo, and an item gone off stays in both until it is marked.
+- **The expiry is a month, never a day.** `expires_on` holds the last day of
+  the month an item expires in — the day it is good through — and the schema
+  refuses any other day. What a picked month writes is `expiryOf` in
+  `pantry.ts`, never worked out on a page, and it is picked with
+  `MonthPicker`: two lists, since desktop Firefox has no month input.
+- **One window, `PANTRY_NOTICE_MONTHS`**, decides both what heads the list and
+  what reaches Próximo — from the first day of the month an item expires in —
+  and an item gone off stays in both until it is marked.
 - **A used item is marked, never deleted** (`used_on`): it goes to «Usados»
   at the foot of the list, and Buscar finds it after the rest, by the spec's
   order. The trash is for an item entered by mistake.
@@ -640,9 +641,9 @@ The README's «Despensa» says what an item is. These are the rules on top of it
   `src/config.ts`. Never a shared bag of constants.
 - **Dates and times**: always dd/mm order, never mm/dd, and always the 24-hour
   clock — `formatDate` / `formatDateShort` / `formatTime` from
-  `src/utils/dateUtils.ts`, picked with `DatePicker` and `TimePicker` (or the
-  `Native*` ones behind a control of your own). ESLint bans the native inputs,
-  which print in the browser's language.
+  `src/utils/dateUtils.ts`, picked with `DatePicker`, `MonthPicker` and
+  `TimePicker` (or the `Native*` ones behind a control of your own). ESLint
+  bans the native inputs, which print in the browser's language.
 - **Repetition**: anything that comes back says so the same way — `repeat_every`
   and `repeat_unit` (`day`/`week`/`month`/`year`), both null or both set, on
   `chores`, `dates` and `checkups` alike, with the arithmetic and the words for

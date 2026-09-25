@@ -11,7 +11,9 @@ import {
   formatWeekdayDay,
   monthEnd,
   monthLabel,
+  monthsUntil,
   relativeDay,
+  soonestYearOf,
   todayIso,
 } from './dateUtils';
 
@@ -133,6 +135,23 @@ describe('monthEnd', () => {
   it('knows a leap year', () => {
     expect(monthEnd('2028-02-10')).toBe('2028-02-29');
     expect(monthEnd('2027-02-10')).toBe('2027-02-28');
+  });
+});
+
+describe('monthsUntil', () => {
+  it('counts calendar months, whatever the days', () => {
+    expect(monthsUntil('2026-09-30', '2026-09-01')).toBe(0);
+    expect(monthsUntil('2026-09-30', '2026-10-01')).toBe(1);
+    expect(monthsUntil('2026-09-01', '2027-03-31')).toBe(6);
+    expect(monthsUntil('2026-09-24', '2026-08-31')).toBe(-1);
+  });
+});
+
+describe('soonestYearOf', () => {
+  it('is this year while the month has not ended, next year after', () => {
+    expect(soonestYearOf(9, '2026-09-24')).toBe(2026);
+    expect(soonestYearOf(12, '2026-09-24')).toBe(2026);
+    expect(soonestYearOf(8, '2026-09-24')).toBe(2027);
   });
 });
 

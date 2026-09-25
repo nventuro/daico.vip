@@ -3,7 +3,7 @@ import { PANTRY_SPEC, type PantryItem } from '../../lib/offline/specs';
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { todayIso } from '../../utils/dateUtils';
 import { lowercaseTrimmed } from '../../utils/textUtils';
-import { PANTRY_PLACE_DEFAULT, expiryPatch, monthOnlyPatch } from './pantry';
+import { PANTRY_PLACE_DEFAULT, expiryOf } from './pantry';
 
 /** What the user writes about an item on its page, apart from its expiry and
  *  its mark, which have hook actions of their own. */
@@ -24,7 +24,6 @@ export function usePantry() {
       return insert({
         title,
         expires_on: null,
-        expires_month_only: false,
         place: PANTRY_PLACE_DEFAULT,
         comments: null,
         used_on: null,
@@ -38,15 +37,9 @@ export function usePantry() {
     [update],
   );
 
-  /** Sets the day an item expires, kept as its package gives it. */
+  /** Sets the month (yyyy-mm) an item expires in, or takes it away. */
   const setExpiry = useCallback(
-    (item: PantryItem, expiresOn: string | null) => update(item.id, expiryPatch(item, expiresOn)),
-    [update],
-  );
-
-  /** Says whether the package gave only the month. */
-  const setMonthOnly = useCallback(
-    (item: PantryItem, monthOnly: boolean) => update(item.id, monthOnlyPatch(item, monthOnly)),
+    (id: string, yearMonth: string | null) => update(id, { expires_on: expiryOf(yearMonth) }),
     [update],
   );
 
@@ -56,5 +49,5 @@ export function usePantry() {
   /** Puts an item back in the house. */
   const unmark = useCallback((id: string) => update(id, { used_on: null }), [update]);
 
-  return { items, loading, error, add, save, setExpiry, setMonthOnly, mark, unmark, remove };
+  return { items, loading, error, add, save, setExpiry, mark, unmark, remove };
 }

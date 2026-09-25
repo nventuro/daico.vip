@@ -66,6 +66,21 @@ export function monthEnd(date: string): string {
   return toIso(year, month, new Date(year, month, 0).getDate());
 }
 
+/** How many calendar months lie from the month `today` falls in to the one
+ *  `date` does: 0 within the same month, negative once it has gone by. */
+export function monthsUntil(today: string, date: string): number {
+  const [y1, m1] = parseIso(today);
+  const [y2, m2] = parseIso(date);
+  return (y2 - y1) * 12 + (m2 - m1);
+}
+
+/** The year the soonest `month` (1–12) from `today` falls in: this year's
+ *  while it has not ended, next year's once it has. */
+export function soonestYearOf(month: number, today: string): number {
+  const [year, current] = parseIso(today);
+  return month >= current ? year : year + 1;
+}
+
 /** Formats an hour of the day (HH:MM, or the HH:MM:SS the server writes back)
  *  the way it is read here, on a 24-hour clock: "8:40", "21:15". */
 export function formatTime(time: string): string {

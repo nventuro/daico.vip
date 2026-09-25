@@ -393,17 +393,14 @@ export type PantryPlace = (typeof PANTRY_PLACES)[number];
 
 /**
  * Something rare bought once — the jar for one recipe, not the day-to-day
- * stock — kept by when it expires so it is used before it goes off. Used up,
- * it is marked rather than deleted, and kept under «Usados».
+ * stock — kept by the month it expires in so it is used before it goes off.
+ * Used up, it is marked rather than deleted, and kept under «Usados».
  */
 export interface PantryItem extends SyncedRow {
   title: string;
-  /** The day it is good through (yyyy-mm-dd); null for a package that gives
-   *  none. */
+  /** The last day of the month it expires in (yyyy-mm-dd), the day it is good
+   *  through; null for a package that gives none. Never any other day. */
   expires_on: string | null;
-  /** Whether the package printed only the month: `expires_on` is then that
-   *  month's last day, and only the month is shown. Never set without a date. */
-  expires_month_only: boolean;
   place: PantryPlace;
   /** Whatever else there is to say about it: what to make with it. */
   comments: string | null;
@@ -416,7 +413,6 @@ export const PANTRY_SPEC: TableSpec<PantryItem> = {
   columns: {
     title: { ddl: 'TEXT NOT NULL' },
     expires_on: { ddl: 'TEXT' },
-    expires_month_only: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
     place: { ddl: 'TEXT NOT NULL' },
     comments: { ddl: 'TEXT' },
     used_on: { ddl: 'TEXT' },

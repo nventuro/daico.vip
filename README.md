@@ -148,12 +148,12 @@ clear. Every document's files are kept on every device.
 **Despensa** — `pantry_items`: the rare things bought once — the jar for one
 recipe, not the day-to-day stock — kept so they are used before they go off:
 a title, when it expires, where it is kept (`place`: the alacena, the heladera
-or the freezer), comments and pictures. The expiry is the package's, and one
-that prints only the month is kept as that month's last day, with
-`expires_month_only` saying to show only the month. The list puts first what
-expires within two weeks or already did, which is also what Próximo shows; an
-item used up is marked (`used_on`) and kept under «Usados» at the foot, where
-Buscar still finds it, after the rest. Born undated, in the alacena.
+or the freezer), comments and pictures. The expiry is a month and its year,
+kept as that month's last day, the day the item is good through. From the
+first of that month the item heads the list and shows in Próximo, and it stays
+there once it has gone off; an item used up is marked (`used_on`) and kept
+under «Usados» at the foot, where Buscar still finds it, after the rest. Born
+undated, in the alacena.
 
 **Gastos** — `statements`, read on the device from the PDF the bank sends (one
 parser per layout in `src/apps/gastos/parsers/`; the PDF is never kept). The
