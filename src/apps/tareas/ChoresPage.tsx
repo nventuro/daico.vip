@@ -8,7 +8,7 @@ import { offerUndo } from '../../lib/undo';
 import ChecklistItem from '../../components/ChecklistItem';
 import EntryMarks from '../../components/EntryMarks';
 import CompletedSection from '../../components/CompletedSection';
-import SectionLabel from '../../components/SectionLabel';
+import LaterSection from '../../components/LaterSection';
 import AddBar from '../../components/AddBar';
 import EmptyState from '../../components/EmptyState';
 import ListPage from '../../components/ListPage';
@@ -87,12 +87,9 @@ export default function ChoresPage() {
         <EmptyState>No hay tareas. ¡Todo al día!</EmptyState>
       )}
       {soon.length > 0 && <ul>{soon.map(renderChore)}</ul>}
-      {later.length > 0 && (
-        <section className="mt-6">
-          <SectionLabel>Más adelante</SectionLabel>
-          <ul>{later.map(renderChore)}</ul>
-        </section>
-      )}
+      <LaterSection count={later.length} headed={soon.length > 0}>
+        <ul>{later.map(renderChore)}</ul>
+      </LaterSection>
       <CompletedSection label="Hechas" count={done.length}>
         <ul>{done.map(renderChore)}</ul>
       </CompletedSection>

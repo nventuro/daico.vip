@@ -10,7 +10,7 @@ import CompletedSection from '../../components/CompletedSection';
 import EmptyState from '../../components/EmptyState';
 import EntryMarks from '../../components/EntryMarks';
 import ListPage from '../../components/ListPage';
-import SectionLabel from '../../components/SectionLabel';
+import LaterSection from '../../components/LaterSection';
 import SkeletonRows from '../../components/SkeletonRows';
 import { entryPath } from '../types';
 import { USED_LABEL } from './labels';
@@ -77,12 +77,9 @@ export default function PantryPage() {
         <EmptyState>Todavía no hay nada en la despensa.</EmptyState>
       )}
       {soon.length > 0 && <ul>{soon.map(renderItem)}</ul>}
-      {later.length > 0 && (
-        <section className="mt-6">
-          <SectionLabel>Más adelante</SectionLabel>
-          <ul>{later.map(renderItem)}</ul>
-        </section>
-      )}
+      <LaterSection count={later.length} headed={soon.length > 0}>
+        <ul>{later.map(renderItem)}</ul>
+      </LaterSection>
       <CompletedSection label="Usados" count={used.length}>
         <ul>{used.map(renderItem)}</ul>
       </CompletedSection>
