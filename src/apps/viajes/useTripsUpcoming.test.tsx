@@ -19,6 +19,8 @@ function item(id: string, kind: TripKind, overrides: Partial<TripItem> = {}): Tr
     transport: null,
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',

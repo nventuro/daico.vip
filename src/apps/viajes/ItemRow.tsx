@@ -4,6 +4,7 @@ import ChecklistItem from '../../components/ChecklistItem';
 import EntryMarks from '../../components/EntryMarks';
 import LinkRow from '../../components/LinkRow';
 import { entryPath } from '../types';
+import BaggageIcons from './BaggageIcons';
 import ItemIcon from './ItemIcon';
 import { TRIP_KIND_SHAPES } from './kinds';
 import { itemLines } from './labels';
@@ -43,6 +44,7 @@ export default function ItemRow({ item, today, hasAttachments, onToggle }: ItemR
     <LinkRow
       to={to}
       title={item.title}
+      titleAside={<BaggageIcons carryOn={item.carry_on_bags} checked={item.checked_bags} />}
       subtitle={subtitle}
       secondLine={secondLine}
       leading={<ItemIcon kind={item.kind} transport={item.transport} />}

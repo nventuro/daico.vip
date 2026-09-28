@@ -17,6 +17,8 @@ function taken(transport: TripTransport, origin: string, destination: string): T
     transport,
     origin,
     destination,
+    carry_on_bags: null,
+    checked_bags: null,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -41,6 +43,8 @@ function pasaje(overrides: Partial<ItemDatesValue>): string {
     transport: null,
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     ...overrides,
   };
   return renderToStaticMarkup(<ItemDateFields kind="ticket" fields={fields} onChange={vi.fn()} />);
@@ -84,6 +88,31 @@ describe("a pasaje's controls", () => {
 
   it('asks a bus for its terminals', () => {
     expect(pasaje({ transport: 'bus' })).toContain('aria-label="Terminal de salida"');
+  });
+
+  it('asks a flight for its luggage, each count in words', () => {
+    const html = pasaje({ transport: 'flight', carry_on_bags: 1, checked_bags: 2 });
+    expect(html).toContain('aria-label="Equipaje de mano"');
+    expect(html).toContain('<option value="1" selected="">1 de mano</option>');
+    expect(html).toContain('<option value="2" selected="">2 despachados</option>');
+    expect(html).toContain('<option value="1">1 despachado</option>');
+  });
+
+  it('still offers a count above the usual ones when an email said it', () => {
+    expect(pasaje({ transport: 'flight', checked_bags: 7 })).toContain(
+      '<option value="7" selected="">7 despachados</option>',
+    );
+  });
+
+  it('reads what each count is while a flight never said it', () => {
+    const html = pasaje({ transport: 'flight' });
+    expect(html).toContain('<option value="" disabled="" selected="">De mano</option>');
+    expect(html).toContain('<option value="" disabled="" selected="">Despachado</option>');
+  });
+
+  it('asks no other transport for its luggage', () => {
+    expect(pasaje({ transport: 'train' })).not.toContain('Equipaje');
+    expect(pasaje({ transport: 'bus' })).not.toContain('Equipaje');
   });
 
   it('takes one that does not say what it travels on for the usual one', () => {

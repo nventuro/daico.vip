@@ -25,6 +25,8 @@ function item(id: string, kind: TripKind, done = false): TripItem {
     transport: null,
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     done,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -119,6 +121,18 @@ describe('TripPage', () => {
     expect(html).toContain('>BRC Bariloche<');
     expect(html).toContain('>Estación Norte<');
     expect(html).toContain('>Estación Sur<');
+  });
+
+  it("draws a flight's luggage beside its title, a glyph per piece and no number", () => {
+    state.items = [
+      { ...item('vuelo', 'ticket'), transport: 'flight', carry_on_bags: 1, checked_bags: 2 },
+      { ...item('sin valija', 'ticket'), transport: 'flight' },
+    ];
+    const html = render();
+    expect(html).toContain('aria-label="1 de mano · 2 despachados"');
+    expect(html.match(/tabler-icon-briefcase/g)).toHaveLength(1);
+    expect(html.match(/tabler-icon-luggage/g)).toHaveLength(2);
+    expect(html).not.toContain('de mano<');
   });
 
   it('leaves the ticked pendientes out of the list, under Hechos', () => {

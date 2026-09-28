@@ -39,6 +39,29 @@ export const TRIP_TRANSPORT_PLACES: Record<TripTransport, string> = {
   bus: 'Terminal',
 };
 
+/** A flight's luggage of one kind, as its picker offers it and a row's icons
+ *  read aloud: «1 de mano», «2 despachados». */
+export function carryOnLabel(count: number): string {
+  return `${count} de mano`;
+}
+
+export function checkedBagsLabel(count: number): string {
+  return countLabel(count, 'despachado', 'despachados');
+}
+
+/** What a flight's luggage picker reads while its count was never said. */
+export const CARRY_ON_PLACEHOLDER = 'De mano';
+export const CHECKED_BAGS_PLACEHOLDER = 'Despachado';
+
+/** A flight's whole allowance in words, the kinds it has none of or never
+ *  said left out; nothing when that is all of it. */
+export function baggageLabel(carryOn: number | null, checked: number | null): string | undefined {
+  return joined([
+    carryOn ? carryOnLabel(carryOn) : undefined,
+    checked ? checkedBagsLabel(checked) : undefined,
+  ]);
+}
+
 /** What the undo bar says once a pendiente is ticked. */
 export const TICK_MESSAGE = 'Pendiente hecho';
 

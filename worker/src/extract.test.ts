@@ -22,6 +22,8 @@ function item(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
     transport: 'flight',
     origin: 'AEP',
     destination: 'BRC',
+    carry_on_bags: 1,
+    checked_bags: 2,
     comments: 'Código QK7T2M',
     boarding_pass_files: [],
     files: [],
@@ -55,6 +57,8 @@ describe('rowsFromExtraction', () => {
       transport: 'flight',
       origin: 'AEP',
       destination: 'BRC',
+      carry_on_bags: 1,
+      checked_bags: 2,
       comments: 'Código QK7T2M',
       boarding_pass_file_ids: [],
       file_ids: [],
@@ -179,6 +183,21 @@ describe('rowsFromExtraction', () => {
     expect(unsaid.transport).toBe('flight');
     expect(pass.transport).toBe('train');
     expect(pass.origin).toBe('Estación Norte');
+  });
+
+  it("counts a flight's luggage and nobody else's, taking an unlikely count for one never said", () => {
+    const bags = (overrides: Partial<ExtractedItem>) => {
+      const [row] = rowsFromExtraction([item(overrides)], 'Bariloche', null, []);
+      return [row.carry_on_bags, row.checked_bags];
+    };
+    expect(bags({})).toEqual([1, 2]);
+    expect(bags({ carry_on_bags: null, checked_bags: 0 })).toEqual([null, 0]);
+    expect(bags({ carry_on_bags: -1, checked_bags: 40 })).toEqual([null, null]);
+    expect(bags({ transport: 'train' })).toEqual([null, null]);
+    expect(bags({ kind: 'lodging' })).toEqual([null, null]);
+    // A boarding pass is put on a pasaje booked before, and changes nothing
+    // of what it carries.
+    expect(bags({ kind: 'boarding_pass' })).toEqual([null, null]);
   });
 
   it('keeps apart the files a pasaje is boarded with and its other files, no file in both', () => {

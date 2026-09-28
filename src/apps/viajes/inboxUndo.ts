@@ -65,6 +65,8 @@ export function inboxRowInput(row: TripInboxItem): RowInput<TripInboxItem> {
     transport: row.transport,
     origin: row.origin,
     destination: row.destination,
+    carry_on_bags: row.carry_on_bags,
+    checked_bags: row.checked_bags,
     comments: row.comments,
     file_ids: row.file_ids,
     boarding_pass_file_ids: row.boarding_pass_file_ids,

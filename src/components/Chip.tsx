@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
-import { IconChevronDown } from '@tabler/icons-react';
+import { IconChevronDown, type TablerIcon } from '@tabler/icons-react';
 import { CHIP_BASE_CLASS, CHIP_IDLE_CLASS, CHIP_SELECTED_CLASS } from './controlClasses';
 
 interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -27,12 +27,25 @@ export function StaticChip({ children }: { children: ReactNode }) {
 }
 
 /** A choice drawn as a chip: the platform's picker opens on the tap, and the
- *  chip reads the option chosen. Any `<select>` attribute passes through. */
-export function ChipSelect({ className = '', ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+ *  chip reads the option chosen, after `icon` when it has one. Any
+ *  `<select>` attribute passes through. */
+export function ChipSelect({
+  icon: Icon,
+  className = '',
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement> & { icon?: TablerIcon }) {
   return (
     <span className="relative inline-flex">
+      {Icon && (
+        <Icon
+          size={16}
+          stroke={1.5}
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+        />
+      )}
       <select
-        className={`${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS} appearance-none pr-7 transition-colors outline-none focus:border-primary ${className}`}
+        className={`${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS} appearance-none pr-7 ${Icon ? 'pl-8' : ''} transition-colors outline-none focus:border-primary ${className}`}
         {...rest}
       />
       <IconChevronDown

@@ -105,6 +105,8 @@ export default function ItemPage() {
               transport: entry.transport,
               origin: entry.origin,
               destination: entry.destination,
+              carry_on_bags: entry.carry_on_bags,
+              checked_bags: entry.checked_bags,
             }}
             onChange={(patch) => void save(entry.id, patch)}
           />

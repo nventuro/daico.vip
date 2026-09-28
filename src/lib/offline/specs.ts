@@ -703,6 +703,10 @@ export interface TripItem extends SyncedRow {
    *  flight, the station's or the terminal's name otherwise. */
   origin: string | null;
   destination: string | null;
+  /** How many pieces each passenger of a flight takes in the cabin and in
+   *  the hold; null on every other class, and on a flight that never said. */
+  carry_on_bags: number | null;
+  checked_bags: number | null;
   /** Only a `todo` is ever ticked. */
   done: boolean;
   /** Whatever else there is to say about the row: a booking code, an address. */
@@ -722,6 +726,8 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
     transport: { ddl: 'TEXT' },
     origin: { ddl: 'TEXT' },
     destination: { ddl: 'TEXT' },
+    carry_on_bags: { ddl: 'INTEGER' },
+    checked_bags: { ddl: 'INTEGER' },
     done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
     comments: { ddl: 'TEXT' },
   },
@@ -760,6 +766,9 @@ export interface TripInboxItem extends SyncedRow {
   transport: TripTransport | null;
   origin: string | null;
   destination: string | null;
+  /** A flight's luggage, as a row of a trip carries it. */
+  carry_on_bags: number | null;
+  checked_bags: number | null;
   comments: string | null;
   /** The ids of the sealed PDFs this row was printed in, as a JSON list: the
    *  engine carries scalars only, and the list is written once. */
@@ -786,6 +795,8 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
     transport: { ddl: 'TEXT' },
     origin: { ddl: 'TEXT' },
     destination: { ddl: 'TEXT' },
+    carry_on_bags: { ddl: 'INTEGER' },
+    checked_bags: { ddl: 'INTEGER' },
     comments: { ddl: 'TEXT' },
     file_ids: { ddl: "TEXT NOT NULL DEFAULT '[]'" },
     boarding_pass_file_ids: { ddl: "TEXT NOT NULL DEFAULT '[]'" },

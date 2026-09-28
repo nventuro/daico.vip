@@ -36,6 +36,8 @@ async function staged(id: string, importId: string, fileIds: string[]): Promise<
     transport: null,
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     comments: null,
     file_ids: JSON.stringify(fileIds),
     boarding_pass_file_ids: '[]',

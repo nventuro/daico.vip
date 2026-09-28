@@ -29,6 +29,8 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     transport: 'flight',
     origin: 'AEP',
     destination: 'BRC',
+    carry_on_bags: null,
+    checked_bags: null,
     comments: 'Código QK7T2M',
     file_ids: '[]',
     boarding_pass_file_ids: '[]',
@@ -118,6 +120,18 @@ const PASS_FILES = new Map([
 ]);
 
 describe('tripItemFrom', () => {
+  it("carries a flight's luggage, and nobody else's", () => {
+    const flight = tripItemFrom(staged('f', { carry_on_bags: 1, checked_bags: 2 }), 'v1');
+    expect([flight.carry_on_bags, flight.checked_bags]).toEqual([1, 2]);
+    const train = tripItemFrom(
+      staged('t', { transport: 'train', carry_on_bags: 1, checked_bags: 2 }),
+      'v1',
+    );
+    expect([train.carry_on_bags, train.checked_bags]).toEqual([null, null]);
+    const stay = tripItemFrom(staged('s', { kind: 'lodging', checked_bags: 1 }), 'v1');
+    expect(stay.checked_bags).toBeNull();
+  });
+
   it('makes a boarding pass the pasaje it is for', () => {
     const flight = tripItemFrom(PASS.items[0], 'v1');
     expect(flight.kind).toBe('ticket');

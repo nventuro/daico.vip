@@ -3,7 +3,7 @@ import { TRIP_ITEMS_SPEC, type TripKind, type TripTransport } from '../../lib/of
 import { useOfflineTable } from '../../hooks/useOfflineTable';
 import { offerUndo } from '../../lib/undo';
 import { lowercaseTrimmed } from '../../utils/textUtils';
-import { TRIP_KIND_DEFAULT, TRIP_KIND_SHAPES, TRIP_TRANSPORT_DEFAULT } from './kinds';
+import { TRIP_KIND_DEFAULT, TRIP_KIND_SHAPES, TRIP_TRANSPORT_DEFAULT, isFlight } from './kinds';
 import { TICK_MESSAGE } from './labels';
 
 /** Everything a form decides about a row of a trip: its own columns minus the
@@ -19,6 +19,8 @@ export interface TripItemFields {
   transport: TripTransport | null;
   origin: string | null;
   destination: string | null;
+  carry_on_bags: number | null;
+  checked_bags: number | null;
   comments: string | null;
 }
 
@@ -39,24 +41,31 @@ export const NEW_TRIP_ITEM: TripItemFields = {
   transport: null,
   origin: null,
   destination: null,
+  carry_on_bags: null,
+  checked_bags: null,
   comments: null,
 };
 
 /** Every class uses the same columns and leaves the ones it has no use for
  *  null, so what the class does not draw is cleared here rather than kept from
  *  whichever class the row was being written as a moment earlier. A pasaje
- *  that does not say what it travels on is born as the usual one. */
+ *  that does not say what it travels on is born as the usual one, and only a
+ *  flight counts its luggage. */
 export function withKindFields(input: TripItemInput): TripItemInput {
   const shape = TRIP_KIND_SHAPES[input.kind];
+  const transport = shape.route ? (input.transport ?? TRIP_TRANSPORT_DEFAULT) : null;
+  const flight = isFlight({ kind: input.kind, transport });
   return {
     ...input,
     on_date: shape.starts === 'none' ? null : input.on_date,
     at_time: shape.starts === 'day-time' ? input.at_time : null,
     ends_on: shape.ends === 'none' ? null : input.ends_on,
     ends_at: shape.ends === 'day-time' ? input.ends_at : null,
-    transport: shape.route ? (input.transport ?? TRIP_TRANSPORT_DEFAULT) : null,
+    transport,
     origin: shape.route ? input.origin : null,
     destination: shape.route ? input.destination : null,
+    carry_on_bags: flight ? input.carry_on_bags : null,
+    checked_bags: flight ? input.checked_bags : null,
     done: shape.ticked ? input.done : false,
   };
 }

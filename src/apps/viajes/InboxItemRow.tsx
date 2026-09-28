@@ -1,5 +1,6 @@
 import type { TripInboxItem } from '../../lib/offline/specs';
 import EntryMarks from '../../components/EntryMarks';
+import BaggageIcons from './BaggageIcons';
 import ItemIcon from './ItemIcon';
 import { inboxItemLines } from './labels';
 import { tripInboxMarks } from './marks';
@@ -20,7 +21,10 @@ export default function InboxItemRow({ item, today }: InboxItemRowProps) {
     <li className="flex items-center gap-2 border-b border-border py-3">
       <ItemIcon kind={item.kind} transport={item.transport} />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-on-surface">{item.title}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-on-surface">{item.title}</span>
+          <BaggageIcons carryOn={item.carry_on_bags} checked={item.checked_bags} />
+        </span>
         {subtitle !== undefined && (
           <span className="mt-0.5 truncate text-xs text-muted">{subtitle}</span>
         )}

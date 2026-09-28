@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { TRIP_TRANSPORTS, type TripKind } from '../../lib/offline/specs';
-import Chip from '../../components/Chip';
+import Chip, { ChipSelect } from '../../components/Chip';
 import DatePicker from '../../components/DatePicker';
 import FormField from '../../components/FormField';
 import TimePicker from '../../components/TimePicker';
@@ -8,23 +8,51 @@ import { CONTROL_CLASS } from '../../components/controlClasses';
 import AirportField from './AirportField';
 import StationField from './StationField';
 import { ownAirports } from './airports';
-import { TRIP_TRANSPORT_DEFAULT, TRIP_TRANSPORT_ICONS } from './kinds';
-import { TRIP_TRANSPORT_LABELS, TRIP_TRANSPORT_PLACES } from './labels';
+import {
+  BAGGAGE_PIECES_OFFERED,
+  CARRY_ON_ICON,
+  CHECKED_BAG_ICON,
+  TRIP_TRANSPORT_DEFAULT,
+  TRIP_TRANSPORT_ICONS,
+} from './kinds';
+import {
+  CARRY_ON_PLACEHOLDER,
+  CHECKED_BAGS_PLACEHOLDER,
+  TRIP_TRANSPORT_LABELS,
+  TRIP_TRANSPORT_PLACES,
+  carryOnLabel,
+  checkedBagsLabel,
+} from './labels';
 import { STATION_LIST_ID, stationOptions } from './stations';
 import { useTripItems } from './useTripItems';
 import type { TripItemFields } from './useTripItems';
 
-/** When a row happens, and for a pasaje what it travels on and between where:
- *  everything of it that is not words. */
+/** When a row happens, and for a pasaje what it travels on, between where
+ *  and, on a flight, with how much luggage: everything of it that is not
+ *  words. */
 export type ItemDatesValue = Pick<
   TripItemFields,
-  'on_date' | 'at_time' | 'ends_on' | 'ends_at' | 'transport' | 'origin' | 'destination'
+  | 'on_date'
+  | 'at_time'
+  | 'ends_on'
+  | 'ends_at'
+  | 'transport'
+  | 'origin'
+  | 'destination'
+  | 'carry_on_bags'
+  | 'checked_bags'
 >;
 
 interface ItemDateFieldsProps {
   kind: TripKind;
   fields: ItemDatesValue;
   onChange: (patch: Partial<ItemDatesValue>) => void;
+}
+
+/** The counts a luggage picker offers: none up to the usual most, and the
+ *  count held when an email said more. */
+function pieceCounts(held: number | null): number[] {
+  return Array.from({ length: Math.max(BAGGAGE_PIECES_OFFERED, held ?? 0) + 1 }, (_, i) => i);
 }
 
 /** A control that takes its share of a row rather than the width of a field. */
@@ -94,7 +122,15 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
                 <Chip
                   key={option}
                   selected={option === transport}
-                  onClick={() => onChange({ transport: option })}
+                  // Only a flight counts its luggage: another transport
+                  // lets go of what it would no longer show.
+                  onClick={() =>
+                    onChange(
+                      option === 'flight'
+                        ? { transport: option }
+                        : { transport: option, carry_on_bags: null, checked_bags: null },
+                    )
+                  }
                 >
                   <Icon size={16} stroke={1.5} aria-hidden />
                   {TRIP_TRANSPORT_LABELS[option]}
@@ -150,6 +186,42 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
               </div>
             </div>
           </FormField>
+          {flight && (
+            <FormField label="Equipaje" group>
+              <div className="flex flex-wrap gap-2">
+                <ChipSelect
+                  icon={CARRY_ON_ICON}
+                  value={fields.carry_on_bags ?? ''}
+                  onChange={(e) => onChange({ carry_on_bags: Number(e.target.value) })}
+                  aria-label="Equipaje de mano"
+                >
+                  <option value="" disabled>
+                    {CARRY_ON_PLACEHOLDER}
+                  </option>
+                  {pieceCounts(fields.carry_on_bags).map((count) => (
+                    <option key={count} value={count}>
+                      {carryOnLabel(count)}
+                    </option>
+                  ))}
+                </ChipSelect>
+                <ChipSelect
+                  icon={CHECKED_BAG_ICON}
+                  value={fields.checked_bags ?? ''}
+                  onChange={(e) => onChange({ checked_bags: Number(e.target.value) })}
+                  aria-label="Equipaje despachado"
+                >
+                  <option value="" disabled>
+                    {CHECKED_BAGS_PLACEHOLDER}
+                  </option>
+                  {pieceCounts(fields.checked_bags).map((count) => (
+                    <option key={count} value={count}>
+                      {checkedBagsLabel(count)}
+                    </option>
+                  ))}
+                </ChipSelect>
+              </div>
+            </FormField>
+          )}
         </>
       );
     }

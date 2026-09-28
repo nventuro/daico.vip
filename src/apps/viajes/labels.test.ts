@@ -7,6 +7,7 @@ import {
   inboxSubtitle,
   itemLines,
   tripSubtitle,
+  baggageLabel,
 } from './labels';
 
 const TODAY = '2026-09-01';
@@ -24,6 +25,8 @@ function item(kind: TripKind, overrides: Partial<TripItem> = {}): TripItem {
     transport: null,
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     done: false,
     comments: null,
     created_at: '2026-01-01T00:00:00Z',
@@ -110,6 +113,20 @@ describe('itemLines', () => {
     expect(itemLines(item('todo', { on_date: '2026-09-02' }), TODAY)).toEqual(['mañana']);
     expect(itemLines(item('todo'), TODAY)).toEqual([]);
     expect(itemLines(item('place'), TODAY)).toEqual([]);
+  });
+});
+
+describe('baggageLabel', () => {
+  it('says each kind a flight carries, and leaves out the one it has none of', () => {
+    expect(baggageLabel(1, 2)).toBe('1 de mano · 2 despachados');
+    expect(baggageLabel(0, 1)).toBe('1 despachado');
+    expect(baggageLabel(2, 0)).toBe('2 de mano');
+  });
+
+  it('says nothing of a flight with no luggage, or none said', () => {
+    expect(baggageLabel(0, 0)).toBeUndefined();
+    expect(baggageLabel(null, null)).toBeUndefined();
+    expect(baggageLabel(null, 1)).toBe('1 despachado');
   });
 });
 

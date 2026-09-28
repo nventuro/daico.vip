@@ -50,6 +50,8 @@ const tripItem = {
   transport: null,
   origin: null,
   destination: null,
+  carry_on_bags: null,
+  checked_bags: null,
   done: false,
   comments: null,
 };

@@ -1,7 +1,9 @@
 import {
   IconBed,
+  IconBriefcase,
   IconBus,
   IconChecklist,
+  IconLuggage,
   IconMapPin,
   IconPlane,
   IconQrcode,
@@ -61,3 +63,13 @@ export const BOARDING_PASS_ICON: TablerIcon = IconQrcode;
 export function isFlight(item: Pick<TripItem, 'kind' | 'transport'>): boolean {
   return item.kind === 'ticket' && item.transport === 'flight';
 }
+
+/** What a piece of a flight's luggage is drawn as, wherever it is: a bag
+ *  for the cabin, a suitcase for the hold. */
+export const CARRY_ON_ICON: TablerIcon = IconBriefcase;
+export const CHECKED_BAG_ICON: TablerIcon = IconLuggage;
+
+/** How many pieces of each a flight's page offers: more than any fare the
+ *  household flies on allows. A count from an email above it is still
+ *  offered, as the count it is. */
+export const BAGGAGE_PIECES_OFFERED = 4;

@@ -204,7 +204,9 @@ deleting a trip takes its rows with it. A pasaje says what it travels on
 (`transport`: a flight, a train or a bus), which is the icon its row wears, and
 where it leaves from and arrives — an airport, held as its IATA code and shown
 by name, or a station's name as the ticket prints it — and its row reads a line
-for each end: when, then where. The airports it knows are every open airport
+for each end: when, then where. A flight also counts the luggage each
+passenger takes (`carry_on_bags`, `checked_bags`, null when never said), picked
+on its page and drawn beside its title as a glyph per piece. The airports it knows are every open airport
 with an IATA code, bundled so the list works offline: `npm run
 airports:generate` writes them from the public-domain
 [OurAirports](https://ourairports.com/data/) dataset, each called by its city
@@ -290,7 +292,8 @@ leave it, so the server only ever stores ciphertext.
 A confirmation email forwarded to the household's address reaches the email
 worker in `worker/` (its header says what it holds and why). It lets through only mail
 from a member, has a model read the bookings out of it — a pasaje with what it
-travels on, its airports by code or its stations by name — and stages one row
+travels on, its airports by code or its stations by name, and a flight's
+luggage allowance — and stages one row
 per booking in `trip_inbox`, always replying to the sender; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
 and answered both times. The files the email carries — PDFs and pictures —

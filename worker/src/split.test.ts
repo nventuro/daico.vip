@@ -29,6 +29,8 @@ function leg(title: string, ...passes: number[][]): ExtractedItem {
     transport: 'flight',
     origin: null,
     destination: null,
+    carry_on_bags: null,
+    checked_bags: null,
     comments: null,
     boarding_pass_files: passes.map((pages) => ({ file: 1, pages })),
     files: [],

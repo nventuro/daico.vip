@@ -8,6 +8,9 @@ interface LinkRowProps {
   /** What tapping the row does, for a row that is a choice rather than a place. */
   onClick?: () => void;
   title: string;
+  /** What stands right after the title, on its line: a few glyphs that say
+   *  more about the entry, never a control. */
+  titleAside?: ReactNode;
   /** The smaller line under the title: a date, what it came to. */
   subtitle?: ReactNode;
   /** A second smaller line, for an entry with two things of a line's length
@@ -32,6 +35,7 @@ export default function LinkRow({
   to,
   onClick,
   title,
+  titleAside,
   subtitle,
   secondLine,
   overdue = false,
@@ -43,7 +47,14 @@ export default function LinkRow({
     <>
       {leading}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-on-surface">{title}</span>
+        {titleAside === undefined ? (
+          <span className="truncate text-on-surface">{title}</span>
+        ) : (
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-on-surface">{title}</span>
+            {titleAside}
+          </span>
+        )}
         {subtitle !== undefined && (
           <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
             {subtitle}

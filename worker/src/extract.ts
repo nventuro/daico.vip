@@ -30,6 +30,10 @@ const COMMENTS_MAX_CHARS = 1000;
 const STATION_MAX_CHARS = 80;
 const PROBLEM_MAX_CHARS = 300;
 
+/** The most pieces of luggage of one kind a flight is staged with: anything
+ *  above it is no allowance but a misreading, and is taken as none said. */
+const BAGS_MAX = 9;
+
 /** What is said when the model found nothing and did not say why; also the
  *  example it is given of saying so. */
 export const NO_BOOKINGS_FOUND = 'No encontré ninguna reserva en este correo';
@@ -89,6 +93,8 @@ const ITEM = z.object({
   transport: z.enum(TRANSPORTS).nullable(),
   origin: z.string().nullable(),
   destination: z.string().nullable(),
+  carry_on_bags: z.number().int().nullable(),
+  checked_bags: z.number().int().nullable(),
   comments: z.string().nullable(),
   boarding_pass_files: z.array(
     z.object({ file: z.number().int(), pages: z.array(z.number().int()) }),
@@ -200,6 +206,16 @@ fields.
   Trains and buses: the station or terminal name exactly as printed, in
   full — "London St Pancras International", not "London". If the email
   gives only the city, use the city.
+- carry_on_bags, checked_bags: the baggage allowance of a flight ticket,
+  as the number of pieces each passenger may take — carry_on_bags in the
+  cabin, checked_bags in the hold. A carry-on is the bag for the overhead
+  bin; a personal item that goes under the seat (a purse, a small
+  backpack) is not counted. A checked allowance printed as a weight
+  ("23 kg") with no number of pieces is 1 piece. Use 0 for a kind the
+  fare explicitly excludes. If passengers have different allowances,
+  give the smallest and say each passenger's in comments. null when the
+  email does not state it, and always null for anything but a flight
+  ticket.
 - comments: other details worth keeping, joined with " · ", booking
   code first, then seat or coach, room, address. With several people,
   each name with their own seat or code. For a boarding_pass: each
@@ -259,6 +275,7 @@ names were not:
         "transport": "train",
         "origin": "London St Pancras International",
         "destination": "Paris Gare du Nord",
+        "carry_on_bags": null, "checked_bags": null,
         "comments": "Código QK7T2M · Coche 11 · Ana asiento 45 · Bruno asiento 46",
         "boarding_pass_files": [{ "file": 1, "pages": [1] }, { "file": 1, "pages": [2] }],
         "files": [2] } ] }
@@ -269,6 +286,7 @@ is not a boarding pass:
     "on_date": "2026-09-12", "at_time": "08:40",
     "ends_on": "2026-09-12", "ends_at": "11:05",
     "transport": "flight", "origin": "AEP", "destination": "BRC",
+    "carry_on_bags": 1, "checked_bags": 1,
     "comments": "Código QK7T2M · Ana 14A · Bruno 14B",
     "boarding_pass_files": [], "files": [1] }
   { "kind": "ticket", "title": "AR 1425 · vuelta",
@@ -282,6 +300,7 @@ details, with the ticket in the second file:
     "ends_on": null, "ends_at": null,
     "transport": "bus",
     "origin": "Terminal de Ómnibus de Bariloche", "destination": null,
+    "carry_on_bags": null, "checked_bags": null,
     "comments": "Butaca 12",
     "boarding_pass_files": [{ "file": 2, "pages": [1] }], "files": [] }
 
@@ -290,6 +309,7 @@ A stay — dates only:
     "on_date": "2026-09-12", "at_time": null,
     "ends_on": "2026-09-19", "ends_at": null,
     "transport": null, "origin": null, "destination": null,
+    "carry_on_bags": null, "checked_bags": null,
     "comments": "Reserva 88412 · Av. Costanera 2140",
     "boarding_pass_files": [], "files": [1] }
 
@@ -416,6 +436,8 @@ export interface InboxRow {
   transport: Transport | null;
   origin: string | null;
   destination: string | null;
+  carry_on_bags: number | null;
+  checked_bags: number | null;
   comments: string | null;
   boarding_pass_file_ids: string[];
   file_ids: string[];
@@ -479,6 +501,15 @@ function transportOf(kind: InboxKind, said: Transport | null): Transport | null 
 function placeOrNull(value: string | null, transport: Transport | null): string | null {
   if (transport === null) return null;
   return transport === 'flight' ? codeOrNull(value) : textOrNull(value, STATION_MAX_CHARS);
+}
+
+/** How many pieces of luggage of one kind a row is staged with: what the
+ *  model said of a flight's pasaje, if it is a count there can be, and
+ *  nothing for anything else — a boarding pass included, which is put on a
+ *  pasaje and does not change what it carries. */
+function bagsOf(kind: InboxKind, transport: Transport | null, said: number | null): number | null {
+  if (kind !== 'ticket' || transport !== 'flight' || said === null) return null;
+  return Number.isInteger(said) && said >= 0 && said <= BAGS_MAX ? said : null;
 }
 
 /** The model's account of what was wrong, as it can be shown to the member:
@@ -552,6 +583,8 @@ export function rowsFromExtraction(
         transport,
         origin: placeOrNull(item.origin, transport),
         destination: placeOrNull(item.destination, transport),
+        carry_on_bags: bagsOf(item.kind, transport, item.carry_on_bags),
+        checked_bags: bagsOf(item.kind, transport, item.checked_bags),
         comments: textOrNull(item.comments, COMMENTS_MAX_CHARS),
         boarding_pass_file_ids: passIds,
         file_ids: otherIds,
