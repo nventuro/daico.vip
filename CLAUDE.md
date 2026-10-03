@@ -507,10 +507,12 @@ and what becomes of a forwarded email. These are the rules on top of it.
   a member that passed DMARC in the receiving server's own verdict (the first
   `Authentication-Results` header, and only when it is headed by that
   server's name, checked before the database is even opened), logs nothing of
-  an email, and always replies to the sender — a reply marked
+  an email, and replies to the sender only when something went wrong —
+  nothing was staged, or an attachment was left out; an email staged whole
+  gets no reply, its suggestions in the app being the answer — a reply marked
   `Auto-Submitted`, and never to a mail that is itself a machine's. An email
   is staged once: its Message-ID goes into `trip_inbox_imports` with its
-  rows, and a second delivery is answered without being read again. What
+  rows, and a second delivery is neither read again nor answered. What
   reaches the model is bounded (PDF count and bytes, text length, one retry),
   and what comes back is cut to length and checked for real dates before it
   is written. It is deployed on its own with the `worker:*` scripts, never by

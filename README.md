@@ -294,9 +294,11 @@ worker in `worker/` (its header says what it holds and why). It lets through onl
 from a member, has a model read the bookings out of it — a pasaje with what it
 travels on, its airports by code or its stations by name, and a flight's
 luggage allowance — and stages one row
-per booking in `trip_inbox`, always replying to the sender; an email delivered
+per booking in `trip_inbox`, replying to the sender only when something went
+wrong — nothing was staged, or an attachment was left out; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
-and answered both times. The files the email carries — PDFs and pictures —
+and the second delivery is not answered. The files the email carries — PDFs
+and pictures —
 are staged beside the rows in `trip_inbox_files`, sealed to the household's
 inbox key: a pair in
 `inbox_key` whose public half the worker seals to and whose private half is

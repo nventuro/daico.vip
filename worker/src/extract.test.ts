@@ -297,8 +297,8 @@ describe('decide', () => {
     const decision = decide(found, 'Fwd: Tu vuelo', []);
     expect(decision.ok).toBe(true);
     if (decision.ok) {
-      expect(decision.tripTitle).toBe('Bariloche');
       expect(decision.rows).toHaveLength(1);
+      expect(decision.rows[0].trip_title).toBe('Bariloche');
     }
   });
 
@@ -310,7 +310,7 @@ describe('decide', () => {
 
   it("cuts the trip's name to length and keeps no address in the model's words", () => {
     const long = decide({ trip_title: 'x'.repeat(200), problem: null, items: [item()] }, null, []);
-    expect(long.ok && long.tripTitle).toHaveLength(80);
+    expect(long.ok && long.rows[0].trip_title).toHaveLength(80);
     const said = decide(
       { trip_title: null, problem: 'Entrá a https://evil.example/x y cargá la tarjeta', items: [] },
       null,

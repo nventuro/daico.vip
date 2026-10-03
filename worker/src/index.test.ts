@@ -146,16 +146,16 @@ describe("the email's text", () => {
 });
 
 describe('an email delivered twice', () => {
-  it('is answered without being read again', async () => {
+  it('is neither read again nor answered', async () => {
     vi.mocked(alreadyStaged).mockResolvedValue(true);
     const message = forwarded([OWN_PASS]);
     await handle(message);
     expect(alreadyStaged).toHaveBeenCalledWith(expect.anything(), '<one@example.com>');
     expect(extractBookings).not.toHaveBeenCalled();
-    expect(replied(message)).toContain('ya lo hab');
+    expect(message.reply).not.toHaveBeenCalled();
   });
 
-  it('is answered as staged before when the other delivery staged it first', async () => {
+  it('is not answered when the other delivery staged it first', async () => {
     vi.mocked(extractBookings).mockResolvedValueOnce({
       trip_title: 'Bariloche',
       problem: null,
@@ -188,8 +188,7 @@ describe('an email delivered twice', () => {
       [],
       '<one@example.com>',
     );
-    expect(replied(message)).toContain('ya lo hab');
-    expect(replied(message)).not.toContain('falla del servicio');
+    expect(message.reply).not.toHaveBeenCalled();
   });
 });
 
@@ -363,7 +362,42 @@ describe('the files an email brings', () => {
     expect(files).toMatchObject([{ name: 'pass', mime: 'image/png', size: 40_000 }]);
     expect(rows[0].boarding_pass_file_ids).toEqual([files[0].id]);
     expect(rows[0].file_ids).toEqual([]);
-    expect(replied(message)).toContain('un boarding pass, con 1 archivo');
+    // Staged whole: the suggestion in the app is the answer.
+    expect(message.reply).not.toHaveBeenCalled();
+  });
+
+  it('answers a staged email only to say an attachment was left out', async () => {
+    vi.mocked(extractBookings).mockResolvedValueOnce({
+      trip_title: 'Bariloche',
+      problem: null,
+      items: [
+        {
+          kind: 'lodging',
+          title: 'Hotel Cormorán',
+          on_date: '2026-09-12',
+          at_time: null,
+          ends_on: '2026-09-19',
+          ends_at: null,
+          transport: null,
+          origin: null,
+          destination: null,
+          carry_on_bags: null,
+          checked_bags: null,
+          comments: null,
+          boarding_pass_files: [],
+          files: [],
+        },
+      ],
+    });
+    const message = withAttachments([
+      // Claims to be a PDF and opens as nothing.
+      { name: 'x.pdf', type: 'application/pdf', bytes: fileBytes('hello', 40_000) },
+    ]);
+    await handle(message);
+    expect(insertRows).toHaveBeenCalledTimes(1);
+    expect(message.reply).toHaveBeenCalledTimes(1);
+    expect(replied(message)).toContain('un adjunto');
+    expect(replied(message)).not.toContain('no guard');
   });
 
   it('stages each leg of a connection with its own page of the one PDF, and not the whole', async () => {

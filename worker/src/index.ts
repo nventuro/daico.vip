@@ -5,8 +5,8 @@
 // below, which lets only a verified member through, has a model extract the
 // bookings, seals the files the bookings are printed in for the household,
 // inserts one row per booking into `trip_inbox` with those files beside it,
-// and always replies to the sender — success or failure — so a forward never
-// vanishes without a word.
+// and replies to the sender only when something went wrong: a forward that
+// was staged whole is answered by its suggestions in the app.
 //
 // What the worker holds: an Anthropic key, and a Hyperdrive binding to the
 // database as `trip_inbox_writer`, a role that can insert into `trip_inbox`,
@@ -36,14 +36,7 @@ import {
   type FileType,
   type InboxRow,
 } from './extract';
-import {
-  alreadyStagedBody,
-  countsOf,
-  failureBody,
-  replyMime,
-  serviceFailureBody,
-  successBody,
-} from './reply';
+import { failureBody, leftOutBody, replyMime, serviceFailureBody } from './reply';
 import {
   AlreadyStagedError,
   alreadyStaged,
@@ -313,12 +306,10 @@ export default {
 
       try {
         // An email delivered again — the sending server never got the first
-        // delivery's answer — is answered again, and read and staged once.
+        // delivery's answer — is read and staged once, and whatever there
+        // was to say of it the first delivery said.
         const messageId = normalizedMessageId(email.messageId ?? null);
-        if (messageId !== null && (await alreadyStaged(db, messageId))) {
-          await reply(alreadyStagedBody());
-          return;
-        }
+        if (messageId !== null && (await alreadyStaged(db, messageId))) return;
         const { content, skipped } = contentOf(email);
         const output = await extractBookings(env.ANTHROPIC_API_KEY, content);
         const split = output === null ? null : await splitSharedPasses(output, content.files);
@@ -351,20 +342,12 @@ export default {
           await insertRows(db, crypto.randomUUID(), rows, files, messageId);
         } catch (error) {
           // Two deliveries read at once: the other one staged it first.
-          if (error instanceof AlreadyStagedError) {
-            await reply(alreadyStagedBody());
-            return;
-          }
+          if (error instanceof AlreadyStagedError) return;
           throw error;
         }
-        await reply(
-          successBody(
-            decision.tripTitle,
-            countsOf(rows.map((row) => row.kind)),
-            files.length,
-            skipped,
-          ),
-        );
+        // The staged rows are their own word, in the app; a file the member
+        // meant to send and that was not kept shows nowhere.
+        if (skipped > 0) await reply(leftOutBody(skipped));
       } catch (error) {
         console.error(`failed: ${errorMessage(error)}`);
         try {

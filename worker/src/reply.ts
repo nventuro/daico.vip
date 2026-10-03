@@ -1,9 +1,9 @@
 // =============================================================================
-// The reply every forward gets, success or failure, in the member's words,
-// and its assembly into a message the worker can send back.
+// The reply a forward gets when something went wrong with it, in the member's
+// words, and its assembly into a message the worker can send back.
 // =============================================================================
 import { createMimeMessage } from 'mimetext';
-import { INBOX_KINDS, NO_BOOKINGS_FOUND, type InboxKind } from './extract';
+import { NO_BOOKINGS_FOUND } from './extract';
 
 /** Where the suggestions wait for review. */
 const VIAJES_URL = 'https://daico.vip/viajes';
@@ -16,66 +16,14 @@ const SUBJECT_MAX_CHARS = 200;
 export const TRY_FORWARDING_AGAIN =
   'Si era una confirmación de verdad, probá reenviarla de nuevo tal cual llegó.';
 
-export type KindCounts = Record<InboxKind, number>;
-
-/** How many of each class a list of rows holds. */
-export function countsOf(kinds: InboxKind[]): KindCounts {
-  const counts: KindCounts = { ticket: 0, lodging: 0, booking: 0, boarding_pass: 0 };
-  for (const kind of kinds) counts[kind] += 1;
-  return counts;
-}
-
-const KIND_WORDS: Record<InboxKind, { one: string; many: string }> = {
-  ticket: { one: 'un pasaje', many: 'pasajes' },
-  lodging: { one: 'un alojamiento', many: 'alojamientos' },
-  booking: { one: 'una reserva', many: 'reservas' },
-  // The word does not change in number.
-  boarding_pass: { one: 'un boarding pass', many: 'boarding pass' },
-};
-
-function phrase(kind: InboxKind, count: number): string {
-  return count === 1 ? KIND_WORDS[kind].one : `${count} ${KIND_WORDS[kind].many}`;
-}
-
-/** «a, b y c»: the parts in one breath. */
-function listed(parts: string[]): string {
-  if (parts.length <= 1) return parts.join('');
-  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
-}
-
-/** The lines of a successful reply: what was found, with how many files were
- *  kept with it when any were, where it went, and how many attachments were
- *  left out when any were. */
-export function successBody(
-  tripTitle: string,
-  counts: KindCounts,
-  files: number,
-  skipped = 0,
-): string {
-  const total = INBOX_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
-  const parts = INBOX_KINDS.filter((kind) => counts[kind] > 0).map((kind) =>
-    phrase(kind, counts[kind]),
-  );
-  const kept = files === 0 ? '' : files === 1 ? ', con 1 archivo' : `, con ${files} archivos`;
+/** The two lines of a reply to an email that was staged with attachments
+ *  left out: how many, and where what was found went. */
+export function leftOutBody(skipped: number): string {
   return [
-    `Encontré ${total} ${total === 1 ? 'ítem' : 'ítems'} para «${tripTitle}»: ${listed(parts)}${kept}.`,
-    `Quedaron para revisar en Viajes: ${VIAJES_URL}`,
-    ...(skipped > 0
-      ? [
-          skipped === 1
-            ? 'Dejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.'
-            : `Dejé afuera ${skipped} adjuntos que no eran PDF ni imágenes, o eran demasiado grandes.`,
-        ]
-      : []),
-  ].join('\n');
-}
-
-/** The two lines of a reply to an email that was staged before: nothing is
- *  staged twice, and where the first time's suggestions are. */
-export function alreadyStagedBody(): string {
-  return [
-    'Este correo ya lo había recibido, así que no guardé nada de nuevo.',
-    `Las sugerencias de la primera vez están en Viajes: ${VIAJES_URL}`,
+    skipped === 1
+      ? 'Dejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.'
+      : `Dejé afuera ${skipped} adjuntos que no eran PDF ni imágenes, o eran demasiado grandes.`,
+    `Lo que encontré quedó para revisar en Viajes: ${VIAJES_URL}`,
   ].join('\n');
 }
 

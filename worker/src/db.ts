@@ -10,8 +10,8 @@ import type { InboxRow } from './extract';
 /** The unique violation Postgres reports, as pg hands it over. */
 const UNIQUE_VIOLATION = '23505';
 
-/** An email whose Message-ID was staged before: its sender was answered
- *  then, and a second delivery of it is answered again, never staged again. */
+/** An email whose Message-ID was staged before: a second delivery of it is
+ *  never staged again. */
 export class AlreadyStagedError extends Error {
   constructor() {
     super('already staged');

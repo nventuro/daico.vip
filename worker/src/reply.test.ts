@@ -1,73 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import {
-  alreadyStagedBody,
-  countsOf,
-  failureBody,
-  replyMime,
-  serviceFailureBody,
-  successBody,
-} from './reply';
+import { failureBody, leftOutBody, replyMime, serviceFailureBody } from './reply';
 
-describe('successBody', () => {
-  it('says one item in the singular, with its class', () => {
-    expect(successBody('Bariloche', countsOf(['ticket']), 0)).toBe(
-      'Encontré 1 ítem para «Bariloche»: un pasaje.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
+describe('leftOutBody', () => {
+  it('says how many attachments were left out, and where what was found went', () => {
+    expect(leftOutBody(1)).toBe(
+      'Dejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.\nLo que encontré quedó para revisar en Viajes: https://daico.vip/viajes',
     );
-    expect(successBody('Bariloche', countsOf(['lodging']), 0)).toContain(': un alojamiento.');
-    expect(successBody('Bariloche', countsOf(['booking']), 0)).toContain(': una reserva.');
-  });
-
-  it('lists the classes in their order, plurals where there are two, and « y » before the last', () => {
-    const counts = countsOf(['booking', 'ticket', 'lodging', 'ticket', 'booking']);
-    expect(successBody('Bariloche', counts, 0)).toBe(
-      'Encontré 5 ítems para «Bariloche»: 2 pasajes, un alojamiento y 2 reservas.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket', 'ticket']), 0)).toContain(': 2 pasajes.');
-    expect(successBody('Bariloche', countsOf(['lodging', 'lodging']), 0)).toContain(
-      ': 2 alojamientos.',
-    );
-    expect(successBody('Bariloche', countsOf(['booking', 'booking']), 0)).toContain(
-      ': 2 reservas.',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket', 'booking']), 0)).toContain(
-      ': un pasaje y una reserva.',
-    );
-  });
-
-  it('says how many files were kept, and nothing when none were', () => {
-    expect(successBody('Bariloche', countsOf(['ticket', 'ticket']), 1)).toBe(
-      'Encontré 2 ítems para «Bariloche»: 2 pasajes, con 1 archivo.\nQuedaron para revisar en Viajes: https://daico.vip/viajes',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket', 'lodging']), 2)).toContain(
-      ': un pasaje y un alojamiento, con 2 archivos.',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket']), 0)).not.toContain('archivo');
-  });
-
-  it('counts a boarding pass in a word that does not change', () => {
-    expect(successBody('Bariloche', countsOf(['boarding_pass']), 2)).toContain(
-      ': un boarding pass, con 2 archivos.',
-    );
-    expect(successBody('Bariloche', countsOf(['boarding_pass', 'boarding_pass']), 2)).toContain(
-      ': 2 boarding pass, con 2 archivos.',
-    );
-  });
-
-  it('says how many attachments were left out, when any were', () => {
-    expect(successBody('Bariloche', countsOf(['ticket']), 1, 1)).toContain(
-      '\nDejé afuera un adjunto que no era un PDF ni una imagen, o era demasiado grande.',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket']), 1, 3)).toContain(
-      'Dejé afuera 3 adjuntos',
-    );
-    expect(successBody('Bariloche', countsOf(['ticket']), 1)).not.toContain('Dejé afuera');
-  });
-});
-
-describe('alreadyStagedBody', () => {
-  it('says nothing was staged again, and where the first time went', () => {
-    expect(alreadyStagedBody()).toBe(
-      'Este correo ya lo había recibido, así que no guardé nada de nuevo.\nLas sugerencias de la primera vez están en Viajes: https://daico.vip/viajes',
+    expect(leftOutBody(3)).toBe(
+      'Dejé afuera 3 adjuntos que no eran PDF ni imágenes, o eran demasiado grandes.\nLo que encontré quedó para revisar en Viajes: https://daico.vip/viajes',
     );
   });
 });

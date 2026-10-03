@@ -50,8 +50,7 @@ export const NO_BOARDING_PASS_FILE_ADVICE =
   'Guardalo como PDF o hacé una captura, y subilo desde la app al pasaje.';
 
 /** What a forwarded email can contain: the booked classes, never a pendiente
- *  or a lugar, and the boarding pass of a pasaje booked before. Also the
- *  order the reply lists them in. */
+ *  or a lugar, and the boarding pass of a pasaje booked before. */
 export const INBOX_KINDS = ['ticket', 'lodging', 'booking', 'boarding_pass'] as const;
 export type InboxKind = (typeof INBOX_KINDS)[number];
 
@@ -598,8 +597,7 @@ export function rowsFromExtraction(
  *  the worker's own — and what to do about it when it is not to forward the
  *  email again. */
 export type Decision =
-  | { ok: true; tripTitle: string; rows: InboxRow[] }
-  | { ok: false; problem: string | null; advice?: string };
+  { ok: true; rows: InboxRow[] } | { ok: false; problem: string | null; advice?: string };
 
 /**
  * Whether the model's answer is worth staging: it found items, named the
@@ -624,7 +622,7 @@ export function decide(output: Extraction, subject: string | null, fileIds: stri
     if (withFiles.length === 0) {
       return { ok: false, problem: NO_BOARDING_PASS_FILE, advice: NO_BOARDING_PASS_FILE_ADVICE };
     }
-    return { ok: true, tripTitle, rows: withFiles };
+    return { ok: true, rows: withFiles };
   }
-  return { ok: true, tripTitle, rows };
+  return { ok: true, rows };
 }
