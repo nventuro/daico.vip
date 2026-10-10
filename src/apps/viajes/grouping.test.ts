@@ -302,6 +302,11 @@ describe('boardingPassChoices', () => {
   it('falls back to the flight number, then to a new pasaje in the next trip, then to a new trip', () => {
     const byNumber = staged('IDA', { kind: 'boarding_pass', on_date: '2026-10-01' });
     expect(suggestedBoardingPassChoice(byNumber, choices, flights)).toBe('ida');
+    const withAirline = staged('IDA · Argentinas', {
+      kind: 'boarding_pass',
+      on_date: '2026-10-01',
+    });
+    expect(suggestedBoardingPassChoice(withAirline, choices, flights)).toBe('ida');
     const unknown = staged('LA 400', { kind: 'boarding_pass', on_date: '2026-10-01' });
     expect(suggestedBoardingPassChoice(unknown, choices, flights)).toBe('new:próximo');
     const none = boardingPassChoices([trips[0]], flights, 'Bariloche', TODAY);

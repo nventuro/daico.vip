@@ -49,7 +49,7 @@ describe('rowsFromExtraction', () => {
       email_subject: 'Fwd: Tu vuelo',
       trip_title: 'Bariloche',
       kind: 'ticket',
-      title: 'AR 1420',
+      title: 'ar 1420',
       on_date: '2026-09-12',
       at_time: '08:40',
       ends_on: '2026-09-12',
@@ -97,6 +97,36 @@ describe('rowsFromExtraction', () => {
     expect(row.at_time).toBe('08:40');
   });
 
+  it('stages every title in lower case, and nothing else of a row', () => {
+    const rows = rowsFromExtraction(
+      [
+        item({ title: 'IB 103 · Iberia', comments: 'Código QK7T2M' }),
+        item({
+          title: 'Eurostar 9014',
+          transport: 'train',
+          origin: 'London St Pancras International',
+          destination: 'Paris Gare du Nord',
+        }),
+        item({ kind: 'lodging', title: 'Hotel Cormorán' }),
+        item({ kind: 'booking', title: 'Autos Pampa · alquiler de auto' }),
+      ],
+      'Bariloche',
+      null,
+      [],
+    );
+    expect(rows.map((row) => row.title)).toEqual([
+      'ib 103 · iberia',
+      'eurostar 9014',
+      'hotel cormorán',
+      'autos pampa · alquiler de auto',
+    ]);
+    expect(rows[0].trip_title).toBe('Bariloche');
+    expect(rows[0].origin).toBe('AEP');
+    expect(rows[0].comments).toBe('Código QK7T2M');
+    expect(rows[1].origin).toBe('London St Pancras International');
+    expect(rows[1].destination).toBe('Paris Gare du Nord');
+  });
+
   it('drops an item with a blank title and keeps the rest', () => {
     const rows = rowsFromExtraction(
       [item({ title: '   ' }), item({ title: 'AR 1425' })],
@@ -104,7 +134,7 @@ describe('rowsFromExtraction', () => {
       null,
       [],
     );
-    expect(rows.map((row) => row.title)).toEqual(['AR 1425']);
+    expect(rows.map((row) => row.title)).toEqual(['ar 1425']);
   });
 
   it('nulls a date or hour not written as asked, and blank text', () => {
@@ -343,7 +373,7 @@ describe('decide', () => {
       expect(decision.rows).toHaveLength(1);
       expect(decision.rows[0]).toMatchObject({
         kind: 'boarding_pass',
-        title: 'AR 1420',
+        title: 'ar 1420',
         on_date: '2026-09-12',
         at_time: '08:40',
         origin: 'AEP',

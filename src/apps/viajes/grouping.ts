@@ -232,6 +232,13 @@ function compact(text: string): string {
   return normalize(text).replace(/\s+/g, '');
 }
 
+/** The number a title opens with, as numbers are compared: what stands
+ *  before its first «·», where a flight's goes on to name its airline, or the
+ *  whole of it when it has none. */
+function numberOf(title: string): string {
+  return compact(title.split('·')[0]);
+}
+
 /**
  * How well a pasaje matches a staged boarding pass: leaving the same day
  * between the same places is best, the same day with one place or none next,
@@ -249,7 +256,8 @@ function matchScore(row: TripInboxItem, ticket: TripItem): number {
     ).length;
     return 2 + places;
   }
-  return compact(ticket.title).includes(compact(row.title)) ? 1 : 0;
+  const number = numberOf(row.title);
+  return number !== '' && compact(ticket.title).includes(number) ? 1 : 0;
 }
 
 /**

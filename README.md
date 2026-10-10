@@ -294,7 +294,9 @@ worker in `worker/` (its header says what it holds and why). It lets through onl
 from a member, has a model read the bookings out of it — a pasaje with what it
 travels on, its airports by code or its stations by name, and a flight's
 luggage allowance — and stages one row
-per booking in `trip_inbox`, replying to the sender only when something went
+per booking in `trip_inbox`, its title in lower case like one typed in the
+app, a flight's as its number and its airline's short name («ib 103 ·
+iberia»), replying to the sender only when something went
 wrong — nothing was staged, or an attachment was left out; an email delivered
 twice is staged once (`trip_inbox_imports` remembers each by its Message-ID)
 and the second delivery is not answered. The files the email carries — PDFs

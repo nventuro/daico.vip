@@ -2,6 +2,7 @@ import type { AttachmentSource } from '../../hooks/useAttachments';
 import { openInboxFile, openInboxKey, rowBinding, type InboxKeyPair } from '../../lib/householdKey';
 import type { TripInboxItem } from '../../lib/offline/specs';
 import type { AttachmentOwner } from '../../types';
+import { lowercaseTrimmed } from '../../utils/textUtils';
 import { CREATE_TRIP_CHOICE, type BoardingPassTarget, type InboxGroup } from './grouping';
 import {
   INBOX_FILES_TABLE,
@@ -29,9 +30,10 @@ export interface InboxWrites {
 }
 
 /** A staged row as the row of a trip it becomes: its class's own columns and
- *  nothing else, under its title as it came — a flight number or a hotel's
- *  name keeps its capitals, unlike what is typed into an add bar. A boarding
- *  pass with no pasaje yet becomes the pasaje it is for. */
+ *  nothing else, under its title in lower case — a row that came by email
+ *  reads like one typed into an add bar, and stays as it is when its title is
+ *  next written on. A boarding pass with no pasaje yet becomes the pasaje it
+ *  is for. */
 export function tripItemFrom(row: TripInboxItem, tripId: string): TripItemWrite {
   return {
     ...withKindFields({
@@ -49,7 +51,7 @@ export function tripItemFrom(row: TripInboxItem, tripId: string): TripItemWrite 
       comments: row.comments,
       done: false,
     }),
-    title: row.title.trim(),
+    title: lowercaseTrimmed(row.title),
     trip_id: tripId,
   };
 }

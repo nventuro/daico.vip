@@ -135,16 +135,16 @@ describe('tripItemFrom', () => {
   it('makes a boarding pass the pasaje it is for', () => {
     const flight = tripItemFrom(PASS.items[0], 'v1');
     expect(flight.kind).toBe('ticket');
-    expect(flight.title).toBe('AR 1420');
+    expect(flight.title).toBe('ar 1420');
     expect(flight.transport).toBe('flight');
     expect(flight.origin).toBe('AEP');
     expect(flight.at_time).toBe('08:40');
     expect(flight.ends_at).toBe('11:05');
   });
 
-  it('keeps the capitals of a title, and only what its class carries', () => {
+  it('keeps a title in lower case, and only what its class carries', () => {
     const item = tripItemFrom(GROUP.items[1], 'v1');
-    expect(item.title).toBe('Hotel Cormorán');
+    expect(item.title).toBe('hotel cormorán');
     expect(item.trip_id).toBe('v1');
     expect(item.kind).toBe('lodging');
     expect(item.done).toBe(false);
@@ -192,11 +192,11 @@ describe('confirmInbox', () => {
     const undo = await confirmInbox(GROUP, 'v1', w);
     expect(w.addTrip).not.toHaveBeenCalled();
     expect(order).toEqual([
-      'add AR 1420',
+      'add ar 1420',
       'remove s1',
-      'add Hotel Cormorán',
+      'add hotel cormorán',
       'remove s2',
-      'add Autos Pampa · alquiler de auto',
+      'add autos pampa · alquiler de auto',
       'remove s3',
     ]);
     expect(vi.mocked(w.addItem).mock.calls.every(([input]) => input.trip_id === 'v1')).toBe(true);
@@ -370,7 +370,7 @@ describe('confirmBoardingPass', () => {
     );
     expect(vi.mocked(w.addItem).mock.calls[0][0]).toMatchObject({
       kind: 'ticket',
-      title: 'AR 1420',
+      title: 'ar 1420',
       trip_id: 'v1',
     });
     expect(w.attached).toEqual([

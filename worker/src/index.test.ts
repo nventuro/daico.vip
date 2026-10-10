@@ -358,7 +358,7 @@ describe('the files an email brings', () => {
     ]);
     await handle(message);
     const [, , rows, files] = vi.mocked(insertRows).mock.calls[0];
-    expect(rows).toMatchObject([{ kind: 'boarding_pass', title: 'AR 1420' }]);
+    expect(rows).toMatchObject([{ kind: 'boarding_pass', title: 'ar 1420' }]);
     expect(files).toMatchObject([{ name: 'pass', mime: 'image/png', size: 40_000 }]);
     expect(rows[0].boarding_pass_file_ids).toEqual([files[0].id]);
     expect(rows[0].file_ids).toEqual([]);

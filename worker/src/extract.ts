@@ -138,13 +138,15 @@ Argentinian Spanish: trip_title, problem, the descriptive part of a
 booking's title, and the labels in comments ("Código", "Asiento",
 "Coche", "Habitación"). Translate labels, never data: carriers, flight
 and train numbers, booking codes, addresses, and the names of stations,
-hotels and companies stay exactly as printed.
+hotels and companies stay exactly as printed — but for the airline in a
+flight's title, described under title below.
 
 ## Accuracy
 
 Extract only what the email states. A value it does not give is null.
-Do not guess, and do not fill gaps from general knowledge; the one
-exception is an airport's IATA code, described under origin below.
+Do not guess, and do not fill gaps from general knowledge; the two
+exceptions are an airport's IATA code, described under origin below,
+and a flight's airline and its code, described under title.
 
 ## Items
 
@@ -179,9 +181,21 @@ Choosing between "ticket" and "boarding_pass":
   only the boarding_pass item and no ticket.
 
 title:
-- ticket and boarding_pass: carrier and number — "AR 1420", "Eurostar
-  9014" — or the carrier alone if no number is printed. When the email
-  covers both directions of a round trip, add " · ida" and " · vuelta".
+- ticket and boarding_pass by plane: the flight number, " · ", then the
+  airline — "IB 103 · Iberia", "BA 2204 · British" — and nothing else.
+  The flight number is the airline's two-character code, a space, and
+  the number. The airline is the short name it is known by, without the
+  generic words of its full name ("Airlines", "Airways", "Air Lines",
+  "Líneas Aéreas", "Aerolíneas"): "United", "American", "Delta",
+  "Qatar", "LATAM", "Argentinas". Keep the name whole when it is not
+  said without them: "Air France", "Air Europa", "Air Canada".
+  If the email gives the code without naming the airline, or names the
+  airline without its code, give the one that goes with the other. If
+  no flight number is printed, the title is the airline alone.
+- ticket and boarding_pass by train or bus: carrier and number —
+  "Eurostar 9014" — or the carrier alone if no number is printed. When
+  the email covers both directions of a round trip, add " · ida" and
+  " · vuelta".
 - lodging: the property's name as printed — "Hotel Cormorán".
 - booking: the company or venue, then what it is in Spanish — "Autos
   Pampa · alquiler de auto".
@@ -281,14 +295,14 @@ names were not:
 
 A round trip by plane — two tickets, both in the same e-ticket, which
 is not a boarding pass:
-  { "kind": "ticket", "title": "AR 1420 · ida",
+  { "kind": "ticket", "title": "AR 1420 · Argentinas",
     "on_date": "2026-09-12", "at_time": "08:40",
     "ends_on": "2026-09-12", "ends_at": "11:05",
     "transport": "flight", "origin": "AEP", "destination": "BRC",
     "carry_on_bags": 1, "checked_bags": 1,
     "comments": "Código QK7T2M · Ana 14A · Bruno 14B",
     "boarding_pass_files": [], "files": [1] }
-  { "kind": "ticket", "title": "AR 1425 · vuelta",
+  { "kind": "ticket", "title": "AR 1425 · Argentinas",
     "on_date": "2026-09-19", "at_time": "19:10", …,
     "boarding_pass_files": [], "files": [1] }
 
@@ -325,7 +339,7 @@ with nothing to add:
 
 A check-in email — the boarding passes of one flight for two
 passengers, one PDF each:
-  { "kind": "boarding_pass", "title": "AR 1420",
+  { "kind": "boarding_pass", "title": "AR 1420 · Argentinas",
     "on_date": "2026-09-12", "at_time": "08:40",
     "ends_on": "2026-09-12", "ends_at": "11:05",
     "transport": "flight", "origin": "AEP", "destination": "BRC",
@@ -335,11 +349,11 @@ passengers, one PDF each:
 
 A check-in email for one passenger on a flight with a connection — one
 PDF holding both legs' passes, a page each:
-  { "kind": "boarding_pass", "title": "AR 1502",
+  { "kind": "boarding_pass", "title": "AR 1502 · Argentinas",
     "on_date": "2026-09-12", "at_time": "07:10", …,
     "transport": "flight", "origin": "AEP", "destination": "COR",
     "boarding_pass_files": [{ "file": 1, "pages": [1] }], "files": [] }
-  { "kind": "boarding_pass", "title": "AR 1564",
+  { "kind": "boarding_pass", "title": "AR 1564 · Argentinas",
     "on_date": "2026-09-12", "at_time": "10:45", …,
     "transport": "flight", "origin": "COR", "destination": "BRC",
     "boarding_pass_files": [{ "file": 1, "pages": [2] }], "files": [] }
@@ -518,10 +532,11 @@ function problemOrNull(value: string | null): string | null {
   return textOrNull(value?.replace(/\bhttps?:\/\/\S+/gi, '') ?? null, PROBLEM_MAX_CHARS);
 }
 
-/** An item's title as its row is staged with; null for one that is not
- *  staged at all, for want of one. */
+/** An item's title as its row is staged with — in lower case, as the title
+ *  of every row of a trip is kept, so one that came by email reads like one
+ *  typed; null for one that is not staged at all, for want of one. */
 export function stagedTitle(item: ExtractedItem): string | null {
-  return textOrNull(item.title, TITLE_MAX_CHARS);
+  return textOrNull(item.title.toLowerCase(), TITLE_MAX_CHARS);
 }
 
 /** The numbers of the files an item's row is boarded with. Only what
