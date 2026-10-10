@@ -414,6 +414,10 @@ and what becomes of a forwarded email. These are the rules on top of it.
 - **Everything travels in the clear**: a row's free text is `comments`, like a
   chore's, so Buscar matches a booking code, and a row carries pictures the way
   a chore does.
+- **A row's page names its trip on a chip beside its class** (`ChipLink`),
+  which leads where the header's arrow does: a row is also opened from
+  Próximo and Buscar, where nothing else says which trip it is in. Never a
+  line over the title, and never in the band, which is the shell's.
 - **The airports are every airport, bundled and never looked up.**
   `airportList.ts` is written by `npm run airports:generate` from the
   OurAirports dataset — every open airport with an IATA code — and never
@@ -710,9 +714,10 @@ The README's «Despensa» says what an item is. These are the rules on top of it
   is tested headlessly in `BodyEditor.test.ts`, and that the two draw the same
   elements in `parity.test.tsx`: a change to how either draws a block must
   keep that test green.
-- **A page is left, never stacked on**: `useLeave` for every delete and the
-  header's arrow, `useLeaveBack` for the mark that leaves; a plain link or
-  `navigate` only going down, from a list to an entry. `src/lib/visited.ts`
+- **A page is left, never stacked on**: `useLeave` for every delete,
+  `useLeaveLink` for a link that goes up — the header's arrow, a `ChipLink`
+  naming what an entry is in — and `useLeaveBack` for the mark that leaves; a
+  plain link or `navigate` only going down, from a list to an entry. `src/lib/visited.ts`
   is the record both read, and a change to it comes with a test in
   `visited.test.ts`.
 - **The title is the heading** (`EntryHead`): normalised on blur, never saved

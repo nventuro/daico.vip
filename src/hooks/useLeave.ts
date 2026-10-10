@@ -1,6 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback, type MouseEvent, type MouseEventHandler } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { previousPathname, stepsBackTo } from '../lib/visited';
+
+/** A tap meant for this page: the main button, no modifier. Anything else
+ *  (a middle click, ctrl-click) is the browser's to open a new tab with. */
+function plainClick(e: MouseEvent<HTMLElement>): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
 
 /**
  * The one way an entry page goes to another screen: back to it when it is
@@ -19,6 +25,27 @@ export function useLeave(): (to: string) => void {
     },
     [navigate],
   );
+}
+
+/**
+ * What a link that leaves the page for `to` is given: where it leads, which
+ * stays its address for the browser's own gestures, and the tap that leaves
+ * for it instead of following it.
+ */
+export function useLeaveLink(to: string): {
+  to: string;
+  onClick: MouseEventHandler<HTMLElement>;
+} {
+  const leave = useLeave();
+  const onClick = useCallback(
+    (e: MouseEvent<HTMLElement>) => {
+      if (!plainClick(e)) return;
+      e.preventDefault();
+      leave(to);
+    },
+    [leave, to],
+  );
+  return { to, onClick };
 }
 
 /**

@@ -200,7 +200,8 @@ before leaving, or a pasaje, an alojamiento, a reserva, a lugar. The app is for
 the weeks before a trip — what is booked and what is still missing — and,
 during it, for looking up a code or an address; it is not an agenda. A row's
 kind is asked by the + and never changed, only a pendiente is ever ticked, and
-deleting a trip takes its rows with it. A pasaje says what it travels on
+deleting a trip takes its rows with it. A row's page names the trip it is in,
+on a chip beside its class that leads to the trip. A pasaje says what it travels on
 (`transport`: a flight, a train or a bus), which is the icon its row wears, and
 where it leaves from and arrives — an airport, held as its IATA code and shown
 by name, or a station's name as the ticket prints it — and its row reads a line

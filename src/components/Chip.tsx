@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
-import { IconChevronDown, type TablerIcon } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
+import { IconChevronDown, IconChevronRight, type TablerIcon } from '@tabler/icons-react';
+import { useLeaveLink } from '../hooks/useLeave';
 import { CHIP_BASE_CLASS, CHIP_IDLE_CLASS, CHIP_SELECTED_CLASS } from './controlClasses';
 
 interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,6 +26,22 @@ export default function Chip({ selected, className = '', ...rest }: ChipProps) {
  *  feeds): the same pill, with nothing to tap. */
 export function StaticChip({ children }: { children: ReactNode }) {
   return <span className={`${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`}>{children}</span>;
+}
+
+/** A chip that names what the entry belongs to and leads there, the page left
+ *  for it rather than stacked under it. Its chevron is what tells it from a
+ *  chip that only says something; a name too long for its row is cut. */
+export function ChipLink({ to, children }: { to: string; children: ReactNode }) {
+  const link = useLeaveLink(to);
+  return (
+    <Link
+      {...link}
+      className={`${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS} max-w-full min-w-0 pr-2 transition-colors hover:text-muted-strong`}
+    >
+      <span className="truncate">{children}</span>
+      <IconChevronRight size={14} stroke={1.5} aria-hidden className="shrink-0" />
+    </Link>
+  );
 }
 
 /** A choice drawn as a chip: the platform's picker opens on the tap, and the

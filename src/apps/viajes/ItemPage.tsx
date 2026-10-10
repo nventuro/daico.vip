@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import type { TripItem } from '../../lib/offline/specs';
 import AttachmentGrid from '../../components/AttachmentGrid';
 import CheckRow from '../../components/CheckRow';
-import { StaticChip } from '../../components/Chip';
+import { ChipLink, StaticChip } from '../../components/Chip';
 import Comments from '../../components/Comments';
 import DeleteDialog from '../../components/DeleteDialog';
 import EntryHead from '../../components/EntryHead';
@@ -25,16 +25,20 @@ import {
 } from './labels';
 import { useInboxUndoArrival } from './useInboxUndo';
 import { useTripItems } from './useTripItems';
+import { useTrips } from './useTrips';
 
 /** A row of a trip, read and written on the same page: the title on blur,
  *  each control as it changes, the comments a moment after typing stops and
- *  on leaving. Its class is stated, never changed. A pasaje keeps its
- *  boarding passes on a shelf of their own, apart from its other files. The
- *  one control that leaves the page is a pendiente's tick. */
+ *  on leaving. Its class is stated, never changed, and beside it a link names
+ *  the trip it is in. A pasaje keeps its boarding passes on a shelf of their
+ *  own, apart from its other files. The one control that leaves the page is
+ *  a pendiente's tick. */
 export default function ItemPage() {
   const { tripId = '', itemId = '' } = useParams();
   const { items, loading, error, save, setDone, remove } = useTripItems(tripId);
   const entry = useEntry(items, 'itemId');
+  const { items: trips } = useTrips();
+  const trip = useEntry(trips, 'tripId');
   const attachments = useAttachments({ kind: 'trip_item', id: entry?.id ?? '' });
   const boardingPasses = useAttachments({ kind: 'boarding_pass', id: entry?.id ?? '' });
   const leave = useLeave();
@@ -84,7 +88,14 @@ export default function ItemPage() {
           <EntryHead
             title={entry.title}
             onTitle={(title) => void save(entry.id, { title })}
-            chips={<StaticChip>{TRIP_KIND_LABELS[entry.kind]}</StaticChip>}
+            chips={
+              <>
+                <StaticChip>{TRIP_KIND_LABELS[entry.kind]}</StaticChip>
+                {/* A row is also opened from outside its trip, where nothing
+                    else on the page would say which one it is in. */}
+                {trip && <ChipLink to={entryPath('viajes', trip.id)}>{trip.title}</ChipLink>}
+              </>
+            }
             onDelete={() => setDeleting(true)}
             deleteLabel={removeItemLabel(entry.kind)}
           />
