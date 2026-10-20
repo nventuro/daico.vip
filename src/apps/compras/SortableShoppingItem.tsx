@@ -25,7 +25,7 @@ export default function SortableShoppingItem({ item, onToggle }: SortableShoppin
       onToggle={onToggle}
       toggleLabel={item.checked ? 'Destachar' : 'Tachar'}
       containerRef={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
       dragging={isDragging}
       dragHandle={
         <IconButton

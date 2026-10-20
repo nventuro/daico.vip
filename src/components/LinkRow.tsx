@@ -25,6 +25,9 @@ interface LinkRowProps {
   trailing?: ReactNode;
   /** Whether the row ends in a chevron saying it opens something else. */
   chevron?: boolean;
+  /** Whether the title is said in the muted colour: a choice that stands
+   *  apart from the entries listed over it, such as filing under none. */
+  muted?: boolean;
 }
 
 /** One entry in a list: a hairline row that opens it, that does one thing
@@ -42,16 +45,18 @@ export default function LinkRow({
   leading,
   trailing,
   chevron = false,
+  muted = false,
 }: LinkRowProps) {
+  const titleClass = `truncate ${muted ? 'text-muted' : 'text-on-surface'}`;
   const body = (
     <>
       {leading}
       <span className="flex min-w-0 flex-1 flex-col">
         {titleAside === undefined ? (
-          <span className="truncate text-on-surface">{title}</span>
+          <span className={titleClass}>{title}</span>
         ) : (
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-on-surface">{title}</span>
+            <span className={titleClass}>{title}</span>
             {titleAside}
           </span>
         )}

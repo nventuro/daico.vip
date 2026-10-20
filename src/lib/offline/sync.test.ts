@@ -300,7 +300,12 @@ describe('syncAll', () => {
 
   it('a failing table does not stop the others from syncing', async () => {
     server.fail('select', 'chores');
-    const id = await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: null });
+    const id = await engine.insert(SHOPPING_SPEC, {
+      name: 'Pan',
+      checked: false,
+      position: null,
+      section_id: null,
+    });
     await syncAll();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(server.rows('shopping_items')).toMatchObject([{ id }]);

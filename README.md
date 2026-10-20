@@ -126,10 +126,17 @@ where it departs from this.
 **Tareas** — `chores`: a title, an optional due date and comments. A chore can
 repeat, and marking one that does moves its date on instead of finishing it.
 
-**Compras** — `shopping_items`: a name, whether it is in the cart, and a
-fractional `position`, so reordering the list writes one row. Items live in the
-list; there is no page. A struck item leaves on its own half an hour on, deleted
-by the next device to open the list, so it is never seen going.
+**Compras** — `shopping_items`: a name, whether it is in the cart, a
+fractional `position`, so reordering the list writes one row, and the section
+it is bought in (`section_id`): one of `shopping_sections` — the verdulería,
+the supermercado — or none. Items live in the list; there is no page. The list
+is drawn by section, in the order the household drags the sections into, with
+what is in none last and a section with nothing in it left out. Its + asks
+where what was typed goes: into a section, into none, or into a new section
+it names. A section's page, opened from its heading, adds straight into it,
+and is where it is renamed and deleted, its items then falling to none. A
+struck item leaves on its own half an hour on, deleted by the next device to
+open the list, so it is never seen going.
 
 **Fechas** — `dates`: birthdays, appointments, renewals. Nothing is ever done:
 `occurs_on` is the anchor the user entered, and a repeating entry's next

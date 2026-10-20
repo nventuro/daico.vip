@@ -35,6 +35,7 @@ const TABLE_PRIVILEGES = {
   inbox_key: ['select', 'insert'],
   chores: CRUD,
   shopping_items: CRUD,
+  shopping_sections: CRUD,
   dates: CRUD,
   recipes: CRUD,
   documents: CRUD,

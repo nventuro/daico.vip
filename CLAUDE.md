@@ -580,6 +580,36 @@ the rules on top of it.
   `/salud/:id/:attachmentId?`, the id looked up in both tables, because
   `entryPath` is all Próximo and Buscar know how to write.
 
+## Compras — read before touching it
+
+The README's «Compras» says what an item and a section are. These are the
+rules on top of it.
+
+- **A section is a table (`shopping_sections`), never a column** — unlike
+  Ideas' groups — because a struck item leaves on its own: a section named
+  only by its items would go with the last one bought. **`section_id` has no
+  foreign key**, for the race Ideas' groups avoid; an id that names no
+  section is read as none (`shoppingGroups`), so a section is deleted alone
+  and its items are never written for it.
+- **The list's + asks where the item goes**, in `KindPickDialog`: every
+  section, the empty ones included, then «sin sección» and «nueva sección»,
+  muted, nothing preselected, and the bar keeps the text until it is
+  answered. It is the one + that asks something that can change afterwards,
+  because that bar makes sections as well as items. A section's own page
+  asks nothing: what is added there goes into it, which is what the page is
+  for.
+- **What the list draws is `shoppingGroups`**: only the sections with
+  something in them, in their `position` order, then «Sin sección» — last,
+  never dragged, and not drawn at all while nothing is filed. A section is
+  reached from its heading, never from a list of its own.
+- **Items keep one key space across the whole list.** An item's place in its
+  section is a key between its neighbours there (`itemDrop`), and a new one
+  is put after the last of the whole list, which is after the last of any
+  section. Sections have keys of their own. An item is dragged by the handle
+  at its left, a section by the one at the right of its heading, which folds
+  the list to its headings until it is dropped.
+- **Items have no page.** A hit in Buscar opens the list.
+
 ## Despensa — read before touching it
 
 The README's «Despensa» says what an item is. These are the rules on top of it.
@@ -693,7 +723,7 @@ The README's «Despensa» says what an item is. These are the rules on top of it
   the + asks it first through `KindPickDialog`, its `onAdd` returning false so
   the bar keeps the title for a dismissed question; nothing else is ever asked
   at birth — a column with no sensible default is a design question, never a
-  form. **The one control that leaves a page is the square that marks it**, a
+  form. Compras' list is the one exception, for the reason under Compras. **The one control that leaves a page is the square that marks it**, a
   `CheckRow` under the head with the list's words: it writes what the list's
   square writes, offers the same undo, and leaves back to where the page was
   opened from (`useLeaveBack`), so the page never shows the after-state.

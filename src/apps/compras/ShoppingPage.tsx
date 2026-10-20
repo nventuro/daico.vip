@@ -1,105 +1,102 @@
 import { useState } from 'react';
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { useNavigate } from 'react-router-dom';
 import { useShoppingList } from './useShoppingList';
-import { keyForMove } from './ordering';
-import { offerUndo } from '../../lib/undo';
-import SortableShoppingItem from './SortableShoppingItem';
+import { useShoppingSections } from './useShoppingSections';
 import AddBar from '../../components/AddBar';
-import Button from '../../components/Button';
 import EmptyState from '../../components/EmptyState';
+import KindPickDialog from '../../components/KindPickDialog';
 import ListPage from '../../components/ListPage';
 import SkeletonRows from '../../components/SkeletonRows';
+import { entryPath } from '../types';
+import ClearStruckButton from './ClearStruckButton';
+import GroupedList from './GroupedList';
+
+/** The answers that are not a section: filing under none, and making a
+ *  section of what was typed. A section's own answer is its id, a uuid,
+ *  which neither can be. */
+const NO_SECTION = 'none';
+const NEW_SECTION = 'new';
+
+/** What was typed into the bar while where it goes is asked, and how the bar
+ *  is told whether to clear. */
+interface Filing {
+  name: string;
+  answer: (added: boolean) => void;
+}
 
 export default function ShoppingPage() {
   const { items, loading, error, add, toggle, removeChecked, restore, move } = useShoppingList();
+  const {
+    sections,
+    loading: sectionsLoading,
+    error: sectionsError,
+    add: addSection,
+    move: moveSection,
+  } = useShoppingSections();
+  const navigate = useNavigate();
+  const [filing, setFiling] = useState<Filing | null>(null);
 
-  // Optimistic ordering: a drag reorder is reflected here synchronously so the
-  // dropped row stays in its new slot, instead of snapping back for a frame
-  // until the async local-store write lands (which read as a jiggle). When the
-  // store update arrives it carries the same order, so nothing moves — and it
-  // is adopted while rendering, which is what keeps that frame from showing.
-  const [view, setView] = useState(items);
-  const [syncedItems, setSyncedItems] = useState(items);
-  if (syncedItems !== items) {
-    setSyncedItems(items);
-    setView(items);
-  }
-
-  const sensors = useSensors(
-    // A small drag threshold so a tap on the handle never starts an accidental drag.
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  function handleDragEnd({ active, over }: DragEndEvent) {
-    if (!over || active.id === over.id) return;
-    const key = keyForMove(view, String(active.id), String(over.id));
-    if (key == null) return;
-    const from = view.findIndex((i) => i.id === active.id);
-    const to = view.findIndex((i) => i.id === over.id);
-    setView((v) => arrayMove(v, from, to));
-    void move(String(active.id), key);
-  }
-
-  async function clearStruck() {
-    const removed = await removeChecked();
-    if (removed?.length) {
-      offerUndo({ message: 'Tachados borrados', undo: () => restore(removed) });
+  /** What was typed goes where it was told: into a section, into none, or —
+   *  a new section — becomes one, whose page it opens to be filled. */
+  async function file(choice: string) {
+    if (!filing) return;
+    const { name, answer } = filing;
+    setFiling(null);
+    if (choice === NEW_SECTION) {
+      const id = await addSection(name);
+      answer(id !== undefined);
+      if (id) void navigate(entryPath('compras', id));
+      return;
     }
+    answer(true);
+    await add(name, choice === NO_SECTION ? null : choice);
   }
 
-  const hasStruck = view.some((i) => i.checked);
+  const hasStruck = items.some((i) => i.checked);
 
   return (
     <ListPage
-      loading={loading}
-      error={error}
+      loading={loading || sectionsLoading}
+      error={error ?? sectionsError}
       skeleton={<SkeletonRows leading="check" />}
       bar={
         <AddBar
-          onAdd={(name) => void add(name)}
-          placeholder="Agregar producto..."
-          inputLabel="Nuevo producto"
+          // Where it goes is asked first, and the bar keeps the text until
+          // it is answered.
+          onAdd={(name) => new Promise<boolean>((answer) => setFiling({ name, answer }))}
+          placeholder="Agregar..."
+          inputLabel="Nuevo producto o sección"
           notice={
-            hasStruck ? (
-              <Button variant="dangerOutline" size="sm" onClick={() => void clearStruck()}>
-                Borrar tachados
-              </Button>
-            ) : undefined
+            hasStruck ? <ClearStruckButton clear={removeChecked} restore={restore} /> : undefined
           }
         />
       }
     >
-      {view.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState>La lista está vacía. Agregá lo que necesites comprar.</EmptyState>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={view.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            <ul>
-              {view.map((item) => (
-                <SortableShoppingItem
-                  key={item.id}
-                  item={item}
-                  onToggle={() => void toggle(item)}
-                />
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
+        <GroupedList
+          sections={sections}
+          items={items}
+          onToggle={(item) => void toggle(item)}
+          onMoveItem={(id, place) => void move(id, place)}
+          onMoveSection={(id, position) => void moveSection(id, position)}
+        />
+      )}
+      {filing && (
+        <KindPickDialog
+          question="Sección"
+          options={[
+            ...sections.map((section) => ({ kind: section.id, label: section.name })),
+            { kind: NO_SECTION, label: 'sin sección', muted: true },
+            { kind: NEW_SECTION, label: 'nueva sección', muted: true },
+          ]}
+          onPick={(choice) => void file(choice)}
+          onClose={() => {
+            filing.answer(false);
+            setFiling(null);
+          }}
+        />
       )}
     </ListPage>
   );

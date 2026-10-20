@@ -218,6 +218,23 @@ export const CHORES_SPEC: TableSpec<Chore> = {
 
 // ─── Compras ─────────────────────────────────────────────────────────────────
 
+/** Where things on the shopping list are bought — the verdulería, the
+ *  supermercado — in the order the household walks through them. */
+export interface ShoppingSection extends SyncedRow {
+  name: string;
+  /** Fractional-index sort key, as an item's `position`. */
+  position: string | null;
+}
+
+export const SHOPPING_SECTIONS_SPEC: TableSpec<ShoppingSection> = {
+  table: 'shopping_sections',
+  columns: {
+    name: { ddl: 'TEXT NOT NULL' },
+    position: { ddl: 'TEXT' },
+  },
+  orderBy: 'position ASC NULLS LAST, created_at ASC',
+};
+
 /** An item on the shared shopping list. */
 export interface ShoppingItem extends SyncedRow {
   name: string;
@@ -228,6 +245,9 @@ export interface ShoppingItem extends SyncedRow {
    * a row inserted manually via SQL); the client sets it on every insert.
    */
   position: string | null;
+  /** The section it is bought in; null for none. Nothing holds it to an
+   *  existing section, and one that names none is in none. */
+  section_id: string | null;
 }
 
 export const SHOPPING_SPEC: TableSpec<ShoppingItem> = {
@@ -236,6 +256,7 @@ export const SHOPPING_SPEC: TableSpec<ShoppingItem> = {
     name: { ddl: 'TEXT NOT NULL' },
     checked: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
     position: { ddl: 'TEXT' },
+    section_id: { ddl: 'TEXT' },
   },
   // A struck (bought) item keeps its place in the list, so the order ignores `checked`.
   orderBy: 'position ASC NULLS LAST, created_at ASC',
@@ -862,6 +883,7 @@ export const SHELL_SPECS: TableSpec[] = [
 export const ALL_SPECS: TableSpec[] = [
   ...SHELL_SPECS,
   CHORES_SPEC,
+  SHOPPING_SECTIONS_SPEC,
   SHOPPING_SPEC,
   IDEAS_SPEC,
   NOTES_SPEC,

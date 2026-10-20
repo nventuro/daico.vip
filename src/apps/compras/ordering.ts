@@ -26,7 +26,7 @@ export function positionBetween(before: string | null, after: string | null): st
 }
 
 /** Move element `from` → `to`, returning a new array (matches dnd-kit's arrayMove). */
-function arrayMove<T>(items: T[], from: number, to: number): T[] {
+export function arrayMove<T>(items: T[], from: number, to: number): T[] {
   const copy = items.slice();
   const [moved] = copy.splice(from, 1);
   copy.splice(to, 0, moved);
@@ -57,19 +57,43 @@ export function keyForMove(items: Positioned[], fromId: string, toId: string): s
   const from = items.findIndex((i) => i.id === fromId);
   const to = items.findIndex((i) => i.id === toId);
   if (from === -1 || to === -1) return null;
+  return keyForIndex(
+    items.filter((_, i) => i !== from),
+    to,
+  );
+}
 
-  const reordered = arrayMove(items, from, to);
-  const before = to > 0 ? reordered[to - 1].position : null;
-  let end = to + 1;
+/**
+ * The key for a row put at index `at` of `rows`, a list in visible order that
+ * does not hold it — past any run of keys equal to the one before it, as in
+ * `keyForMove`. Null when no key can be minted there.
+ */
+export function keyForIndex(rows: Positioned[], at: number): string | null {
+  const before = at > 0 ? rows[at - 1].position : null;
+  let end = at;
   if (before !== null) {
-    while (end < reordered.length && reordered[end].position === before) end += 1;
+    while (end < rows.length && rows[end].position === before) end += 1;
   }
-  const after = end < reordered.length ? reordered[end].position : null;
+  const after = end < rows.length ? rows[end].position : null;
   try {
     return positionBetween(before, after);
   } catch {
     return null;
   }
+}
+
+/** Two rows in the order the store lists them: by key, one without a key
+ *  last, and by when they were made where the keys say nothing. */
+export function byPosition<Row extends Positioned & { created_at: string }>(
+  a: Row,
+  b: Row,
+): number {
+  if (a.position !== b.position) {
+    if (a.position === null) return 1;
+    if (b.position === null) return -1;
+    return a.position < b.position ? -1 : 1;
+  }
+  return a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0;
 }
 
 /**

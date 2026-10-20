@@ -6,8 +6,10 @@ import { ADD_BAR_BUTTON_CLASS, ADD_BAR_INPUT_CLASS } from './controlClasses';
 interface AddBarProps {
   /** Called with what was typed, never blank. The bar then clears itself,
    *  unless this returns false: a bar whose + first asks something keeps the
-   *  text for the question to come back to. */
-  onAdd: (text: string) => boolean | void;
+   *  text for the question to come back to. One whose page stays once the
+   *  question is answered returns the answer to come instead, and the bar
+   *  clears when it is true. */
+  onAdd: (text: string) => boolean | void | Promise<boolean>;
   placeholder: string;
   /** Accessible label for the text input. */
   inputLabel: string;
@@ -38,7 +40,16 @@ export default function AddBar({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const text = value.trim();
-    if (text && onAdd(text) !== false) setValue('');
+    if (text) {
+      const added = onAdd(text);
+      if (added instanceof Promise) {
+        void added.then((cleared) => {
+          if (cleared) setValue('');
+        });
+      } else if (added !== false) {
+        setValue('');
+      }
+    }
     // Keep focus so several items can be added in a row without re-tapping the
     // input — on mobile this also keeps the keyboard open between adds.
     inputRef.current?.focus();

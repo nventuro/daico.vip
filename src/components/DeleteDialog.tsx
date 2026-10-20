@@ -5,6 +5,9 @@ interface DeleteDialogProps {
   open: boolean;
   /** What is asked, e.g. "¿Eliminar la nota?". */
   question: string;
+  /** What becomes of what the entry held, said before that it cannot be
+   *  undone, e.g. "Sus 4 productos pasan a «Sin sección».". */
+  detail?: string;
   confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -15,6 +18,7 @@ interface DeleteDialogProps {
 export default function DeleteDialog({
   open,
   question,
+  detail,
   confirmLabel = 'Eliminar',
   onCancel,
   onConfirm,
@@ -24,7 +28,9 @@ export default function DeleteDialog({
     <ModalDialog onClose={onCancel} layout="confirm" label={question}>
       <div className="flex flex-col gap-2">
         <p className="font-medium text-on-surface">{question}</p>
-        <p className="text-sm text-muted">No se puede deshacer.</p>
+        <p className="text-sm text-muted">
+          {detail !== undefined && `${detail} `}No se puede deshacer.
+        </p>
         <DialogFooter
           onCancel={onCancel}
           onConfirm={onConfirm}

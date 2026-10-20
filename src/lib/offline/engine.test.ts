@@ -98,11 +98,13 @@ describe('insert', () => {
       name: 'Pan',
       checked: true,
       position: null,
+      section_id: null,
     });
     const unchecked = await engine.insert(SHOPPING_SPEC, {
       name: 'Leche',
       checked: false,
       position: null,
+      section_id: null,
     });
     const items = await engine.listVisible<ShoppingItem>(SHOPPING_SPEC);
     expect(items.find((i) => i.id === checked)).toMatchObject({ checked: true, position: null });
@@ -123,16 +125,19 @@ describe('listVisible', () => {
       name: 'Pan',
       checked: false,
       position: 'a0',
+      section_id: null,
     });
     const second = await engine.insert(SHOPPING_SPEC, {
       name: 'Leche',
       checked: false,
       position: 'a1',
+      section_id: null,
     });
     const third = await engine.insert(SHOPPING_SPEC, {
       name: 'Yerba',
       checked: false,
       position: 'a2',
+      section_id: null,
     });
     await engine.update(SHOPPING_SPEC, second, { checked: true });
     const ids = (await engine.listVisible<ShoppingItem>(SHOPPING_SPEC)).map((i) => i.id);
@@ -289,7 +294,12 @@ describe('clearAll', () => {
     await engine.insert(CHORES_SPEC, newChore);
     await pulled(serverChore('a', T0));
     await engine.remove(CHORES_SPEC, 'a');
-    await engine.insert(SHOPPING_SPEC, { name: 'Pan', checked: false, position: null });
+    await engine.insert(SHOPPING_SPEC, {
+      name: 'Pan',
+      checked: false,
+      position: null,
+      section_id: null,
+    });
     await cacheImage('img', 'AAAA');
 
     await engine.clearAll();
@@ -536,6 +546,7 @@ describe('reconcile', () => {
       name: 'Pan',
       checked: false,
       position: null,
+      section_id: null,
     });
     await engine.markUpserted(SHOPPING_SPEC, item, T0);
     await engine.reconcile(CHORES_SPEC, []);

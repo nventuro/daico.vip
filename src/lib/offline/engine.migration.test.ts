@@ -192,6 +192,7 @@ describe('table migration', () => {
       'updated_at',
       'pending_op',
       'synced',
+      'section_id',
     ]);
     // A build a migration got ahead of is swapped in while the app is not
     // running, which is when an edit made offline is most likely still queued.
