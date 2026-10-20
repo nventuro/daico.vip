@@ -118,6 +118,25 @@ function press(target: EventTarget, key: string): void {
   });
 }
 
+type Point = { x: number; y: number };
+
+/** A gesture over the file: each finger down from its point, then the first
+ *  one lifted where it ends. */
+function drag(fingers: Point[], end: Point): void {
+  const target = document.querySelector('dialog span.absolute');
+  if (!target) throw new Error('no file area');
+  const touch = ({ x, y }: Point) => ({ clientX: x, clientY: y });
+  function fire(type: string, touches: Point[], changed: Point[]): void {
+    const event = new Event(type, { bubbles: true });
+    Object.assign(event, { touches: touches.map(touch), changedTouches: changed.map(touch) });
+    target?.dispatchEvent(event);
+  }
+  act(() => {
+    fingers.forEach((_, i) => fire('touchstart', fingers.slice(0, i + 1), [fingers[i]]));
+    fire('touchend', fingers.slice(1), [end]);
+  });
+}
+
 describe('AttachmentLightbox', () => {
   it('draws the name in place, and the field by its own name when there is none', () => {
     mount([attachment('a1', 'la canilla')]);
@@ -189,5 +208,34 @@ describe('AttachmentLightbox', () => {
     press(document.body, 'ArrowRight');
     expect(onRename).toHaveBeenCalledWith(one, 'la factura');
     expect(path()).toBe(`${OWNER_PATH}/a2`);
+  });
+
+  it('moves on with a finger swept across', () => {
+    const both = [attachment('a1', ''), attachment('a2', '')];
+    mount(both);
+    drag([{ x: 300, y: 300 }], { x: 200, y: 320 });
+    expect(path()).toBe(`${OWNER_PATH}/a2`);
+    act(() => root?.unmount());
+    mount(both, 1);
+    drag([{ x: 200, y: 300 }], { x: 300, y: 280 });
+    expect(path()).toBe(`${OWNER_PATH}/a1`);
+  });
+
+  it('stays put while a finger scrolls, though it drifts sideways', () => {
+    mount([attachment('a1', ''), attachment('a2', '')]);
+    drag([{ x: 300, y: 600 }], { x: 220, y: 200 });
+    expect(path()).toBe(`${OWNER_PATH}/a1`);
+  });
+
+  it('stays put after a pinch', () => {
+    mount([attachment('a1', ''), attachment('a2', '')]);
+    drag(
+      [
+        { x: 300, y: 300 },
+        { x: 100, y: 300 },
+      ],
+      { x: 200, y: 300 },
+    );
+    expect(path()).toBe(`${OWNER_PATH}/a1`);
   });
 });

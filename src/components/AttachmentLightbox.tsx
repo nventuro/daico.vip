@@ -30,6 +30,10 @@ import { IN_PLACE_CLASS } from './controlClasses';
 /** How far a finger must travel across the lightbox to change picture, in pixels. */
 const LIGHTBOX_SWIPE_MIN_PX = 50;
 
+/** How many times further across than up or down a finger must travel for a
+ *  swipe: a PDF is scrolled with the same finger, which seldom moves straight. */
+const LIGHTBOX_SWIPE_MIN_RATIO = 2;
+
 /** Navigation state a link into the lightbox carries when it is followed from
  *  the entry's own page, so that closing can simply go back to it. */
 export const LIGHTBOX_FROM_ENTRY_PAGE = { fromEntryPage: true } as const;
@@ -84,7 +88,7 @@ export default function AttachmentLightbox({
   const pdfView = usePdf(pdf ? file : null);
   const uploadState = useAttachmentUploadState(attachment.id);
   const online = useOnline();
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(attachment.name);
   const committed = useRef(attachment.name);
@@ -133,12 +137,21 @@ export default function AttachmentLightbox({
     return () => document.removeEventListener('keydown', onKey);
   }, [show, index, hasPrev, hasNext, deleting]);
 
+  function touchStarted(e: TouchEvent) {
+    // A second finger makes it a pinch, which is never a swipe.
+    touchStart.current =
+      e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  }
+
   function touchEnd(e: TouchEvent) {
-    if (touchStartX.current === null) return;
-    const delta = e.changedTouches[0].clientX - touchStartX.current;
-    touchStartX.current = null;
-    if (delta > LIGHTBOX_SWIPE_MIN_PX && hasPrev) show(index - 1);
-    if (delta < -LIGHTBOX_SWIPE_MIN_PX && hasNext) show(index + 1);
+    if (touchStart.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    touchStart.current = null;
+    if (Math.abs(dx) < LIGHTBOX_SWIPE_MIN_PX) return;
+    if (Math.abs(dx) < Math.abs(dy) * LIGHTBOX_SWIPE_MIN_RATIO) return;
+    if (dx > 0 && hasPrev) show(index - 1);
+    if (dx < 0 && hasNext) show(index + 1);
   }
 
   // The device's share sheet takes files on Android; desktop Firefox has none,
@@ -210,13 +223,7 @@ export default function AttachmentLightbox({
           <span aria-hidden className="w-10" />
         </div>
 
-        <div
-          className="relative min-h-0 flex-1"
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0].clientX;
-          }}
-          onTouchEnd={touchEnd}
-        >
+        <div className="relative min-h-0 flex-1" onTouchStart={touchStarted} onTouchEnd={touchEnd}>
           {pdf && pdfView.status === 'ready' ? (
             <div className="absolute inset-0 overflow-y-auto">
               <div className="flex flex-col gap-2 px-4 pb-4">
