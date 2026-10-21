@@ -29,6 +29,8 @@ function staged(id: string, overrides: Partial<TripInboxItem> = {}): TripInboxIt
     transport: 'flight',
     origin: 'AEP',
     destination: 'BRC',
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     comments: 'Código QK7T2M',
@@ -130,6 +132,17 @@ describe('tripItemFrom', () => {
     expect([train.carry_on_bags, train.checked_bags]).toEqual([null, null]);
     const stay = tripItemFrom(staged('s', { kind: 'lodging', checked_bags: 1 }), 'v1');
     expect(stay.checked_bags).toBeNull();
+  });
+
+  it("carries the zone of each end of a pasaje, and of nothing that doesn't travel", () => {
+    const zones = { origin_time_zone: 'Europe/London', destination_time_zone: 'Europe/Paris' };
+    const train = tripItemFrom(staged('t', { transport: 'train', ...zones }), 'v1');
+    expect([train.origin_time_zone, train.destination_time_zone]).toEqual([
+      'Europe/London',
+      'Europe/Paris',
+    ]);
+    const stay = tripItemFrom(staged('s', { kind: 'lodging', ...zones }), 'v1');
+    expect([stay.origin_time_zone, stay.destination_time_zone]).toEqual([null, null]);
   });
 
   it('makes a boarding pass the pasaje it is for', () => {

@@ -724,6 +724,11 @@ export interface TripItem extends SyncedRow {
    *  flight, the station's or the terminal's name otherwise. */
   origin: string | null;
   destination: string | null;
+  /** The time zone each end of a train or a bus keeps its clocks in (an IANA
+   *  name, «Europe/London»), as the email it came by said; null on a flight,
+   *  whose airports say it, and wherever it was never said. */
+  origin_time_zone: string | null;
+  destination_time_zone: string | null;
   /** How many pieces each passenger of a flight takes in the cabin and in
    *  the hold; null on every other class, and on a flight that never said. */
   carry_on_bags: number | null;
@@ -747,6 +752,8 @@ export const TRIP_ITEMS_SPEC: TableSpec<TripItem> = {
     transport: { ddl: 'TEXT' },
     origin: { ddl: 'TEXT' },
     destination: { ddl: 'TEXT' },
+    origin_time_zone: { ddl: 'TEXT' },
+    destination_time_zone: { ddl: 'TEXT' },
     carry_on_bags: { ddl: 'INTEGER' },
     checked_bags: { ddl: 'INTEGER' },
     done: { ddl: 'INTEGER NOT NULL DEFAULT 0', boolean: true },
@@ -787,6 +794,8 @@ export interface TripInboxItem extends SyncedRow {
   transport: TripTransport | null;
   origin: string | null;
   destination: string | null;
+  origin_time_zone: string | null;
+  destination_time_zone: string | null;
   /** A flight's luggage, as a row of a trip carries it. */
   carry_on_bags: number | null;
   checked_bags: number | null;
@@ -816,6 +825,8 @@ export const TRIP_INBOX_SPEC: TableSpec<TripInboxItem> = {
     transport: { ddl: 'TEXT' },
     origin: { ddl: 'TEXT' },
     destination: { ddl: 'TEXT' },
+    origin_time_zone: { ddl: 'TEXT' },
+    destination_time_zone: { ddl: 'TEXT' },
     carry_on_bags: { ddl: 'INTEGER' },
     checked_bags: { ddl: 'INTEGER' },
     comments: { ddl: 'TEXT' },

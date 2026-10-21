@@ -53,6 +53,11 @@ export function airportsOf(records) {
       latitude: Number(record.latitude_deg),
       longitude: Number(record.longitude_deg),
       keywords: record.keywords,
+      // The other codes the airport goes by — its ICAO one above all — which
+      // is how a dataset that keeps no IATA code names it.
+      idents: [record.icao_code, record.ident, record.gps_code]
+        .map((ident) => (ident ?? '').trim())
+        .filter((ident, i, all) => ident !== '' && all.indexOf(ident) === i),
     });
   }
   return [...airports.values()];

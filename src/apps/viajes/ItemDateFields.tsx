@@ -22,6 +22,7 @@ import {
   TRIP_TRANSPORT_PLACES,
   carryOnLabel,
   checkedBagsLabel,
+  journeyDurationLabel,
 } from './labels';
 import { STATION_LIST_ID, stationOptions } from './stations';
 import { useTripItems } from './useTripItems';
@@ -39,6 +40,8 @@ export type ItemDatesValue = Pick<
   | 'transport'
   | 'origin'
   | 'destination'
+  | 'origin_time_zone'
+  | 'destination_time_zone'
   | 'carry_on_bags'
   | 'checked_bags'
 >;
@@ -89,13 +92,20 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
       const transport = fields.transport ?? TRIP_TRANSPORT_DEFAULT;
       const flight = transport === 'flight';
       const place = TRIP_TRANSPORT_PLACES[transport];
+      const duration = journeyDurationLabel({ ...fields, kind, transport });
 
       // Where a leg is: an airport held as its code on a flight, a station by
       // its name otherwise. On a line of its own, since a name needs the width.
+      // A place written by hand lets go of the zone the email gave the one
+      // before it, which could be anywhere else.
       const where = (end: 'origin' | 'destination', leg: string) => {
         const label = `${place} de ${leg}`;
         const change = (value: string | null) =>
-          onChange(end === 'origin' ? { origin: value } : { destination: value });
+          onChange(
+            end === 'origin'
+              ? { origin: value, origin_time_zone: null }
+              : { destination: value, destination_time_zone: null },
+          );
         return flight ? (
           <AirportField value={fields[end]} onChange={change} label={label} own={airports} />
         ) : (
@@ -186,6 +196,13 @@ export default function ItemDateFields({ kind, fields, onChange }: ItemDateField
               </div>
             </div>
           </FormField>
+          {/* The sum the two hours above leave to whoever reads them, since
+              each is in its own place's time. */}
+          {duration !== undefined && (
+            <FormField label="Duración" group>
+              <span className="text-base text-on-surface">{duration}</span>
+            </FormField>
+          )}
           {flight && (
             <FormField label="Equipaje" group>
               <div className="flex flex-wrap gap-2">

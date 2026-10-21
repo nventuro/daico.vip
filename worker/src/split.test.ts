@@ -29,6 +29,8 @@ function leg(title: string, ...passes: number[][]): ExtractedItem {
     transport: 'flight',
     origin: null,
     destination: null,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     comments: null,

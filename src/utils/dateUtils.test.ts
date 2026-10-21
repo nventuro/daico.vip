@@ -9,6 +9,7 @@ import {
   formatDayMonth,
   formatMonthYear,
   formatWeekdayDay,
+  instantIn,
   monthEnd,
   monthLabel,
   monthsUntil,
@@ -180,5 +181,27 @@ describe('formatTime', () => {
 
   it('reads the seconds the server writes back the same way', () => {
     expect(formatTime('08:40:00')).toBe('8:40');
+  });
+});
+
+describe('instantIn', () => {
+  it('reads a wall clock in its own zone, whatever zone the device is in', () => {
+    expect(instantIn('2026-11-14', '13:25', 'America/Argentina/Buenos_Aires')).toBe(
+      Date.UTC(2026, 10, 14, 16, 25),
+    );
+    expect(instantIn('2026-11-15', '05:35:00', 'Europe/Madrid')).toBe(
+      Date.UTC(2026, 10, 15, 4, 35),
+    );
+  });
+
+  it('keeps the offset of the day, summer time included', () => {
+    expect(instantIn('2026-07-01', '12:00', 'Europe/Madrid')).toBe(Date.UTC(2026, 6, 1, 10, 0));
+    // The days the clocks change, after they have.
+    expect(instantIn('2026-03-29', '12:00', 'Europe/Madrid')).toBe(Date.UTC(2026, 2, 29, 10, 0));
+    expect(instantIn('2026-10-25', '12:00', 'Europe/Madrid')).toBe(Date.UTC(2026, 9, 25, 11, 0));
+  });
+
+  it('knows no zone the browser does not', () => {
+    expect(instantIn('2026-11-14', '13:25', 'Nowhere/Atlantis')).toBeNull();
   });
 });

@@ -11,9 +11,11 @@
 // cannot say — a city's own name where it gives the English one, the city an
 // airport serves where it gives the suburb the runway is in, what an airport
 // is called day to day — is written by hand in generate-airports/names.mjs.
+// Each airport's time zone comes from the mwgg/Airports dataset (MIT), as
+// generate-airports/zones.mjs works it out.
 //
-// `--from <dir>` reads airports.csv and regions.csv from a directory instead
-// of downloading them. `--review <file>` writes a sheet of every airport an
+// `--from <dir>` reads airports.csv, regions.csv and airports.json from a
+// directory instead of downloading them. `--review <file>` writes a sheet of every airport an
 // airline's ticket is normally for — what the dataset says beside what the
 // list will read, by country — to look over. The dataset changes under
 // volunteers' hands, so the generated file's diff is read before it is kept.
@@ -30,8 +32,10 @@ import {
   plainRegion,
 } from './generate-airports/labels.mjs';
 import { NAMES, REGION_NAMES } from './generate-airports/names.mjs';
+import { airportZones, zoneLines } from './generate-airports/zones.mjs';
 
 const SOURCE = 'https://davidmegginson.github.io/ourairports-data/';
+const ZONES_SOURCE = 'https://raw.githubusercontent.com/mwgg/Airports/master/';
 const OUTPUT = 'src/apps/viajes/airportList.ts';
 // The app is in Argentinian Spanish, and so is what a country is called.
 const COUNTRY_LOCALE = 'es-AR';
@@ -46,9 +50,9 @@ const opt = (name) => {
 const fromDir = opt('--from');
 const reviewFile = opt('--review');
 
-async function read(file) {
+async function read(file, source = SOURCE) {
   if (fromDir) return fs.readFile(path.join(fromDir, file), 'utf8');
-  const response = await fetch(SOURCE + file);
+  const response = await fetch(source + file);
   if (!response.ok) throw new Error(`${file}: ${response.status}`);
   return response.text();
 }
@@ -56,6 +60,7 @@ async function read(file) {
 const airports = airportsOf(csvRecords(await read('airports.csv')));
 const regions = new Map(csvRecords(await read('regions.csv')).map((r) => [r.code, r.name]));
 const countries = new Intl.DisplayNames([COUNTRY_LOCALE], { type: 'region' });
+const zones = airportZones(airports, JSON.parse(await read('airports.json', ZONES_SOURCE)));
 
 // The regions a label ended up naming as the dataset calls them, to look over:
 // the dataset's names are in English or the region's own language.
@@ -81,20 +86,31 @@ if (problems.length > 0) {
 }
 
 const today = new Date().toISOString().slice(0, 10);
-const lines = entries
-  .map((entry) => `${entry.airport.code} ${entry.label}`)
-  .join('\n')
-  .replace(/[\\`]|\$\{/g, '\\$&');
+const escaped = (lines) => lines.join('\n').replace(/[\\`]|\$\{/g, '\\$&');
+const lines = escaped(entries.map((entry) => `${entry.airport.code} ${entry.label}`));
+// Only an airport the list writes takes a place among the zones.
+const zoned = new Map(
+  entries
+    .map((entry) => entry.airport.code)
+    .filter((code) => zones.has(code))
+    .map((code) => [code, zones.get(code)]),
+);
 await fs.writeFile(
   path.join(root, OUTPUT),
   `// Written by \`npm run airports:generate\` from the OurAirports dataset (public
-// domain, https://ourairports.com/data/) as it stood on ${today}. Never edited by
-// hand: a name that reads wrong is put right in the script's names and the file
-// written again.
+// domain, https://ourairports.com/data/) and the time zones of the mwgg/Airports
+// dataset (MIT, Copyright (c) 2014 mwgg, https://github.com/mwgg/Airports) as
+// they stood on ${today}. Never edited by hand: a name that reads wrong is put
+// right in the script's names and the file written again.
 
 /** Every airport a ticket can name, a line each: its IATA code, a space, and
  *  what it is called. The ones a ticket is likeliest to name come first. */
 export const AIRPORT_LINES = \`${lines}\`;
+
+/** The time zone each airport's clocks keep, a line per zone: its name, and
+ *  the codes of its airports after it, a space between each. An airport whose
+ *  zone is not known is on no line. */
+export const AIRPORT_ZONES = \`${escaped(zoneLines(zoned))}\`;
 `,
 );
 
@@ -113,14 +129,16 @@ if (reviewFile) {
         entry.label,
         entry.airport.municipality,
         entry.airport.name,
+        zones.get(entry.airport.code) ?? '',
         NAMES[entry.airport.code] ? 'by hand' : '',
         isUnbacked(entry) ? 'not in the record' : '',
       ].join('\t'),
     );
   await fs.writeFile(
     reviewFile,
-    ['country\tcode\treads\tmunicipality\tofficial name\twritten\tcheck', ...sheet].join('\n') +
+    ['country\tcode\treads\tmunicipality\tofficial name\tzone\twritten\tcheck', ...sheet].join(
       '\n',
+    ) + '\n',
   );
 }
 
@@ -131,5 +149,12 @@ console.log(
   `${guessed.length} airports a ticket is normally for carry a short name worked out, not written:`,
 );
 console.log(guessed.map((entry) => `  ${entry.airport.code} ${entry.label}`).join('\n'));
+const unzoned = entries.filter((entry) => !zoned.has(entry.airport.code));
+const bigUnzoned = unzoned.filter((entry) => isBig(entry.airport));
+console.log(
+  `${unzoned.length} airports have no time zone, so no flight of theirs says how long it takes;` +
+    ` ${bigUnzoned.length} of them a ticket is normally for:`,
+);
+console.log(bigUnzoned.map((entry) => `  ${entry.airport.code} ${entry.label}`).join('\n'));
 console.log(`${asTheDatasetSays.size} regions are called as the dataset calls them:`);
 console.log(`  ${[...asTheDatasetSays].sort().join(', ')}`);

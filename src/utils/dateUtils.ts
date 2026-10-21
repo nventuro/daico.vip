@@ -232,3 +232,56 @@ export function monthName(yearMonth: string, style: 'long' | 'short'): string {
   const [year, month] = yearMonth.split('-').map(Number);
   return namePart(new Date(year, month - 1, 1), { month: style });
 }
+
+/** A reader of each time zone's wall clock, by the zone's name, or null for a
+ *  name the browser does not know: building one is slow, and a list asks for
+ *  the same few zones on every row. */
+const zoneClocks = new Map<string, Intl.DateTimeFormat | null>();
+
+function zoneClock(zone: string): Intl.DateTimeFormat | null {
+  let clock = zoneClocks.get(zone);
+  if (clock === undefined) {
+    try {
+      clock = new Intl.DateTimeFormat('en-US', {
+        timeZone: zone,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+      });
+    } catch {
+      clock = null;
+    }
+    zoneClocks.set(zone, clock);
+  }
+  return clock;
+}
+
+/** What a zone's wall clock reads at `instant`, as the instant that reading
+ *  would be in UTC: the two differ by the zone's offset there. */
+function wallClockAt(clock: Intl.DateTimeFormat, instant: number): number {
+  const parts = clock.formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'));
+}
+
+/**
+ * The instant, in milliseconds since the epoch, at which the clocks of `zone`
+ * read `time` (HH:MM, or the HH:MM:SS the server writes back) on `day`
+ * (yyyy-mm-dd); null for a zone the browser does not know.
+ */
+export function instantIn(day: string, time: string, zone: string): number | null {
+  const clock = zoneClock(zone);
+  if (!clock) return null;
+  const [year, month, date] = parseIso(day);
+  const [hours, minutes] = time.split(':').map(Number);
+  const reading = Date.UTC(year, month - 1, date, hours, minutes);
+  // The offset is the one where the reading falls: guessed at the reading
+  // taken as UTC, and read again where that guess lands, which only differs
+  // near a change of the clocks.
+  const guess = reading - (wallClockAt(clock, reading) - reading);
+  return reading - (wallClockAt(clock, guess) - guess);
+}

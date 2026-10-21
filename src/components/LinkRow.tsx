@@ -11,6 +11,10 @@ interface LinkRowProps {
   /** What stands right after the title, on its line: a few glyphs that say
    *  more about the entry, never a control. */
   titleAside?: ReactNode;
+  /** What stands at the far end of the title's line, reaching over the
+   *  trailing marks so it ends where every row does: a figure that lines up
+   *  down the list, never a control. */
+  titleEnd?: ReactNode;
   /** The smaller line under the title: a date, what it came to. */
   subtitle?: ReactNode;
   /** A second smaller line, for an entry with two things of a line's length
@@ -39,6 +43,7 @@ export default function LinkRow({
   onClick,
   title,
   titleAside,
+  titleEnd,
   subtitle,
   secondLine,
   overdue = false,
@@ -48,28 +53,50 @@ export default function LinkRow({
   muted = false,
 }: LinkRowProps) {
   const titleClass = `truncate ${muted ? 'text-muted' : 'text-on-surface'}`;
+  const titleLine =
+    titleAside === undefined && titleEnd === undefined ? (
+      <span className={titleClass}>{title}</span>
+    ) : (
+      <span
+        className={`flex min-w-0 items-center gap-2 ${titleEnd === undefined ? '' : 'col-[1/3] row-start-1'}`}
+      >
+        <span className={titleClass}>{title}</span>
+        {titleAside}
+        {titleEnd !== undefined && <span className="ml-auto flex shrink-0">{titleEnd}</span>}
+      </span>
+    );
+  const lines = (
+    <>
+      {subtitle !== undefined && (
+        <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
+          {subtitle}
+        </span>
+      )}
+      {secondLine !== undefined && (
+        <span className="mt-0.5 truncate text-xs text-muted">{secondLine}</span>
+      )}
+    </>
+  );
   const body = (
     <>
       {leading}
-      <span className="flex min-w-0 flex-1 flex-col">
-        {titleAside === undefined ? (
-          <span className={titleClass}>{title}</span>
-        ) : (
-          <span className="flex min-w-0 items-center gap-2">
-            <span className={titleClass}>{title}</span>
-            {titleAside}
+      {titleEnd === undefined ? (
+        <>
+          <span className="flex min-w-0 flex-1 flex-col">
+            {titleLine}
+            {lines}
           </span>
-        )}
-        {subtitle !== undefined && (
-          <span className={`mt-0.5 truncate text-xs ${overdue ? 'text-error' : 'text-muted'}`}>
-            {subtitle}
-          </span>
-        )}
-        {secondLine !== undefined && (
-          <span className="mt-0.5 truncate text-xs text-muted">{secondLine}</span>
-        )}
-      </span>
-      {trailing}
+          {trailing}
+        </>
+      ) : (
+        // The title's line spans both columns, so what ends it ends where the
+        // row does, over the marks, which stay centred on the row.
+        <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2">
+          {titleLine}
+          <span className="col-start-1 row-start-2 flex min-w-0 flex-col">{lines}</span>
+          {trailing !== undefined && <span className="col-start-2 row-[1/3] flex">{trailing}</span>}
+        </span>
+      )}
       {chevron && <IconChevronRight size={18} stroke={1.5} className="shrink-0 text-muted" />}
     </>
   );

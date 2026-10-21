@@ -116,6 +116,8 @@ export default function ItemPage() {
               transport: entry.transport,
               origin: entry.origin,
               destination: entry.destination,
+              origin_time_zone: entry.origin_time_zone,
+              destination_time_zone: entry.destination_time_zone,
               carry_on_bags: entry.carry_on_bags,
               checked_bags: entry.checked_bags,
             }}

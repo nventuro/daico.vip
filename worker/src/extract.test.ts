@@ -22,6 +22,8 @@ function item(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
     transport: 'flight',
     origin: 'AEP',
     destination: 'BRC',
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: 1,
     checked_bags: 2,
     comments: 'Código QK7T2M',
@@ -57,6 +59,8 @@ describe('rowsFromExtraction', () => {
       transport: 'flight',
       origin: 'AEP',
       destination: 'BRC',
+      origin_time_zone: null,
+      destination_time_zone: null,
       carry_on_bags: 1,
       checked_bags: 2,
       comments: 'Código QK7T2M',
@@ -95,6 +99,58 @@ describe('rowsFromExtraction', () => {
     expect(row.origin).toBeNull();
     expect(row.destination).toBeNull();
     expect(row.at_time).toBe('08:40');
+  });
+
+  it('keeps the time zone of each end of a train or a bus, when the runtime knows it by that name', () => {
+    const [train, bus] = rowsFromExtraction(
+      [
+        item({
+          title: 'Eurostar 9014',
+          transport: 'train',
+          origin: 'London St Pancras International',
+          destination: 'Paris Gare du Nord',
+          origin_time_zone: ' Europe/London ',
+          destination_time_zone: 'Europe/Paris',
+        }),
+        item({
+          title: 'Andesmar',
+          transport: 'bus',
+          origin: 'Mendoza',
+          destination: 'Santiago',
+          origin_time_zone: 'Mars/Olympus_Mons',
+          destination_time_zone: '-04:00',
+        }),
+      ],
+      'Europa',
+      null,
+      [],
+    );
+    expect([train.origin_time_zone, train.destination_time_zone]).toEqual([
+      'Europe/London',
+      'Europe/Paris',
+    ]);
+    expect([bus.origin_time_zone, bus.destination_time_zone]).toEqual([null, null]);
+  });
+
+  it('stages no time zone on a flight, whose airports say it, nor on what does not travel', () => {
+    const [flight, stay] = rowsFromExtraction(
+      [
+        item({
+          origin_time_zone: 'America/Argentina/Buenos_Aires',
+          destination_time_zone: 'America/Argentina/Salta',
+        }),
+        item({
+          kind: 'lodging',
+          title: 'Hotel Cormorán',
+          origin_time_zone: 'America/Argentina/Salta',
+        }),
+      ],
+      'Bariloche',
+      null,
+      [],
+    );
+    expect([flight.origin_time_zone, flight.destination_time_zone]).toEqual([null, null]);
+    expect([stay.origin_time_zone, stay.destination_time_zone]).toEqual([null, null]);
   });
 
   it('stages every title in lower case, and nothing else of a row', () => {

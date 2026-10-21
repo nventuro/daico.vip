@@ -7,7 +7,7 @@ import { entryPath } from '../types';
 import BaggageIcons from './BaggageIcons';
 import ItemIcon from './ItemIcon';
 import { TRIP_KIND_SHAPES } from './kinds';
-import { itemLines } from './labels';
+import { itemLines, journeyDurationLabel } from './labels';
 import { tripItemMarks } from './marks';
 
 interface ItemRowProps {
@@ -23,6 +23,7 @@ export default function ItemRow({ item, today, hasAttachments, onToggle }: ItemR
   const { ticked } = TRIP_KIND_SHAPES[item.kind];
   const marks = <EntryMarks marks={tripItemMarks(item, hasAttachments)} />;
   const [subtitle, secondLine] = itemLines(item, today);
+  const duration = journeyDurationLabel(item);
   const to = entryPath('viajes', item.trip_id, item.id);
 
   if (ticked) {
@@ -45,6 +46,13 @@ export default function ItemRow({ item, today, hasAttachments, onToggle }: ItemR
       to={to}
       title={item.title}
       titleAside={<BaggageIcons carryOn={item.carry_on_bags} checked={item.checked_bags} />}
+      // As wide as the longest a pasaje takes, so every row's starts at the
+      // same place down the list.
+      titleEnd={
+        duration === undefined ? undefined : (
+          <span className="w-19 text-xs text-muted tabular-nums">{duration}</span>
+        )
+      }
       subtitle={subtitle}
       secondLine={secondLine}
       leading={<ItemIcon kind={item.kind} transport={item.transport} />}

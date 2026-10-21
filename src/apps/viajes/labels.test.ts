@@ -4,8 +4,10 @@ import {
   boardingPassAddedLabel,
   boardingPassDueLabel,
   boardingPassLines,
+  durationLabel,
   inboxSubtitle,
   itemLines,
+  journeyDurationLabel,
   tripSubtitle,
   baggageLabel,
 } from './labels';
@@ -25,6 +27,8 @@ function item(kind: TripKind, overrides: Partial<TripItem> = {}): TripItem {
     transport: null,
     origin: null,
     destination: null,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     done: false,
@@ -113,6 +117,65 @@ describe('itemLines', () => {
     expect(itemLines(item('todo', { on_date: '2026-09-02' }), TODAY)).toEqual(['mañana']);
     expect(itemLines(item('todo'), TODAY)).toEqual([]);
     expect(itemLines(item('place'), TODAY)).toEqual([]);
+  });
+});
+
+describe('durationLabel', () => {
+  it('says hours and minutes, and leaves out whichever is none', () => {
+    expect(durationLabel(730)).toBe('12 h 10 min');
+    expect(durationLabel(125)).toBe('2 h 5 min');
+    expect(durationLabel(120)).toBe('2 h');
+    expect(durationLabel(45)).toBe('45 min');
+  });
+});
+
+describe('journeyDurationLabel', () => {
+  it('reads a flight across zones the way neither of its hours does', () => {
+    const overnight = item('ticket', {
+      transport: 'flight',
+      origin: 'EZE',
+      destination: 'MAD',
+      on_date: '2026-11-14',
+      at_time: '13:25',
+      ends_on: '2026-11-15',
+      ends_at: '05:35',
+    });
+    expect(journeyDurationLabel(overnight)).toBe('12 h 10 min');
+  });
+
+  it('reads a train in the zones it was staged with, and says nothing without them', () => {
+    const eurostar = item('ticket', {
+      transport: 'train',
+      origin: 'London St Pancras International',
+      destination: 'Paris Gare du Nord',
+      on_date: '2026-11-18',
+      at_time: '09:01',
+      ends_at: '12:20',
+    });
+    expect(
+      journeyDurationLabel({
+        ...eurostar,
+        origin_time_zone: 'Europe/London',
+        destination_time_zone: 'Europe/Paris',
+      }),
+    ).toBe('2 h 19 min');
+    expect(journeyDurationLabel(eurostar)).toBeUndefined();
+  });
+
+  it('says nothing while an hour or an airport’s zone is missing, nor for an arrival before leaving', () => {
+    const flight = {
+      transport: 'flight' as const,
+      origin: 'AEP',
+      destination: 'BRC',
+      on_date: '2026-09-12',
+      at_time: '08:40',
+      ends_at: '11:05',
+    };
+    expect(journeyDurationLabel(item('ticket', flight))).toBe('2 h 25 min');
+    expect(journeyDurationLabel(item('ticket', { ...flight, ends_at: null }))).toBeUndefined();
+    expect(journeyDurationLabel(item('ticket', { ...flight, origin: 'ZZZ' }))).toBeUndefined();
+    expect(journeyDurationLabel(item('ticket', { ...flight, ends_at: '07:00' }))).toBeUndefined();
+    expect(journeyDurationLabel(item('booking', flight))).toBeUndefined();
   });
 });
 

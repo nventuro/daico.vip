@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { TripItem, TripTransport } from '../../lib/offline/specs';
+import { instantIn } from '../../utils/dateUtils';
 import {
   AIRPORT_MATCHES_MAX,
   airportAfterTyping,
@@ -8,6 +9,7 @@ import {
   airportMatches,
   airportOptionText,
   airportOptionValue,
+  airportZone,
   allAirports,
   ownAirports,
   pickedAirportCode,
@@ -31,6 +33,8 @@ function pasaje(
     transport,
     origin: from,
     destination: to,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     done: false,
@@ -51,6 +55,18 @@ describe('the bundled list', () => {
       expect(label.trim()).toBe(label);
       expect(label).not.toBe('');
     }
+  });
+
+  it('gives most airports a zone the runtime knows, and none it does not list', () => {
+    const codes = allAirports().map(([code]) => code);
+    const zoned = codes.filter((code) => airportZone(code) !== null);
+    expect(zoned.length).toBeGreaterThan(codes.length * 0.8);
+    for (const zone of new Set(zoned.map(airportZone))) {
+      expect(instantIn('2026-01-01', '00:00', zone ?? '')).not.toBeNull();
+    }
+    expect(airportZone('EZE')).toBe('America/Argentina/Buenos_Aires');
+    expect(airportZone('MAD')).toBe('Europe/Madrid');
+    expect(airportZone('ZZZ')).toBeNull();
   });
 });
 

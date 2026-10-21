@@ -24,6 +24,8 @@ const ITEM: TripItem = {
   transport: null,
   origin: null,
   destination: null,
+  origin_time_zone: null,
+  destination_time_zone: null,
   carry_on_bags: null,
   checked_bags: null,
   done: false,

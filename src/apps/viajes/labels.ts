@@ -14,6 +14,7 @@ import {
 } from '../../utils/dateUtils';
 import { countLabel } from '../../utils/textUtils';
 import { airportLabel } from './airports';
+import { journeyMinutes, type Journey } from './duration';
 import { isFlight } from './kinds';
 
 /** What each class is called: the word its control offers and its chip states. */
@@ -170,6 +171,23 @@ function journeyLines(item: ItemLine, today: string): string[] {
     placeLabel(item, item.destination),
   ]);
   return [departure, arrival].filter((line) => line !== undefined);
+}
+
+const MINUTES_PER_HOUR = 60;
+
+/** A length of time as a row and a page say it: «12 h 10 min», «2 h»,
+ *  «45 min». */
+export function durationLabel(minutes: number): string {
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  const rest = minutes % MINUTES_PER_HOUR;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/** How long a pasaje takes, in words; nothing while it cannot be told. */
+export function journeyDurationLabel(journey: Journey): string | undefined {
+  const minutes = journeyMinutes(journey);
+  return minutes === null ? undefined : durationLabel(minutes);
 }
 
 /** How long an alojamiento is for: «12 → 19 sep · 7 noches». */

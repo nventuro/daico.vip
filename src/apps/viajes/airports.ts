@@ -1,6 +1,6 @@
 import type { TripItem } from '../../lib/offline/specs';
 import { normalize } from '../../utils/textUtils';
-import { AIRPORT_LINES } from './airportList';
+import { AIRPORT_LINES, AIRPORT_ZONES } from './airportList';
 import { isFlight } from './kinds';
 
 /** How long an IATA code is, and so how much of a line of the list is one. */
@@ -76,6 +76,23 @@ function airports(): Airports {
   });
   parsed = { list, byCode: new Map(list.map((airport) => [airport.code, airport])) };
   return parsed;
+}
+
+let zones: ReadonlyMap<string, string> | null = null;
+
+/** The time zone an airport's clocks keep, by its code; null for an airport
+ *  whose zone the list does not know. The zones are read the first time one
+ *  is asked for, like the airports. */
+export function airportZone(code: string): string | null {
+  if (!zones) {
+    const byCode = new Map<string, string>();
+    for (const line of AIRPORT_ZONES.split('\n')) {
+      const [zone, ...codes] = line.split(' ');
+      for (const airport of codes) byCode.set(airport, zone);
+    }
+    zones = byCode;
+  }
+  return zones.get(code) ?? null;
 }
 
 /** Every airport the list knows, as its code and what it is called. */

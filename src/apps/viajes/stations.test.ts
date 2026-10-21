@@ -20,6 +20,8 @@ function row(
     transport,
     origin,
     destination,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     done: false,

@@ -92,6 +92,8 @@ const ITEM = z.object({
   transport: z.enum(TRANSPORTS).nullable(),
   origin: z.string().nullable(),
   destination: z.string().nullable(),
+  origin_time_zone: z.string().nullable(),
+  destination_time_zone: z.string().nullable(),
   carry_on_bags: z.number().int().nullable(),
   checked_bags: z.number().int().nullable(),
   comments: z.string().nullable(),
@@ -219,6 +221,11 @@ fields.
   Trains and buses: the station or terminal name exactly as printed, in
   full — "London St Pancras International", not "London". If the email
   gives only the city, use the city.
+- origin_time_zone, destination_time_zone: for a train or bus, the IANA
+  time zone of the city where it leaves and of the city where it
+  arrives: "Europe/London" for London St Pancras International,
+  "Europe/Paris" for Paris Gare du Nord. null for a flight, for lodging
+  and booking, and for an end whose city you cannot tell.
 - carry_on_bags, checked_bags: the baggage allowance of a flight ticket,
   as the number of pieces each passenger may take — carry_on_bags in the
   cabin, checked_bags in the hold. A carry-on is the bag for the overhead
@@ -288,6 +295,8 @@ names were not:
         "transport": "train",
         "origin": "London St Pancras International",
         "destination": "Paris Gare du Nord",
+        "origin_time_zone": "Europe/London",
+        "destination_time_zone": "Europe/Paris",
         "carry_on_bags": null, "checked_bags": null,
         "comments": "Código QK7T2M · Coche 11 · Ana asiento 45 · Bruno asiento 46",
         "boarding_pass_files": [{ "file": 1, "pages": [1] }, { "file": 1, "pages": [2] }],
@@ -299,6 +308,7 @@ is not a boarding pass:
     "on_date": "2026-09-12", "at_time": "08:40",
     "ends_on": "2026-09-12", "ends_at": "11:05",
     "transport": "flight", "origin": "AEP", "destination": "BRC",
+    "origin_time_zone": null, "destination_time_zone": null,
     "carry_on_bags": 1, "checked_bags": 1,
     "comments": "Código QK7T2M · Ana 14A · Bruno 14B",
     "boarding_pass_files": [], "files": [1] }
@@ -313,6 +323,8 @@ details, with the ticket in the second file:
     "ends_on": null, "ends_at": null,
     "transport": "bus",
     "origin": "Terminal de Ómnibus de Bariloche", "destination": null,
+    "origin_time_zone": "America/Argentina/Salta",
+    "destination_time_zone": null,
     "carry_on_bags": null, "checked_bags": null,
     "comments": "Butaca 12",
     "boarding_pass_files": [{ "file": 2, "pages": [1] }], "files": [] }
@@ -322,6 +334,7 @@ A stay — dates only:
     "on_date": "2026-09-12", "at_time": null,
     "ends_on": "2026-09-19", "ends_at": null,
     "transport": null, "origin": null, "destination": null,
+    "origin_time_zone": null, "destination_time_zone": null,
     "carry_on_bags": null, "checked_bags": null,
     "comments": "Reserva 88412 · Av. Costanera 2140",
     "boarding_pass_files": [], "files": [1] }
@@ -449,6 +462,8 @@ export interface InboxRow {
   transport: Transport | null;
   origin: string | null;
   destination: string | null;
+  origin_time_zone: string | null;
+  destination_time_zone: string | null;
   carry_on_bags: number | null;
   checked_bags: number | null;
   comments: string | null;
@@ -472,6 +487,7 @@ const SHAPES: Record<
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME = /^(\d{2}):(\d{2})$/;
 const AIRPORT_CODE = /^[a-z]{3}$/i;
+const TIME_ZONE = /^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/;
 
 // A value the model did not write as asked — or wrote as asked but of a day
 // or an hour there is not — is dropped rather than sent to the database,
@@ -514,6 +530,22 @@ function transportOf(kind: InboxKind, said: Transport | null): Transport | null 
 function placeOrNull(value: string | null, transport: Transport | null): string | null {
   if (transport === null) return null;
   return transport === 'flight' ? codeOrNull(value) : textOrNull(value, STATION_MAX_CHARS);
+}
+
+/** The time zone one end of a train or a bus is in, written as the
+ *  runtime knows one — an IANA name, never an offset, which knows nothing of
+ *  summer time; null for anything else, and for every end of a flight, whose
+ *  airport says it, or of what does not travel. */
+function zoneOrNull(value: string | null, transport: Transport | null): string | null {
+  if (transport === null || transport === 'flight') return null;
+  const name = value?.trim() ?? '';
+  if (!TIME_ZONE.test(name)) return null;
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: name });
+    return name;
+  } catch {
+    return null;
+  }
 }
 
 /** How many pieces of luggage of one kind a row is staged with: what the
@@ -597,6 +629,8 @@ export function rowsFromExtraction(
         transport,
         origin: placeOrNull(item.origin, transport),
         destination: placeOrNull(item.destination, transport),
+        origin_time_zone: zoneOrNull(item.origin_time_zone, transport),
+        destination_time_zone: zoneOrNull(item.destination_time_zone, transport),
         carry_on_bags: bagsOf(item.kind, transport, item.carry_on_bags),
         checked_bags: bagsOf(item.kind, transport, item.checked_bags),
         comments: textOrNull(item.comments, COMMENTS_MAX_CHARS),

@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { TripItem, TripTransport } from '../../lib/offline/specs';
 import type { ItemDatesValue } from './ItemDateFields';
@@ -17,6 +20,8 @@ function taken(transport: TripTransport, origin: string, destination: string): T
     transport,
     origin,
     destination,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     done: false,
@@ -34,8 +39,18 @@ vi.mock('./useTripItems', () => ({
 
 const { default: ItemDateFields } = await import('./ItemDateFields');
 
-function pasaje(overrides: Partial<ItemDatesValue>): string {
-  const fields: ItemDatesValue = {
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+let root: Root | null = null;
+
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  document.body.innerHTML = '';
+});
+
+function fieldsOf(overrides: Partial<ItemDatesValue>): ItemDatesValue {
+  return {
     on_date: null,
     at_time: null,
     ends_on: null,
@@ -43,11 +58,39 @@ function pasaje(overrides: Partial<ItemDatesValue>): string {
     transport: null,
     origin: null,
     destination: null,
+    origin_time_zone: null,
+    destination_time_zone: null,
     carry_on_bags: null,
     checked_bags: null,
     ...overrides,
   };
-  return renderToStaticMarkup(<ItemDateFields kind="ticket" fields={fields} onChange={vi.fn()} />);
+}
+
+function pasaje(overrides: Partial<ItemDatesValue>): string {
+  return renderToStaticMarkup(
+    <ItemDateFields kind="ticket" fields={fieldsOf(overrides)} onChange={vi.fn()} />,
+  );
+}
+
+/** The pasaje drawn to be written on, and its controls found by name. */
+function drawn(overrides: Partial<ItemDatesValue>, onChange: (patch: object) => void) {
+  const container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() =>
+    root!.render(<ItemDateFields kind="ticket" fields={fieldsOf(overrides)} onChange={onChange} />),
+  );
+  return (label: string) => container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+}
+
+/** Types `text` into a field, as a whole, and leaves it. */
+function typeInto(input: HTMLInputElement, text: string) {
+  act(() => {
+    input.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, text);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.blur());
 }
 
 /** Which of the transports is drawn as the chosen one. */
@@ -117,5 +160,41 @@ describe("a pasaje's controls", () => {
 
   it('takes one that does not say what it travels on for the usual one', () => {
     expect(pressed(pasaje({ transport: null }))).toEqual(['Avión']);
+  });
+
+  it('says how long it takes once both hours and both zones are known', () => {
+    const flight = {
+      transport: 'flight' as const,
+      origin: 'EZE',
+      destination: 'MAD',
+      on_date: '2026-11-14',
+      at_time: '13:25',
+      ends_on: '2026-11-15',
+      ends_at: '05:35',
+    };
+    const html = pasaje(flight);
+    expect(html).toContain('Duración');
+    expect(html).toContain('12 h 10 min');
+    expect(pasaje({ ...flight, ends_at: null })).not.toContain('Duración');
+    expect(pasaje({ ...flight, transport: 'train' })).not.toContain('Duración');
+  });
+
+  it('lets go of the zone of a station written over by hand, and keeps the other end’s', () => {
+    const onChange = vi.fn();
+    const field = drawn(
+      {
+        transport: 'train',
+        origin: 'London St Pancras International',
+        destination: 'Paris Gare du Nord',
+        origin_time_zone: 'Europe/London',
+        destination_time_zone: 'Europe/Paris',
+      },
+      onChange,
+    );
+    typeInto(field('Estación de salida'), 'Ebbsfleet International');
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({
+      origin: 'Ebbsfleet International',
+      origin_time_zone: null,
+    });
   });
 });

@@ -19,6 +19,8 @@ export interface TripItemFields {
   transport: TripTransport | null;
   origin: string | null;
   destination: string | null;
+  origin_time_zone: string | null;
+  destination_time_zone: string | null;
   carry_on_bags: number | null;
   checked_bags: number | null;
   comments: string | null;
@@ -41,6 +43,8 @@ export const NEW_TRIP_ITEM: TripItemFields = {
   transport: null,
   origin: null,
   destination: null,
+  origin_time_zone: null,
+  destination_time_zone: null,
   carry_on_bags: null,
   checked_bags: null,
   comments: null,
@@ -64,6 +68,8 @@ export function withKindFields(input: TripItemInput): TripItemInput {
     transport,
     origin: shape.route ? input.origin : null,
     destination: shape.route ? input.destination : null,
+    origin_time_zone: shape.route ? input.origin_time_zone : null,
+    destination_time_zone: shape.route ? input.destination_time_zone : null,
     carry_on_bags: flight ? input.carry_on_bags : null,
     checked_bags: flight ? input.checked_bags : null,
     done: shape.ticked ? input.done : false,

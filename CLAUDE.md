@@ -420,10 +420,10 @@ and what becomes of a forwarded email. These are the rules on top of it.
   line over the title, and never in the band, which is the shell's.
 - **The airports are every airport, bundled and never looked up.**
   `airportList.ts` is written by `npm run airports:generate` from the
-  OurAirports dataset — every open airport with an IATA code — and never
-  edited by hand. A lookup does not work offline, and a list picked by hand is
-  either a guess at where the household flies or a record of it, in a public
-  repository. An airport is called by its city, in the city's own name
+  OurAirports dataset — every open airport with an IATA code — with each
+  one's time zone from the mwgg/Airports dataset, and never edited by hand.
+  A lookup does not work offline, and a list picked by hand is either a guess
+  at where the household flies or a record of it, in a public repository. An airport is called by its city, in the city's own name
   («München») or the English one where the language is not written in the
   Latin alphabet («Tokyo»), and a parenthesis says only what tells it from
   another entry: the airport's name where its city has several, the country
@@ -434,6 +434,16 @@ and what becomes of a forwarded email. These are the rules on top of it.
   write two airports that read alike. A change to how a label is worked out
   comes with a test in `labels.test.mjs`, and the dataset is kept by
   volunteers, so a regenerated list's diff is read before it is kept.
+- **A pasaje's duration is worked out, never stored**: its two hours read
+  each in its own end's time zone (`journeyMinutes`), never subtracted as
+  written. A flight's zones are its airports' (`airportZone`, bundled with
+  the list); a train's or a bus's are `origin_time_zone` and
+  `destination_time_zone`, which only the email worker writes, an IANA name
+  the runtime knows and never an offset. A place changed by hand drops its
+  end's zone, and a pasaje missing an hour or a zone says no duration rather
+  than a guessed one. It stands at the end of the row's first line, in a
+  slot as wide on every row so the list lines up (`LinkRow`'s `titleEnd`),
+  and under Llegada on the page.
 - **An airport's field offers from the browser's own `<datalist>`, handed only
   what fits what is typed** (`airportMatches`) — never the whole list as
   options, and never a control of our own in its place. A browser hides an
